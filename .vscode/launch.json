@@ -1,0 +1,151 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Wire: dev cluster (local)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "${workspaceFolder}/scripts/wire-dev.sh up --profile core && ${workspaceFolder}/scripts/wire-dev.sh env && ${workspaceFolder}/scripts/wire-dev.sh status"
+    },
+    {
+      "name": "Wire: dev cluster (s3)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "${workspaceFolder}/scripts/wire-dev.sh up --profile s3 && ${workspaceFolder}/scripts/wire-dev.sh env --storage s3 && ${workspaceFolder}/scripts/wire-dev.sh status"
+    },
+    {
+      "name": "Debug: pytest (pipeline)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}/pipeline",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/pipeline/src"
+      },
+      "preLaunchTask": "install-deps",
+      "jinja": true
+    },
+    {
+      "name": "Debug: pytest (current file)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v"],
+      "cwd": "${workspaceFolder}/pipeline",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/pipeline/src"
+      },
+      "preLaunchTask": "install-deps",
+      "jinja": true
+    },
+    {
+      "name": "Debug: ingest_web (file)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "path_graph.steps.ingest_web",
+      "args": [
+        "--tenant",
+        "dev",
+        "--file",
+        "${workspaceFolder}/pipeline/dev/sample.txt"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "preLaunchTask": "debug-ready",
+      "jinja": true
+    },
+    {
+      "name": "Debug: ingest_web (file + RAG)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "path_graph.steps.ingest_web",
+      "args": [
+        "--tenant",
+        "dev",
+        "--file",
+        "${workspaceFolder}/pipeline/dev/sample.txt",
+        "--rag"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "preLaunchTask": "debug-ready",
+      "jinja": true
+    },
+    {
+      "name": "Debug: ingest_web (URL)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "path_graph.steps.ingest_web",
+      "args": ["--tenant", "dev", "--url", "https://example.com"],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "preLaunchTask": "debug-ready",
+      "jinja": true
+    },
+    {
+      "name": "Debug: ingest_web (file, S3 blob)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "path_graph.steps.ingest_web",
+      "args": [
+        "--tenant",
+        "dev",
+        "--file",
+        "${workspaceFolder}/pipeline/dev/sample.txt"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "preLaunchTask": "debug-ready-s3",
+      "jinja": true
+    },
+    {
+      "name": "Debug: ingest_sharepoint (dry-run)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "path_graph.steps.ingest_sharepoint",
+      "args": [
+        "--tenant",
+        "dev",
+        "--folder",
+        "회사규정",
+        "--dry-run"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "preLaunchTask": "debug-ready",
+      "jinja": true
+    },
+    {
+      "name": "Debug: ingest_sharepoint (collect + RAG)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "path_graph.steps.ingest_sharepoint",
+      "args": [
+        "--tenant",
+        "dev",
+        "--source-id",
+        "sharepoint:kms",
+        "--folder",
+        "회사규정",
+        "--batch-id",
+        "debug",
+        "--rag"
+      ],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "envFile": "${workspaceFolder}/.env.dev.local",
+      "preLaunchTask": "debug-ready",
+      "jinja": true
+    }
+  ]
+}

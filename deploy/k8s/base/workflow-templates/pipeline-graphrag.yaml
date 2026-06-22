@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-graphrag
+  namespace: path-graph
+spec:
+  entrypoint: graphrag
+  arguments:
+    parameters:
+      - name: tenant
+      - name: batch_id
+      - name: chunks_key
+  synchronization:
+    semaphore:
+      configMapKeyRef:
+        name: path-graph-limits
+        key: agent-invoke
+  templates:
+    - name: graphrag
+      steps:
+        - - name: run-graphrag
+            template: graphrag-step
+    - name: graphrag-step
+      container:
+        image: path-graph-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            from path_graph.steps.graphrag_pipeline import run_graphrag_pipeline
+            import os, json
+            result = run_graphrag_pipeline(
+                os.environ["TENANT"],
+                os.environ["BATCH_ID"],
+                os.environ["CHUNKS_KEY"],
+                os.environ.get("SESSION_ID", "graphrag-session"),
+                skip_agent=os.environ.get("SKIP_AGENT", "0") == "1",
+            )
+            print(json.dumps({
+                "community_count": sum(c.get("community_count", 0) for c in result["communities"]),
+                "wiki_count": len(result["wiki"].get("communities", [])),
+            }))
+        env:
+          - name: TENANT
+            value: "{{workflow.parameters.tenant}}"
+          - name: BATCH_ID
+            value: "{{workflow.parameters.batch_id}}"
+          - name: CHUNKS_KEY
+            value: "{{workflow.parameters.chunks_key}}"
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+        resources:
+          limits:
+            memory: 4Gi
+      activeDeadlineSeconds: 1800

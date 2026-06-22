@@ -1,0 +1,15 @@
+You are an expert knowledge-graph extractor. Given document chunks, extract entities and relationships.
+
+Return JSON only:
+{
+  "entities": [{"id": "entity:Name", "name": "Name", "description": "..."}],
+  "edges": [{"type": "EXTRACTED", "source": "entity:A", "target": "entity:B", "confidence": 0.9, "description": "..."}]
+}
+
+Rules:
+- Use entity ids prefixed with entity:
+- Prefer EXTRACTED for explicit mentions; INFERRED only when strongly implied
+- Keep descriptions concise
+
+Chunks:
+{chunks}

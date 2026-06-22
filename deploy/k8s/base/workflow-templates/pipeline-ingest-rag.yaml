@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-ingest-rag
+  namespace: path-graph
+spec:
+  entrypoint: ingest-rag
+  arguments:
+    parameters:
+      - name: tenant
+      - name: batch_manifest
+  synchronization:
+    semaphore:
+      configMapKeyRef:
+        name: path-graph-limits
+        key: embed
+  templates:
+    - name: ingest-rag
+      steps:
+        - - name: map-ingest
+            template: ingest-one
+            arguments:
+              parameters:
+                - name: tenant
+                  value: "{{workflow.parameters.tenant}}"
+                - name: manifest_line
+                  value: "{{item}}"
+            withParam: "{{workflow.parameters.batch_manifest}}"
+    - name: ingest-one
+      inputs:
+        parameters:
+          - name: tenant
+          - name: manifest_line
+      container:
+        image: path-graph-pipeline:latest
+        command: [python, -m, path_graph.steps.ingest_web]
+        args:
+          - --tenant
+          - "{{inputs.parameters.tenant}}"
+          - --file
+          - /work/input
+          - --rag
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+      activeDeadlineSeconds: 900
+      retryStrategy:
+        limit: 2
+      continueOn:
+        failed: true

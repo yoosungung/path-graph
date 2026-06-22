@@ -1,0 +1,60 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "install-deps",
+      "type": "shell",
+      "command": "make install",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "wire-dev-up",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/wire-dev.sh up --profile core && ${workspaceFolder}/scripts/wire-dev.sh env",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "wire-dev-up-s3",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/wire-dev.sh up --profile s3 && ${workspaceFolder}/scripts/wire-dev.sh env --storage s3",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "wire-dev-down",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/wire-dev.sh down",
+      "problemMatcher": []
+    },
+    {
+      "label": "wire-dev-status",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/wire-dev.sh status",
+      "problemMatcher": []
+    },
+    {
+      "label": "debug-ready",
+      "dependsOn": ["install-deps", "wire-dev-up"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "debug-ready-s3",
+      "dependsOn": ["install-deps", "wire-dev-up-s3"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ]
+}

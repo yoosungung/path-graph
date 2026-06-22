@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: path-graph
+  labels:
+    app.kubernetes.io/name: path-graph
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: path-graph-pipeline
+  namespace: path-graph
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: path-graph-limits
+  namespace: path-graph
+data:
+  agent-invoke: "8"
+  parse-hwp: "4"
+  embed: "16"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: path-graph-artifact-repositories
+  namespace: path-graph
+data:
+  default-v1: |
+    s3:
+      bucket: path-graph
+      endpoint: garage-s3.runtime.svc.cluster.local:3900
+      insecure: true
+      accessKeySecret:
+        name: s3-creds
+        key: accessKey
+      secretKeySecret:
+        name: s3-creds
+        key: secretKey

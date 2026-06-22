@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-wiki
+  namespace: path-graph
+spec:
+  entrypoint: wiki
+  arguments:
+    parameters:
+      - name: tenant
+      - name: batch_id
+      - name: chunks_key
+  synchronization:
+    semaphore:
+      configMapKeyRef:
+        name: path-graph-limits
+        key: agent-invoke
+  templates:
+    - name: wiki
+      container:
+        image: path-graph-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            from path_graph.steps.wiki_pipeline import run_wiki_pipeline_legacy
+            import os
+            run_wiki_pipeline_legacy(
+                os.environ["TENANT"],
+                os.environ["BATCH_ID"],
+                os.environ["CHUNKS_KEY"],
+                os.environ.get("SESSION_ID", "wiki-session"),
+                skip_agent=os.environ.get("SKIP_AGENT", "0") == "1",
+            )
+        env:
+          - name: TENANT
+            value: "{{workflow.parameters.tenant}}"
+          - name: BATCH_ID
+            value: "{{workflow.parameters.batch_id}}"
+          - name: CHUNKS_KEY
+            value: "{{workflow.parameters.chunks_key}}"
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+        resources:
+          limits:
+            memory: 2Gi
+      activeDeadlineSeconds: 900
