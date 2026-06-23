@@ -319,8 +319,8 @@ python -m path_graph.steps.ingest_sharepoint --tenant dev --folder 회사규정 
 python -m path_graph.steps.ingest_gdrive --tenant dev --folder-path MyFolder --dry-run
 python -m path_graph.steps.ingest_onedrive --tenant dev --folder Documents --dry-run
 
-# docker
-docker build -f pipeline/Dockerfile -t path-graph-pipeline:latest .
+# 컨테이너 이미지 — GitHub Actions → GHCR (로컬 docker 빌드 없음)
+#   git push && make build-images
 ```
 
 Local env: [`scripts/wire-dev.sh`](../scripts/wire-dev.sh) `env` 또는 [`.env.dev.local.example`](../.env.dev.local.example)

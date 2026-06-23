@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: path-graph-artifact-repositories
+  namespace: path-graph
+  labels:
+    app.kubernetes.io/name: path-graph
+data:
+  default-v1: |
+    s3:
+      bucket: path-graph
+      endpoint: garage-s3.runtime.svc.cluster.local:3900
+      insecure: true
+      accessKeySecret:
+        name: s3-creds
+        key: S3_ACCESS_KEY_ID
+      secretKeySecret:
+        name: s3-creds
+        key: S3_SECRET_ACCESS_KEY

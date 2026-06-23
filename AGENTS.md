@@ -40,4 +40,4 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline 패키지(v0.1.0) · deploy/k8s · agents 스켈레ton · `make test` (61 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · GHA `build-images` → GHCR · `make k8s-apply-dev` · `make test` (61 tests).

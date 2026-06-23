@@ -4,6 +4,13 @@ metadata:
   name: pipeline-graph
   namespace: path-graph
 spec:
+  serviceAccountName: path-graph-pipeline
+  imagePullSecrets:
+    - name: registry-creds
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: path-graph
+      app.kubernetes.io/component: pipeline
   entrypoint: graph
   arguments:
     parameters:
@@ -18,7 +25,8 @@ spec:
   templates:
     - name: graph
       container:
-        image: path-graph-pipeline:latest
+        image: path-graph/pipeline:latest
+        imagePullPolicy: Always
         command: [python, -c]
         args:
           - |

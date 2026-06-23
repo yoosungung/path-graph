@@ -4,6 +4,13 @@ metadata:
   name: pipeline-ingest-rag
   namespace: path-graph
 spec:
+  serviceAccountName: path-graph-pipeline
+  imagePullSecrets:
+    - name: registry-creds
+  podMetadata:
+    labels:
+      app.kubernetes.io/name: path-graph
+      app.kubernetes.io/component: pipeline
   entrypoint: ingest-rag
   arguments:
     parameters:
@@ -32,7 +39,8 @@ spec:
           - name: tenant
           - name: manifest_line
       container:
-        image: path-graph-pipeline:latest
+        image: path-graph/pipeline:latest
+        imagePullPolicy: Always
         command: [python, -m, path_graph.steps.ingest_web]
         args:
           - --tenant

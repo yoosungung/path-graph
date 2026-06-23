@@ -1,0 +1,61 @@
+# Egress allowlist for pipeline Workflow Pods (deploy/DESIGN.md).
+# k3s/flannel may not enforce NetworkPolicy; manifest is contract for CNI-ready clusters.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: path-graph-pipeline-egress
+  namespace: path-graph
+  labels:
+    app.kubernetes.io/name: path-graph
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: pipeline
+  policyTypes:
+    - Egress
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # agents-runtime: Garage, PG, Envoy
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: runtime
+      ports:
+        - protocol: TCP
+          port: 3900
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8080
+    # test_infra: Qdrant, Nebula
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: qdrant
+      ports:
+        - protocol: TCP
+          port: 6333
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nebula
+      ports:
+        - protocol: TCP
+          port: 9669
+    # llm-serving: TEI embed
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: llm-serving
+      ports:
+        - protocol: TCP
+          port: 8080

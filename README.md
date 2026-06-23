@@ -17,10 +17,10 @@
 
 | ✅ 로컬 CLI | ⏳ 미완 (→ [ROADMAP.md](ROADMAP.md)) |
 |-------------|--------------------------------------|
-| web / file / SharePoint / GDrive / OneDrive ingest | Argo controller 설치·WF E2E |
-| parse → chunk → (선택) RAG | manifest ↔ WorkflowTemplate 정합 |
-| `wire-dev.sh` port-forward | RLS policy, `pipeline_runs` 전 단계 기록 |
-| GraphRAG·Wiki 코드 + WF YAML (클러스터 미검증) | agents LangGraph 본구현 |
+| web / file / SharePoint / GDrive / OneDrive ingest | manifest ↔ WorkflowTemplate 정합 (2.4.1) |
+| parse → chunk → (선택) RAG | RLS policy, `pipeline_runs` 전 단계 기록 |
+| `wire-dev.sh` port-forward | WF E2E on cluster (이미지 import 후) |
+| `make bootstrap-k8s` — Argo + k8s base | agents LangGraph 본구현 |
 
 ## 아키텍처 (한 장)
 
@@ -85,6 +85,11 @@ python -m path_graph.steps.ingest_onedrive --tenant dev --folder Documents --dry
 ```
 
 K8s 배포: [deploy/SETUP.md](deploy/SETUP.md)
+
+```bash
+git push origin main && make build-images   # GHCR 이미지 (로컬 docker 없음)
+make k8s-apply-dev                          # dev overlay apply
+```
 
 ## VS Code 디버그
 

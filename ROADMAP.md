@@ -13,8 +13,8 @@
 | pipeline 패키지 | v0.1.0, `make test` **61 tests** (2026-06) |
 | 로컬 ingest | CLI로 **web / local file / SharePoint / GDrive / OneDrive** → parse → chunk → (선택) RAG |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward 가능 (`wire-dev.sh`) |
-| Argo Workflows | **컨트롤러 미설치** (CRD·Pod 없음) |
-| `path-graph` NS / WorkflowTemplate | **미 apply** (`deploy/k8s/base` YAML만 존재) |
+| Argo Workflows | `argo` NS — `make argo-install` |
+| `path-graph` NS / WorkflowTemplate | **applied** — `make bootstrap-k8s` |
 | agents | graph-extractor / wiki-synthesizer **스켈레ton** (invoke 연동 테스트는 pipeline mock 위주) |
 
 ---
@@ -63,13 +63,13 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 1.4.1 | `namespace.yaml` | [x] | |
-| 1.4.2 | WorkflowTemplate `pipeline-ingest-rag` | [~] | YAML 있음; **collect step·manifest 입력 형식 미정합** |
-| 1.4.3 | ServiceAccount · NetworkPolicy | [ ] | [deploy/DESIGN.md](deploy/DESIGN.md)에만 기술 |
-| 1.4.4 | ConfigMap `path-graph-limits` (semaphore) | [ ] | WF YAML이 참조하나 **kustomization 미포함** |
-| 1.4.5 | Secret `path-graph-env` / PG·S3 참조 | [ ] | SETUP.md 수동 |
-| 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [~] | `pipeline/Dockerfile` 있음; 레지스트리·CI 미연결 |
-| 1.4.7 | **Argo Workflows controller** 설치 | [ ] | test_infra 또는 Helm — [deploy/SETUP.md](deploy/SETUP.md) 전제 |
-| 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [ ] | |
+| 1.4.2 | WorkflowTemplate `pipeline-ingest-rag` | [~] | YAML + SA; **collect step·manifest 입력 형식 미정합** |
+| 1.4.3 | ServiceAccount · NetworkPolicy | [x] | `serviceaccount.yaml`, `networkpolicy.yaml` |
+| 1.4.4 | ConfigMap `path-graph-limits` (semaphore) | [x] | `configmap-limits.yaml` |
+| 1.4.5 | Secret `path-graph-env` / PG·S3 참조 | [x] | `create-path-graph-secrets.sh` |
+| 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [x] | GHA `build-images.yml` + dev overlay GHCR |
+| 1.4.7 | **Argo Workflows controller** 설치 | [x] | `install-argo.sh` + `deploy/k8s/argo/values.yaml` |
+| 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [~] | `workflow-validate` + bootstrap; WF E2E는 2.4.1 |
 | 1.4.9 | CronWorkflow / 이벤트 트리거 | [ ] | ARCHITECTURE: batch 단위 cron |
 
 ### 1.5 Agents (MVP 스켈레ton)
@@ -187,7 +187,7 @@
 | ID | 주제 | 선택지 / 메모 |
 |---|---|---|
 | D1 | Argo controller **설치 주체** | test_infra Helm vs path-graph deploy 문서만 |
-| D2 | pipeline 이미지 **레지스트리** | dev cluster in-cluster build vs GHCR |
+| D2 | pipeline 이미지 **레지스트리** | **GHCR** — GHA `workflow_dispatch` + release (`make build-images`) |
 | D3 | PDF 구조화 | md→blocks 후처리 vs Docling vs Azure DI |
 | D4 | 로컬 embed | TEI port-forward vs 로컬 mock vs cluster-only RAG |
 | D5 | 회사규정 ingest **주기** | SharePoint cron 주기·delta vs full scan |

@@ -21,7 +21,7 @@ def build_ingest_rag_template():
     ) as wt:
         Container(
             name="ingest-rag",
-            image="path-graph-pipeline:latest",
+            image="ghcr.io/yoosungung/path-graph/pipeline:latest",
             command=["python", "-m", "path_graph.steps.ingest_web"],
             args=["--tenant", "{{workflow.parameters.tenant}}", "--rag"],
         )

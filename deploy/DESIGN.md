@@ -6,55 +6,42 @@ path-graph 파이프라인 **워크로드만** 배포한다. Qdrant·Nebula는 [
 
 ```
 deploy/
-  k8s/base/
-    namespace.yaml                    # [x] kustomization 포함
-    serviceaccount.yaml               # [ ] ROADMAP 1.4.3 — 미작성
-    configmap-limits.yaml             # [ ] ROADMAP 1.4.4 — WF가 참조하나 미포함
-    workflow-templates/
-      pipeline-ingest-rag.yaml        # [x]
-      pipeline-graph.yaml             # [x]
-      pipeline-wiki.yaml              # [x]
-      pipeline-graphrag.yaml          # [x]
+  k8s/
+    argo/
+      values.yaml
+    base/                             # WorkflowTemplate·SA·ConfigMap
+    overlays/
+      dev/                            # GHCR image + :latest
 ```
 
-## Namespace
+## 컨테이너 이미지 (GitHub Actions → GHCR)
 
-- **`path-graph` 단독** — Argo WorkflowTemplate·pipeline SA·ConfigMap은 `runtime` NS와 co-locate하지 않는다.
-- Workflow Pod는 cross-namespace egress(NetworkPolicy)로 `runtime`(Garage, PG, Envoy), `qdrant`, `nebula`에만 접근한다. NetworkPolicy 매니페스트는 ROADMAP 1.4.3.
+워크플로: [`.github/workflows/build-images.yml`](../.github/workflows/build-images.yml)
 
-## Secrets (외부 참조)
+| 트리거 | 용도 |
+|--------|------|
+| `workflow_dispatch` | dev 배포용 — **push 후** `make build-images` |
+| Release **published** | 태그 릴리스와 함께 빌드 |
 
-| Secret | 소유 | 용도 |
-|---|---|---|
-| `path-graph-env` (또는 분리) | 수동 / overlay | pipeline Pod env — [SETUP.md](SETUP.md) |
-| `path-graph-pg-dsn` | agents-runtime overlay 또는 수동 | `PATH_GRAPH_DSN` |
-| `qdrant-api-key` | test_infra | Qdrant |
-| `nebula-auth` | test_infra | Graph |
-| `pipeline-jwt` | admin | agent invoke |
-| `s3-creds` | agents-runtime `runtime` NS | Garage artifact |
+태그: `ghcr.io/yoosungung/path-graph/pipeline:latest` 및 `:<git-sha>`
 
-## NetworkPolicy (요약)
-
-pipeline SA egress (ROADMAP 1.4.3 구현 시):
-
-- `garage-s3.runtime.svc:3900`
-- `postgres.runtime.svc:5432`
-- `qdrant.qdrant.svc:6333`
-- `nebula-graphd-svc.nebula.svc:9669`
-- Envoy `runtime` NS `:8080` (로컬 wire-dev는 `:8084`)
-- `bge-m3-tei.llm-serving.svc:8080` — embedding TEI (`/v1/embeddings`)
-
-## Argo
-
-- WorkflowTemplate은 `deploy/k8s/base/workflow-templates/`에 YAML 정본
-- Hera 생성물은 `pipeline/workflows/` — drift 시 YAML 우선
-- Controller 설치: test_infra Helm 또는 별도 — [SETUP.md](SETUP.md), ROADMAP 1.4.7
+```bash
+git push origin main
+make build-images
+gh run list --workflow=build-images.yml --limit=3
+make k8s-apply-dev
+```
 
 ## Commands
 
 ```bash
-make workflow-validate   # kubectl apply --dry-run=client
-kubectl apply -k deploy/k8s/base
+make test
+make kustomize-build
+make workflow-validate
+make argo-install
+make build-images          # GHA workflow_dispatch
+make k8s-apply-dev         # dev overlay + secrets + registry-creds
+make bootstrap-k8s         # argo-install + k8s-apply-dev
 ```
 
 상세: [SETUP.md](SETUP.md)
