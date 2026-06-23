@@ -41,13 +41,14 @@ spec:
       container:
         image: path-graph/pipeline:latest
         imagePullPolicy: Always
-        command: [python, -m, path_graph.steps.ingest_web]
+        command: [python, -m, path_graph.steps.ingest_manifest]
         args:
           - --tenant
           - "{{inputs.parameters.tenant}}"
-          - --file
-          - /work/input
           - --rag
+        env:
+          - name: MANIFEST_LINE
+            value: "{{inputs.parameters.manifest_line}}"
         envFrom:
           - secretRef:
               name: path-graph-env

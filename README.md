@@ -20,7 +20,8 @@
 | web / file / SharePoint / GDrive / OneDrive ingest | manifest ↔ WorkflowTemplate 정합 (2.4.1) |
 | parse → chunk → (선택) RAG | RLS policy, `pipeline_runs` 전 단계 기록 |
 | `wire-dev.sh` port-forward | WF E2E on cluster (이미지 import 후) |
-| `make bootstrap-k8s` — Argo + k8s base | agents LangGraph 본구현 |
+| `make bootstrap-k8s` | Argo + secrets + dev overlay |
+| `./scripts/submit-ingest-rag-e2e.sh` | WF E2E (manifest line → ingest) |
 
 ## 아키텍처 (한 장)
 

@@ -28,11 +28,11 @@ collect / ingest_web
 | `ids.py` | `document_id`, `chunk_id` (UUIDv5) |
 | `config.py` | env → `Settings` |
 
-### 알려진 갭 (ROADMAP 2.4.1)
+### ingest manifest (Argo WF)
 
-- **코드**: `BatchManifestLine` JSONL → `ingest_item(meta)` ([ARCHITECTURE §2.6](../ARCHITECTURE.md#26-공통-json-스키마))
-- **WF**: `pipeline-ingest-rag.yaml`은 `ingest_web --file` 가정 — manifest line JSON 미소비
-- **정합 작업**: dedicated `ingest_manifest` step 또는 WF args 수정
+- **`steps/ingest_manifest.py`** — `BatchManifestLine` JSON 한 줄 → `ingest_item` ([ARCHITECTURE §2.6](../ARCHITECTURE.md#26-공통-json-스키마))
+- **`ingest_helpers.parse_manifest_line`** — `document_id` 보강
+- **WF**: `pipeline-ingest-rag` — `MANIFEST_LINE` env + `withParam` `batch_manifest` JSON 배열
 
 ---
 

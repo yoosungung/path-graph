@@ -42,6 +42,12 @@ make k8s-apply-dev    # WorkflowTemplate image :latest 반영
 PIPELINE_AGENT_ACCESS_TOKEN=... ./scripts/create-path-graph-secrets.sh
 ```
 
+## Submit ingest-rag
+
+```bash
+./scripts/submit-ingest-rag-e2e.sh   # S3 fixture + Argo withParam E2E
+```
+
 ## Troubleshooting
 
 | 증상 | 조치 |

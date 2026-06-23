@@ -1,13 +1,29 @@
 from __future__ import annotations
 
+import json
 import sys
+from typing import Any
 
 from path_graph.config import get_settings
+from path_graph.contracts.schemas import BatchManifestLine
 from path_graph.contracts.s3_keys import s3_key_raw
+from path_graph.ids import document_id
 from path_graph.meta.pg import PgMetaStore
 from path_graph.steps.ingest import ParseError, ingest_raw_bytes
 from path_graph.steps.rag_index import index_rag_for_document
 from path_graph.storage.blob import make_blob_store
+
+
+def parse_manifest_line(raw: str | dict[str, Any], *, tenant: str | None = None) -> dict[str, Any]:
+    """Parse BatchManifestLine JSON (manifest.jsonl one line) into ingest meta dict."""
+    data = json.loads(raw) if isinstance(raw, str) else dict(raw)
+    t = (tenant or data.get("tenant") or "").strip()
+    if not t:
+        raise ValueError("tenant is required")
+    line = BatchManifestLine.model_validate({**data, "tenant": t})
+    meta = line.model_dump(exclude_none=True)
+    meta["document_id"] = data.get("document_id") or document_id(t, meta["content_hash"])
+    return meta
 
 
 def load_raw_for(tenant: str, meta: dict) -> bytes:
