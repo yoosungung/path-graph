@@ -9,3 +9,21 @@ images:
   - name: path-graph/pipeline
     newName: ghcr.io/yoosungung/path-graph/pipeline
     newTag: latest
+patches:
+  - patch: |-
+      - op: replace
+        path: /data/default-v1
+        value: |
+          s3:
+            bucket: runtime-bundles
+            endpoint: garage-s3.runtime.svc.cluster.local:3900
+            insecure: true
+            accessKeySecret:
+              name: s3-creds
+              key: S3_ACCESS_KEY_ID
+            secretKeySecret:
+              name: s3-creds
+              key: S3_SECRET_ACCESS_KEY
+    target:
+      kind: ConfigMap
+      name: path-graph-artifact-repositories

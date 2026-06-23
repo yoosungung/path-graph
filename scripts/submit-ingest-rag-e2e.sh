@@ -20,12 +20,16 @@ if [[ ! -x "$PY" ]]; then
   exit 1
 fi
 
-for cmd in kubectl argo; do
+for cmd in kubectl; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "error: $cmd not found" >&2
     exit 1
   }
 done
+HAS_ARGO=false
+if command -v argo >/dev/null 2>&1; then
+  HAS_ARGO=true
+fi
 
 kubectl -n "$NS" get secret path-graph-env >/dev/null 2>&1 || {
   echo "error: path-graph-env missing — run make k8s-apply-dev" >&2
@@ -82,9 +86,37 @@ PY
 )"
 
 echo "Submitting ingest-rag for tenant=${TENANT} (1 manifest line)..."
-argo submit -n "$NS" --from workflowtemplate/pipeline-ingest-rag \
-  -p "tenant=${TENANT}" \
-  -p "batch_manifest=${BATCH_JSON}" \
-  --wait
+if [[ "$HAS_ARGO" == true ]]; then
+  argo submit -n "$NS" --from workflowtemplate/pipeline-ingest-rag \
+    -p "tenant=${TENANT}" \
+    -p "batch_manifest=${BATCH_JSON}" \
+    --wait
+else
+  WF_NAME="$(kubectl create -f - -o jsonpath='{.metadata.name}' <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ingest-rag-e2e-
+  namespace: ${NS}
+spec:
+  workflowTemplateRef:
+    name: pipeline-ingest-rag
+  arguments:
+    parameters:
+      - name: tenant
+        value: ${TENANT}
+      - name: batch_manifest
+        value: '${BATCH_JSON}'
+EOF
+)"
+  echo "Workflow ${WF_NAME} — waiting for completion..."
+  kubectl -n "$NS" wait "workflow/${WF_NAME}" --for=condition=Completed --timeout=15m
+  phase="$(kubectl -n "$NS" get "workflow/${WF_NAME}" -o jsonpath='{.status.phase}')"
+  if [[ "$phase" != "Succeeded" ]]; then
+    echo "workflow failed: ${phase}" >&2
+    kubectl -n "$NS" get "workflow/${WF_NAME}" -o yaml | tail -40
+    exit 1
+  fi
+fi
 
 echo "E2E workflow succeeded."

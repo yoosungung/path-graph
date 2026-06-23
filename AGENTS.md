@@ -40,4 +40,4 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · GHA `build-images` → GHCR · `make test` (65 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · GHA `build-images` → GHCR · `make test` (66 tests).

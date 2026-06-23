@@ -50,7 +50,8 @@ PG_DSN="$(b64dec "$PG_DSN_RAW" | sed 's/postgresql+asyncpg/postgresql/')"
 S3_ENDPOINT="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_ENDPOINT_URL}')")"
 S3_ACCESS="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_ACCESS_KEY_ID}')")"
 S3_SECRET="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_SECRET_ACCESS_KEY}')")"
-S3_BUCKET="${PATH_GRAPH_S3_BUCKET:-path-graph}"
+S3_BUCKET_RUNTIME="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_BUCKET}')")"
+S3_BUCKET="${PATH_GRAPH_S3_BUCKET:-$S3_BUCKET_RUNTIME}"
 
 QDRANT_KEY="$(b64dec "$(kubectl -n "$QDRANT_NS" get secret qdrant-apikey -o jsonpath='{.data.api-key}')")"
 

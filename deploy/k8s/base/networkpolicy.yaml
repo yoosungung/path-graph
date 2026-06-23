@@ -59,3 +59,10 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Kubernetes API (Argo workflow executor task results)
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

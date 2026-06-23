@@ -3,6 +3,7 @@ import json
 import pytest
 
 from path_graph.collectors.remote import collect_local_file
+from path_graph.config import get_settings
 from path_graph.ids import document_id
 from path_graph.steps.ingest_helpers import parse_manifest_line
 from path_graph.steps.ingest_manifest import main as ingest_manifest_main
@@ -86,4 +87,7 @@ def test_ingest_manifest_reads_manifest_line_env(local_store, monkeypatch):
 def local_store(tmp_path, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     monkeypatch.setenv("PIPELINE_STORAGE_DIR", str(tmp_path))
-    return tmp_path
+    monkeypatch.delenv("PATH_GRAPH_DSN", raising=False)
+    get_settings.cache_clear()
+    yield tmp_path
+    get_settings.cache_clear()
