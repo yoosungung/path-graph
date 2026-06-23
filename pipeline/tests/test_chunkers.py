@@ -12,6 +12,23 @@ def test_chunk_markdown_splits():
     assert chunks[0].document_id == document_id("t1", h)
 
 
+def test_oversized_single_paragraph_splits():
+    text = "a" * 2500
+    h = "deadbeef"
+    chunks = chunk_from_markdown(text, "t1", h, max_chars=1000)
+    assert len(chunks) == 3
+    assert all(len(c.text) <= 1000 for c in chunks)
+
+
+def test_table_like_markdown_splits_without_double_newline():
+    lines = [f"| row {i} | data |" for i in range(80)]
+    text = "title\n" + "\n".join(lines)
+    h = "cafebabe"
+    chunks = chunk_from_markdown(text, "t1", h, max_chars=1000)
+    assert len(chunks) >= 2
+    assert all(len(c.text) <= 1000 for c in chunks)
+
+
 def test_wikilink_extract():
     text = "See [[Page A]] and [[Page B]] and [[Page A]]"
     links = extract_wikilinks(text)

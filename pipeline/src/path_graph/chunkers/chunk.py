@@ -7,17 +7,48 @@ from path_graph.contracts.schemas import ChunkRecord
 from path_graph.ids import chunk_id, document_id, sha256_text
 
 
+def _split_oversized(text: str, max_chars: int) -> list[str]:
+    """Hard-split text longer than max_chars (prefer line/word boundaries)."""
+    if len(text) <= max_chars:
+        return [text]
+    parts: list[str] = []
+    rest = text
+    while rest:
+        if len(rest) <= max_chars:
+            parts.append(rest.strip())
+            break
+        window = rest[:max_chars]
+        cut = window.rfind("\n")
+        if cut < max_chars // 3:
+            cut = window.rfind(" ")
+        if cut < max_chars // 3:
+            cut = max_chars
+        piece = rest[:cut].strip()
+        if piece:
+            parts.append(piece)
+        rest = rest[cut:].lstrip()
+    return [p for p in parts if p]
+
+
 def chunk_from_markdown(
     text: str,
     tenant: str,
     content_hash: str,
     *,
-    max_chars: int = 1500,
+    max_chars: int = 1000,
 ) -> list[ChunkRecord]:
     doc_id = document_id(tenant, content_hash)
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     if not paragraphs:
-        paragraphs = [text] if text.strip() else []
+        paragraphs = [text.strip()] if text.strip() else []
+
+    expanded: list[str] = []
+    for para in paragraphs:
+        if len(para) > max_chars:
+            expanded.extend(_split_oversized(para, max_chars))
+        else:
+            expanded.append(para)
+
     chunks: list[ChunkRecord] = []
     buf: list[str] = []
     size = 0
@@ -45,16 +76,42 @@ def chunk_from_markdown(
         buf = []
         size = 0
 
-    for para in paragraphs:
-        if size + len(para) > max_chars and buf:
+    for piece in expanded:
+        piece_len = len(piece)
+        if piece_len > max_chars:
+            if buf:
+                flush()
+            for sub in _split_oversized(piece, max_chars):
+                chunks.append(
+                    ChunkRecord(
+                        chunk_id=chunk_id(tenant, doc_id, idx, sha256_text(sub)),
+                        document_id=doc_id,
+                        tenant=tenant,
+                        chunk_index=idx,
+                        text=sub,
+                        text_hash=sha256_text(sub),
+                        heading_path=[],
+                        source_block_type="paragraph",
+                    )
+                )
+                idx += 1
+            continue
+        join_overhead = 2 if buf else 0
+        if size + join_overhead + piece_len > max_chars and buf:
             flush()
-        buf.append(para)
-        size += len(para)
+        buf.append(piece)
+        size += piece_len + (2 if len(buf) > 1 else 0)
     flush()
     return chunks
 
 
-def chunk_from_rhwp_json(doc: dict[str, Any], tenant: str, content_hash: str) -> list[ChunkRecord]:
+def chunk_from_rhwp_json(
+    doc: dict[str, Any],
+    tenant: str,
+    content_hash: str,
+    *,
+    max_chars: int = 1000,
+) -> list[ChunkRecord]:
     doc_id = document_id(tenant, content_hash)
     blocks = doc.get("blocks") or []
     chunks: list[ChunkRecord] = []
@@ -66,21 +123,22 @@ def chunk_from_rhwp_json(doc: dict[str, Any], tenant: str, content_hash: str) ->
             text = json.dumps(block.get("rows") or [], ensure_ascii=False)
         if not str(text).strip():
             continue
-        body = str(text)
-        th = sha256_text(body)
-        chunks.append(
-            ChunkRecord(
-                chunk_id=chunk_id(tenant, doc_id, idx, th),
-                document_id=doc_id,
-                tenant=tenant,
-                chunk_index=idx,
-                text=body,
-                text_hash=th,
-                heading_path=list(block.get("heading_path") or []),
-                source_block_type=btype,
+        heading_path = list(block.get("heading_path") or [])
+        for body in _split_oversized(str(text).strip(), max_chars):
+            th = sha256_text(body)
+            chunks.append(
+                ChunkRecord(
+                    chunk_id=chunk_id(tenant, doc_id, idx, th),
+                    document_id=doc_id,
+                    tenant=tenant,
+                    chunk_index=idx,
+                    text=body,
+                    text_hash=th,
+                    heading_path=heading_path,
+                    source_block_type=btype,
+                )
             )
-        )
-        idx += 1
+            idx += 1
     return chunks
 
 

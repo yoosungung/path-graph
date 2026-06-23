@@ -1,33 +1,201 @@
 # ROADMAP.md
 
-[ARCHITECTURE.md](ARCHITECTURE.md) 계약을 구현하는 순서. 미결정은 여기에만 둔다.
+[ARCHITECTURE.md](ARCHITECTURE.md) 계약을 **어떤 순서로**, **어디까지** 구현할지 적는다. 불변 규칙·스키마 형태는 ARCHITECTURE / DESIGN에 두고, 여기서는 **진행 상태·갭·다음 작업**만 관리한다.
 
-## Phase 1 — MVP
+**상태 표기**: `[x]` 완료 · `[~]` 부분(코드만 / 미배포 / 미검증) · `[ ]` 미착수
 
-- [x] ARCHITECTURE.md §1 계약
-- [x] pipeline 패키지·계약 테스트
-- [x] ingest: web collect → parse → chunk → storage
-- [x] RAG: embed → Qdrant + PG 메타
-- [x] Hera `pipeline-ingest-rag` WorkflowTemplate
-- [x] deploy/k8s 스켈레ton (NS, SA, limits, workflow templates)
-- [x] agents/graph-extractor, wiki-synthesizer 스켈레ton
+---
 
-## Phase 2 — fan-out·수집기
+## 현황 스냅샷
 
-- [x] Graph deterministic + agent + Nebula
-- [x] Wiki synthesis workflow
-- [x] GDrive / OneDrive / SharePoint / agent-chat collectors (OAuth + Graph/Drive API)
+| 항목 | 상태 |
+|---|---|
+| pipeline 패키지 | v0.1.0, `make test` **61 tests** (2026-06) |
+| 로컬 ingest | CLI로 **web / local file / SharePoint / GDrive / OneDrive** → parse → chunk → (선택) RAG |
+| k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward 가능 (`wire-dev.sh`) |
+| Argo Workflows | **컨트롤러 미설치** (CRD·Pod 없음) |
+| `path-graph` NS / WorkflowTemplate | **미 apply** (`deploy/k8s/base` YAML만 존재) |
+| agents | graph-extractor / wiki-synthesizer **스켈레ton** (invoke 연동 테스트는 pipeline mock 위주) |
+
+---
+
+## Phase 1 — MVP (ingest + RAG)
+
+목표: 단일 tenant에서 **수집 → 파싱 → 청킹 → 벡터 인덱스**까지 end-to-end. 개발 경로는 **CLI 우선**, Argo는 템플릿까지.
+
+### 1.1 계약·코어 pipeline
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 1.1.1 | ARCHITECTURE §1 계약 문서화 | [x] | |
+| 1.1.2 | `tenant` / `document_id` / `chunk_id` 멱등 식별자 | [x] | `ids.py`, 계약 테스트 |
+| 1.1.3 | S3 key layout (`raw|parsed|chunks|batches|…`) | [x] | `contracts/s3_keys.py` |
+| 1.1.4 | Blob store (local + S3/Garage) | [x] | `PIPELINE_STORAGE_BACKEND` |
+| 1.1.5 | parse → chunk → meta 적재 | [x] | markitdown + rhwp-batch |
+| 1.1.6 | `CHUNK_MAX_CHARS` (기본 1000) + 긴 문단 hard-split | [x] | embed context 안전 |
+| 1.1.7 | dead-letter (parse 실패 격리) | [x] | S3 + PG `dead_letter` |
+| 1.1.8 | PG `path_graph.*` 스키마·마이그레이션 | [~] | 테이블·RLS **enable**만; **POLICY 미정의** |
+| 1.1.9 | `pipeline_runs` / ingest_state **전 단계 기록** | [~] | 테이블 있음; **RAG·DLQ만 write**, graph/wiki 커서·run 미연동 |
+| 1.1.10 | RLS 정책 (`tenant = current_setting('app.tenant')`) | [ ] | ARCHITECTURE §1 요구 |
+| 1.1.11 | document **compensation** (재처리 시 Qdrant/Nebula 삭제) | [ ] | ARCHITECTURE §1 보상 규칙 |
+
+### 1.2 RAG
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 1.2.1 | TEI OpenAI-compatible embed (`bge-m3`, dim 1024) | [x] | `rag/embed.py` |
+| 1.2.2 | Qdrant upsert (tenant×project shard) | [x] | |
+| 1.2.3 | PG `chunks` + `document_ingest_state.rag_at` | [x] | |
+| 1.2.4 | 로컬 RAG E2E (`ingest_web --rag`) | [~] | `EMBEDDING_BASE_URL` k8s 내부 주소 — 로컬은 port-forward 또는 URL override 필요 |
+| 1.2.5 | embed 실패 재시도·배치 (`EMBEDDING_BATCH_SIZE`) | [x] | |
+
+### 1.3 CLI · 개발 UX
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 1.3.1 | `ingest_web` (url / file) | [x] | |
+| 1.3.2 | `wire-dev.sh` (PG·Qdrant·Nebula·Envoy PF) | [x] | Argo 미포함 |
+| 1.3.3 | VS Code launch (ingest, pytest, sharepoint dry-run) | [x] | |
+| 1.3.4 | `make install` editable wheel (hatch `only-packages`) | [x] | |
+
+### 1.4 K8s · Argo (MVP 배포)
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 1.4.1 | `namespace.yaml` | [x] | |
+| 1.4.2 | WorkflowTemplate `pipeline-ingest-rag` | [~] | YAML 있음; **collect step·manifest 입력 형식 미정합** |
+| 1.4.3 | ServiceAccount · NetworkPolicy | [ ] | [deploy/DESIGN.md](deploy/DESIGN.md)에만 기술 |
+| 1.4.4 | ConfigMap `path-graph-limits` (semaphore) | [ ] | WF YAML이 참조하나 **kustomization 미포함** |
+| 1.4.5 | Secret `path-graph-env` / PG·S3 참조 | [ ] | SETUP.md 수동 |
+| 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [~] | `pipeline/Dockerfile` 있음; 레지스트리·CI 미연결 |
+| 1.4.7 | **Argo Workflows controller** 설치 | [ ] | test_infra 또는 Helm — [deploy/SETUP.md](deploy/SETUP.md) 전제 |
+| 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [ ] | |
+| 1.4.9 | CronWorkflow / 이벤트 트리거 | [ ] | ARCHITECTURE: batch 단위 cron |
+
+### 1.5 Agents (MVP 스켈레ton)
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 1.5.1 | graph-extractor / wiki-synthesizer 패키지 | [x] | `agents/` |
+| 1.5.2 | `POST /v1/agents/invoke` payload 계약 | [x] | ARCHITECTURE §2.5 |
+| 1.5.3 | pipeline `agent_invoke.py` (동기 invoke + retry) | [x] | async suspend는 Phase 3 |
+
+---
+
+## Phase 2 — fan-out · 수집기 · Graph/Wiki
+
+목표: **mini-batch manifest** → map ingest → Graph → Wiki. 수집기로 SharePoint 등 자동 유입.
+
+### 2.1 수집기 (collectors)
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 2.1.1 | web / local file | [x] | `collectors/web`, `ingest_web` |
+| 2.1.2 | SharePoint (Graph: app/delegated/device) | [x] | `ingest_sharepoint` |
+| 2.1.3 | Google Drive (OAuth refresh) | [x] | `ingest_gdrive` |
+| 2.1.4 | OneDrive (`/me/drive`) | [x] | `ingest_onedrive` |
+| 2.1.5 | agent-chat JSON export | [x] | `AgentChatCollector` |
+| 2.1.6 | `batches/{tenant}/{batch_id}/manifest.jsonl` writer | [x] | collect CLI가 생성 |
+| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [ ] | |
+| 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [ ] | |
+
+### 2.2 Graph pipeline
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 2.2.1 | wikilink deterministic extract | [x] | `graph_pipeline.py` |
+| 2.2.2 | graph-extractor agent invoke | [x] | |
+| 2.2.3 | Nebula upsert (project shard) | [x] | |
+| 2.2.4 | `partition_chunks_by_project` | [x] | |
+| 2.2.5 | WorkflowTemplate `pipeline-graph` | [~] | YAML only |
+
+### 2.3 Wiki pipeline
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 2.3.1 | wiki-synthesizer invoke | [x] | |
+| 2.3.2 | wiki page → S3 + PG | [x] | |
+| 2.3.3 | WorkflowTemplate `pipeline-wiki` | [~] | YAML only |
+
+### 2.4 배치 오케스트레이션 갭
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 2.4.1 | manifest 한 줄 스키마 ↔ ingest step 입력 정합 | [~] | WF는 `--file` 가정; manifest line JSON 미소비 |
+| 2.4.2 | 단일 Workflow + `withParam` map (batch 100) | [~] | 템플릿 골격; **미실행 검증** |
+| 2.4.3 | tenant별 `parallelism` + semaphore | [~] | DESIGN 기본값; ConfigMap 없음 |
+| 2.4.4 | parse 실패 `continueOn` 배치 격리 | [x] | ingest-rag WF |
+
+---
 
 ## Phase 3 — 하이브리드 GraphRAG 고도화
 
-- [x] Graph-based Community Detection 모듈 구현 (NetworkX 등을 통한 Leiden Clustering)
-- [x] Community Metadata & Report 구조 설계 (S3 및 PostgreSQL 적재)
-- [ ] Graph-enhanced Wiki Synthesizer 에이전트 프롬프트 최적화 (MS GraphRAG 템플릿 이식)
-- [x] Graph-to-Wiki synthesis 오케스트레이션 파이프라인 (Argo Workflow 및 pipeline steps 연계)
-- [ ] agents-runtime VFS wiki mount
-- [ ] Agent async suspend/resume (agents-runtime job API)
-- [ ] RRF hybrid (PG BM25 + Qdrant)
+목표: Community 기반 GraphRAG + 검색 품질·운영성.
+
+### 3.1 Community · GraphRAG
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 3.1.1 | Leiden community detection | [x] | `community_detector.py` |
+| 3.1.2 | community metadata → S3/PG | [x] | |
+| 3.1.3 | graph_context artifact | [x] | |
+| 3.1.4 | `graphrag_pipeline` / WF `pipeline-graphrag` | [~] | 코드+YAML; E2E on cluster 미검증 |
+| 3.1.5 | Graph-enhanced Wiki **프롬프트** (MS GraphRAG 템플릿) | [ ] | |
+
+### 3.2 agents-runtime 연동
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 3.2.1 | VFS wiki mount | [ ] | agents-runtime 측 |
+| 3.2.2 | async job API + Argo **suspend/resume** | [ ] | Phase 1은 extended sync poll |
+
+### 3.3 검색 · 파싱 고도화
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 3.3.1 | **RRF hybrid** (PG BM25 + Qdrant) | [ ] | |
+| 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리 또는 Docling) | [ ] | HWP만 `content.json` |
+| 3.3.3 | ingest 검색 API / retrieval CLI | [ ] | |
+
+---
+
+## 권장 실행 순서 (다음 4 sprint)
+
+아래는 **의존성·리스크** 기준 권장 순서. 번호는 ROADMAP # 참조.
+
+1. **운영 기반** — 1.4.7 Argo 설치 → 1.4.3–1.4.5 → 1.4.8 → 1.4.6 이미지
+2. **배치 ingest 실동** — 2.4.1 manifest→ingest step → 2.4.2 WF E2E → 2.1.8 SharePoint cron (회사규정)
+3. **PG 완성** — 1.1.10 RLS policy → 1.1.9 pipeline_runs 연동 → 1.1.11 compensation
+4. **품질** — 3.3.2 blocks JSON (표 많은 PDF) → 3.3.1 RRF → 3.1.5 wiki 프롬프트
+
+---
+
+## 외부 의존 (path-graph가 설치하지 않음)
+
+| 컴포넌트 | 소유 | path-graph 소비 |
+|---|---|---|
+| Garage, runtime PG, Envoy | agents-runtime | wire-dev / Secret |
+| Qdrant, Nebula | test_infra | |
+| Argo Workflows controller | test_infra 또는 별도 Helm | SETUP.md |
+| TEI `bge-m3` | llm-serving NS | `EMBEDDING_BASE_URL` |
+| rhwp-batch 이미지 | rhwp_batch | HWP parse |
+
+---
 
 ## 미결정
 
-_(없음)_
+| ID | 주제 | 선택지 / 메모 |
+|---|---|---|
+| D1 | Argo controller **설치 주체** | test_infra Helm vs path-graph deploy 문서만 |
+| D2 | pipeline 이미지 **레지스트리** | dev cluster in-cluster build vs GHCR |
+| D3 | PDF 구조화 | md→blocks 후처리 vs Docling vs Azure DI |
+| D4 | 로컬 embed | TEI port-forward vs 로컬 mock vs cluster-only RAG |
+| D5 | 회사규정 ingest **주기** | SharePoint cron 주기·delta vs full scan |
+
+---
+
+## 완료 시 갱신 규칙
+
+- Phase 항목 상태 변경 시 이 파일만 수정 (ARCHITECTURE 계약 변경은 ARCHITECTURE 먼저).
+- 테스트 수·주요 CLI 변경 시 [AGENTS.md](AGENTS.md) §3 Status 한 줄 동기화.
+- 새 컴포넌트 코드 디렉터리 추가 시 [AGENTS.md](AGENTS.md) §1 표 검토.

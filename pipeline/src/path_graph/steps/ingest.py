@@ -47,11 +47,15 @@ def ingest_raw_bytes(
     if rhwp_doc is not None:
         parsed_key = s3_key_parsed_json(tenant, doc_id)
         store.put_bytes(parsed_key, parsed_text.encode("utf-8"))
-        chunks = chunk_from_rhwp_json(rhwp_doc, tenant, content_hash)
+        chunks = chunk_from_rhwp_json(
+            rhwp_doc, tenant, content_hash, max_chars=settings.chunk_max_chars
+        )
     else:
         parsed_key = s3_key_parsed_md(tenant, doc_id)
         store.put_bytes(parsed_key, parsed_text.encode("utf-8"))
-        chunks = chunk_from_markdown(parsed_text, tenant, content_hash)
+        chunks = chunk_from_markdown(
+            parsed_text, tenant, content_hash, max_chars=settings.chunk_max_chars
+        )
 
     meta_key = s3_key_parsed_meta(tenant, doc_id)
     store.put_bytes(

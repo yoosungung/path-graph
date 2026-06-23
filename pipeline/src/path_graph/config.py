@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     embedding_timeout: float = 120.0  # EMBEDDING_TIMEOUT
     embedding_batch_size: int = 8  # EMBEDDING_BATCH_SIZE — TEI CPU backend max
 
+    chunk_max_chars: int = 1000  # CHUNK_MAX_CHARS — embed context (~1k tokens) safe limit
+
     community_max_cluster_size: int = 10  # COMMUNITY_MAX_CLUSTER_SIZE
     community_use_lcc: bool = True  # COMMUNITY_USE_LCC
     community_seed: int = 0xDEADBEEF  # COMMUNITY_SEED
