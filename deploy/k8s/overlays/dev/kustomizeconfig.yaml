@@ -1,0 +1,4 @@
+images:
+  - group: argoproj.io
+    kind: WorkflowTemplate
+    path: spec/templates/container/image
