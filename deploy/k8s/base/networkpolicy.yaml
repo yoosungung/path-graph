@@ -59,10 +59,20 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # Kubernetes API (Argo workflow executor task results)
+    # Cluster Service CIDR (k3s default 10.43.0.0/16) — NP namespaceSelector does not match ClusterIP
     - to:
         - ipBlock:
             cidr: 10.43.0.0/16
       ports:
+        - protocol: TCP
+          port: 3900
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6333
+        - protocol: TCP
+          port: 9669
+        - protocol: TCP
+          port: 8080
         - protocol: TCP
           port: 443

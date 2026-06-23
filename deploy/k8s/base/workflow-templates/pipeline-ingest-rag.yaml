@@ -7,15 +7,13 @@ spec:
   serviceAccountName: path-graph-pipeline
   imagePullSecrets:
     - name: registry-creds
-  podMetadata:
-    labels:
-      app.kubernetes.io/name: path-graph
-      app.kubernetes.io/component: pipeline
   entrypoint: ingest-rag
   arguments:
     parameters:
       - name: tenant
       - name: batch_manifest
+      - name: rag
+        value: "true"
   synchronization:
     semaphore:
       configMapKeyRef:
@@ -41,14 +39,20 @@ spec:
       container:
         image: path-graph/pipeline:latest
         imagePullPolicy: Always
-        command: [python, -m, path_graph.steps.ingest_manifest]
+        command: [sh, -c]
         args:
-          - --tenant
-          - "{{inputs.parameters.tenant}}"
-          - --rag
+          - |
+            set -eu
+            rag_flag=""
+            if [ "$RAG" = "true" ]; then rag_flag="--rag"; fi
+            exec python -m path_graph.steps.ingest_manifest --tenant "$TENANT" $rag_flag
         env:
+          - name: TENANT
+            value: "{{inputs.parameters.tenant}}"
           - name: MANIFEST_LINE
             value: "{{inputs.parameters.manifest_line}}"
+          - name: RAG
+            value: "{{workflow.parameters.rag}}"
         envFrom:
           - secretRef:
               name: path-graph-env

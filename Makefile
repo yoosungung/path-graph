@@ -88,6 +88,7 @@ _bootstrap-registry-secret:
 k8s-apply-dev: ensure-registry-secret
 	./scripts/create-path-graph-secrets.sh
 	kubectl apply -k deploy/k8s/overlays/dev
+	./scripts/patch-runtime-ingress-for-path-graph.sh
 
 bootstrap-k8s: argo-install k8s-apply-dev
 	@echo "Bootstrap complete (images: make build-images after git push)"

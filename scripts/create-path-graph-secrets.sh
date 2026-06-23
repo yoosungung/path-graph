@@ -44,7 +44,10 @@ kubectl get secret s3-creds -n "$RUNTIME_NS" -o yaml \
   | grep -v '^\s*creationTimestamp:' \
   | kubectl apply -f -
 
-PG_DSN_RAW="$(kubectl -n "$RUNTIME_NS" get secret postgres-credentials -o jsonpath='{.data.POSTGRES_DSN}')"
+PG_DSN_RAW="$(kubectl -n "$RUNTIME_NS" get secret postgres-credentials -o jsonpath='{.data.POSTGRES_DIRECT_DSN}')"
+if [[ -z "$PG_DSN_RAW" ]]; then
+  PG_DSN_RAW="$(kubectl -n "$RUNTIME_NS" get secret postgres-credentials -o jsonpath='{.data.POSTGRES_DSN}')"
+fi
 PG_DSN="$(b64dec "$PG_DSN_RAW" | sed 's/postgresql+asyncpg/postgresql/')"
 
 S3_ENDPOINT="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_ENDPOINT_URL}')")"

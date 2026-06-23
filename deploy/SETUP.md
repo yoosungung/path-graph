@@ -31,7 +31,8 @@ gh release create v0.1.1 --title "v0.1.1" --target main
 ```bash
 make bootstrap-k8s    # 최초: Argo + secrets + dev overlay
 # 이후 이미지 갱신 후:
-make k8s-apply-dev    # WorkflowTemplate image :latest 반영
+make k8s-apply-dev    # secrets + dev overlay + runtime NP patch
+./scripts/patch-runtime-ingress-for-path-graph.sh   # k8s-apply-dev에 포함
 ```
 
 ## Secrets

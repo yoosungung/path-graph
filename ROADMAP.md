@@ -122,7 +122,7 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 2.4.1 | manifest 한 줄 스키마 ↔ ingest step 입력 정합 | [x] | `ingest_manifest.py` + WF `MANIFEST_LINE` |
-| 2.4.2 | 단일 Workflow + `withParam` map (batch 100) | [~] | `submit-ingest-rag-e2e.sh` — 클러스터 검증 |
+| 2.4.2 | 단일 Workflow + `withParam` map (batch 100) | [~] | ingest E2E OK (`submit-ingest-rag-e2e.sh`); Argo wait→API NP 잔여 |
 | 2.4.3 | tenant별 `parallelism` + semaphore | [~] | DESIGN 기본값; ConfigMap 없음 |
 | 2.4.4 | parse 실패 `continueOn` 배치 격리 | [x] | ingest-rag WF |
 

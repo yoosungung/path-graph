@@ -7,10 +7,6 @@ spec:
   serviceAccountName: path-graph-pipeline
   imagePullSecrets:
     - name: registry-creds
-  podMetadata:
-    labels:
-      app.kubernetes.io/name: path-graph
-      app.kubernetes.io/component: pipeline
   entrypoint: graphrag
   arguments:
     parameters:

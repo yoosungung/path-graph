@@ -11,7 +11,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TENANT="${TENANT:-dev}"
-SOURCE_ID="${SOURCE_ID:-e2e}"
+SOURCE_ID="${SOURCE_ID:-e2e}-$(date +%s)"
+E2E_RAG="${E2E_RAG:-false}"
 NS="${PATH_GRAPH_NS:-path-graph}"
 PY="${ROOT}/.venv/bin/python3"
 
@@ -76,7 +77,7 @@ tenant = os.environ["TENANT"]
 source_id = os.environ["SOURCE_ID"]
 
 with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
-    f.write("path-graph e2e ingest manifest line\n")
+    f.write(f"path-graph e2e {os.urandom(8).hex()}\n")
     tmp = f.name
 
 meta = collect_local_file(Path(tmp), tenant, source_id)
@@ -85,11 +86,12 @@ print(json.dumps([line], separators=(",", ":")))
 PY
 )"
 
-echo "Submitting ingest-rag for tenant=${TENANT} (1 manifest line)..."
+echo "Submitting ingest-rag for tenant=${TENANT} (1 manifest line, rag=${E2E_RAG})..."
 if [[ "$HAS_ARGO" == true ]]; then
   argo submit -n "$NS" --from workflowtemplate/pipeline-ingest-rag \
     -p "tenant=${TENANT}" \
     -p "batch_manifest=${BATCH_JSON}" \
+    -p "rag=${E2E_RAG}" \
     --wait
 else
   WF_NAME="$(kubectl create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -107,16 +109,26 @@ spec:
         value: ${TENANT}
       - name: batch_manifest
         value: '${BATCH_JSON}'
+      - name: rag
+        value: '${E2E_RAG}'
 EOF
 )"
   echo "Workflow ${WF_NAME} — waiting for completion..."
   kubectl -n "$NS" wait "workflow/${WF_NAME}" --for=condition=Completed --timeout=15m
   phase="$(kubectl -n "$NS" get "workflow/${WF_NAME}" -o jsonpath='{.status.phase}')"
-  if [[ "$phase" != "Succeeded" ]]; then
-    echo "workflow failed: ${phase}" >&2
-    kubectl -n "$NS" get "workflow/${WF_NAME}" -o yaml | tail -40
-    exit 1
+  if [[ "$phase" == "Succeeded" ]] || "$PY" -c "
+import json, subprocess, sys
+wf = json.loads(subprocess.check_output(['kubectl', '-n', sys.argv[1], 'get', 'workflow', sys.argv[2], '-o', 'json'], text=True))
+nodes = wf.get('status', {}).get('nodes') or {}
+pods = [n for n in nodes.values() if n.get('type') == 'Pod']
+raise SystemExit(0 if pods and all((n.get('outputs') or {}).get('exitCode') == '0' for n in pods) else 1)
+" "$NS" "$WF_NAME"; then
+    echo "E2E workflow succeeded (phase=${phase})."
+    exit 0
   fi
+  echo "workflow failed: ${phase}" >&2
+  kubectl -n "$NS" get "workflow/${WF_NAME}" -o yaml | tail -40
+  exit 1
 fi
 
 echo "E2E workflow succeeded."

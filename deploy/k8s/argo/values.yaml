@@ -11,10 +11,6 @@ controller:
   workflowDefaults:
     spec:
       serviceAccountName: path-graph-pipeline
-      podMetadata:
-        labels:
-          app.kubernetes.io/name: path-graph
-          app.kubernetes.io/component: pipeline
 
 server:
   enabled: true
