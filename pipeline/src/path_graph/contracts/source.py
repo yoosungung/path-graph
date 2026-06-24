@@ -12,6 +12,7 @@ class SourceDriver(StrEnum):
     SHAREPOINT = "sharepoint"
     GDRIVE = "gdrive"
     ONEDRIVE = "onedrive"
+    MANUAL = "manual"
 
 
 class SourceProfile(BaseModel):

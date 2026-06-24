@@ -40,4 +40,4 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console MVP (`path_graph.admin`, agents-runtime `/api/pipeline/*` + `/pipeline/*`) · GHA `build-images` → GHCR · `make test` (82 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console MVP (`path_graph.admin`, agents-runtime `/api/pipeline/*` + `/pipeline/*`) · GHA `build-images` → GHCR · `make test` (91 tests).

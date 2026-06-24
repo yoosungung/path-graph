@@ -83,7 +83,7 @@ class GDriveCollector:
             data, filename, mime = self._client.download_file(
                 item["id"], item.get("mimeType", ""), item.get("name", "file")
             )
-            metas.append(_store_raw(data, filename, tenant, source_id, mime))
+            metas.append(store_raw(data, filename, tenant, source_id, mime))
         return metas
 
     def collect_file(self, file_id: str, tenant: str, source_id: str) -> dict[str, Any]:
@@ -91,7 +91,7 @@ class GDriveCollector:
         data, filename, mime = self._client.download_file(
             meta["id"], meta.get("mimeType", ""), meta.get("name", "file")
         )
-        return _store_raw(data, filename, tenant, source_id, mime)
+        return store_raw(data, filename, tenant, source_id, mime)
 
     def write_batch_manifest(self, tenant: str, batch_id: str, items: list[dict[str, Any]]) -> str:
         return write_batch_manifest(tenant, batch_id, items, self._settings)
@@ -149,7 +149,7 @@ class OneDriveCollector:
             name = item.get("name", "")
             mime = item.get("file", {}).get("mimeType", "application/octet-stream")
             data = self._client.download_item(item["id"])
-            metas.append(_store_raw(data, name, tenant, source_id, mime))
+            metas.append(store_raw(data, name, tenant, source_id, mime))
         return metas
 
     def collect_file(self, item_id: str, tenant: str, source_id: str) -> dict[str, Any]:
@@ -157,7 +157,7 @@ class OneDriveCollector:
         name = meta.get("name", "file")
         mime = meta.get("file", {}).get("mimeType", "application/octet-stream")
         data = self._client.download_item(item_id)
-        return _store_raw(data, name, tenant, source_id, mime)
+        return store_raw(data, name, tenant, source_id, mime)
 
     def write_batch_manifest(self, tenant: str, batch_id: str, items: list[dict[str, Any]]) -> str:
         return write_batch_manifest(tenant, batch_id, items, self._settings)
@@ -168,7 +168,7 @@ class AgentChatCollector:
 
     def collect_json(self, export_path: Path, tenant: str, source_id: str) -> dict[str, Any]:
         data = export_path.read_bytes()
-        return _store_raw(data, "conversation.json", tenant, source_id, "application/json")
+        return store_raw(data, "conversation.json", tenant, source_id, "application/json")
 
 
 class SharePointCollector:
@@ -253,7 +253,7 @@ class SharePointCollector:
             name = item.get("name", "")
             mime = item.get("file", {}).get("mimeType", "application/octet-stream")
             data = self._client.download_item(drive_id, item["id"])
-            metas.append(_store_raw(data, name, tenant, source_id, mime))
+            metas.append(store_raw(data, name, tenant, source_id, mime))
         return metas
 
     def write_batch_manifest(self, tenant: str, batch_id: str, items: list[dict[str, Any]]) -> str:
@@ -305,17 +305,19 @@ def _filter_gdrive_extensions(items: list[dict[str, Any]], ext_set: set[str]) ->
     return filtered
 
 
-def _store_raw(
+def store_raw(
     data: bytes,
     filename: str,
     tenant: str,
     source_id: str,
     mime: str,
+    *,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     content_hash = sha256_bytes(data)
     doc_id = document_id(tenant, content_hash)
     key = s3_key_raw(tenant, source_id, content_hash, filename)
-    store = make_blob_store(get_settings())
+    store = make_blob_store(settings or get_settings())
     uri = store.put_bytes(key, data, skip_if_exists=True)
     return {
         "tenant": tenant,
@@ -331,9 +333,9 @@ def _store_raw(
 def collect_web(url: str, tenant: str, source_id: str = "web") -> dict[str, Any]:
     data, mime = fetch_url(url)
     filename = filename_from_url(url)
-    return _store_raw(data, filename, tenant, source_id, mime)
+    return store_raw(data, filename, tenant, source_id, mime)
 
 
 def collect_local_file(path: Path, tenant: str, source_id: str) -> dict[str, Any]:
     data = path.read_bytes()
-    return _store_raw(data, path.name, tenant, source_id, "application/octet-stream")
+    return store_raw(data, path.name, tenant, source_id, "application/octet-stream")

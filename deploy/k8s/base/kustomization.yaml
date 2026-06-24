@@ -9,6 +9,7 @@ labels:
 resources:
   - namespace.yaml
   - serviceaccount.yaml
+  - backend-pipeline-rbac.yaml
   - configmap-limits.yaml
   - configmap-artifact-repositories.yaml
   - networkpolicy.yaml

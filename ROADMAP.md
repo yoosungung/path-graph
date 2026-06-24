@@ -10,7 +10,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **61 tests** (2026-06) |
+| pipeline 패키지 | v0.1.0, `make test` **91 tests** (2026-06) |
 | 로컬 ingest | CLI로 **web / local file / SharePoint / GDrive / OneDrive** → parse → chunk → (선택) RAG |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward 가능 (`wire-dev.sh`) |
 | Argo Workflows | `argo` NS — `make argo-install` |
@@ -70,7 +70,7 @@
 | 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [x] | GHA `build-images.yml` + dev overlay GHCR |
 | 1.4.7 | **Argo Workflows controller** 설치 | [x] | `install-argo.sh` + `deploy/k8s/argo/values.yaml` |
 | 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [~] | `workflow-validate` + bootstrap; WF E2E는 2.4.1 |
-| 1.4.9 | CronWorkflow / 이벤트 트리거 | [ ] | ARCHITECTURE: batch 단위 cron |
+| 1.4.9 | CronWorkflow / 이벤트 트리거 | [x] | Console `schedule_cron` → `pg-cron-{tenant}-{source}` |
 
 ### 1.5 Agents (MVP 스켈레ton)
 
@@ -205,6 +205,7 @@
 | 4.1.3 | Run now → collect → Argo `pipeline-ingest-rag` | [x] | BFF가 manifest jsonl → JSON 배열 submit (MVP) |
 | 4.1.4 | Runs / dead-letter 조회 | [x] | `pipeline_runs`, `documents.ingest_state=dead_letter` |
 | 4.1.5 | `require_admin` 가드 전 API | [x] | agents-runtime `UserRole.ADMIN` |
+| 4.1.6 | Manual raw upload / ingest / documents API | [x] | `driver=manual`, multipart upload, pending ingest |
 
 ### 4.2 Frontend (`/pipeline/*`)
 
@@ -214,6 +215,7 @@
 | 4.2.2 | OAuth 마법사 (SharePoint/GDrive) | [x] | `source_credentials` + K8s Secret; `/api/pipeline/credentials/*/oauth/start` |
 | 4.2.3 | Run now + Runs 테이블 | [x] | Run now → 202 + `pipeline-collect-ingest-rag` WF |
 | 4.2.4 | `<RequireAdmin />` 라우트 가드 | [x] | `RequireRole min="admin"` |
+| 4.2.5 | Manual source UI (upload + documents + ingest) | [x] | `FileDropZone` multi, pending ingest |
 
 ### 4.3 오케스트레이션
 
@@ -221,7 +223,7 @@
 |---|---|---|---|
 | 4.3.1 | WF `batch_manifest_key` (S3 manifest 경로) | [x] | `load_batch_manifest` step; inline JSON legacy |
 | 4.3.2 | `pipeline-collect-ingest-rag` WorkflowTemplate | [x] | BFF Run now 202 + collect→ingest chain |
-| 4.3.3 | CronWorkflow per source (Console에서 스케줄) | [ ] | ROADMAP 1.4.9 |
+| 4.3.3 | CronWorkflow per source (Console에서 스케줄) | [x] | BFF reconcile on create/update/delete |
 
 ---
 

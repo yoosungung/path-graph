@@ -113,6 +113,12 @@ def probe_source(profile: SourceProfile, *, settings: Settings | None = None) ->
             folder=cfg.get("folder"),
             recursive=cfg.get("recursive", True),
         )
+    elif profile.driver == SourceDriver.MANUAL:
+        from path_graph.admin.uploads import list_documents_for_source
+
+        docs = list_documents_for_source(profile.tenant, profile, limit=100, dsn=s.path_graph_dsn)
+        names = [d.get("filename", "") for d in docs[:10]]
+        return {"file_count": len(docs), "sample_names": names}
     else:
         raise ValueError(f"unsupported driver: {profile.driver}")
     names = [i.get("name", "") for i in items[:10]]
@@ -159,6 +165,8 @@ def collect_source(
             folder=cfg.get("folder"),
             recursive=cfg.get("recursive", True),
         )
+    elif profile.driver == SourceDriver.MANUAL:
+        raise ValueError("manual sources use upload API, not collect_source")
     else:
         raise ValueError(f"unsupported driver: {profile.driver}")
 

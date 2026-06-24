@@ -200,6 +200,49 @@ class SourceStore:
             for r in rows
         ]
 
+    def list_documents_by_source(
+        self,
+        tenant: str,
+        source_id: str,
+        *,
+        ingest_state: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            if ingest_state:
+                rows = conn.execute(
+                    """
+                    SELECT id::text, source_id, content_hash, ingest_state, s3_raw_uri
+                    FROM path_graph.documents
+                    WHERE tenant = %s AND source_id = %s AND ingest_state = %s
+                    ORDER BY id DESC
+                    LIMIT %s
+                    """,
+                    (tenant, source_id, ingest_state, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id::text, source_id, content_hash, ingest_state, s3_raw_uri
+                    FROM path_graph.documents
+                    WHERE tenant = %s AND source_id = %s
+                    ORDER BY id DESC
+                    LIMIT %s
+                    """,
+                    (tenant, source_id, limit),
+                ).fetchall()
+        return [
+            {
+                "document_id": r[0],
+                "source_id": r[1],
+                "content_hash": r[2],
+                "ingest_state": r[3],
+                "s3_raw_uri": r[4],
+            }
+            for r in rows
+        ]
+
     def list_pipeline_runs(self, tenant: str, limit: int = 50) -> list[dict[str, Any]]:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)

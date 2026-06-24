@@ -42,6 +42,10 @@ def test_source_create_requires_name():
         SourceCreate(name="  ", driver=SourceDriver.SHAREPOINT, source_id="sp:kms")
 
 
+def test_source_driver_includes_manual():
+    assert SourceDriver.MANUAL.value == "manual"
+
+
 def test_source_profile_roundtrip_fields():
     p = SourceProfile(
         tenant="dev",
