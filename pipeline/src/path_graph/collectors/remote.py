@@ -12,7 +12,7 @@ from path_graph.collectors.web import fetch_url, filename_from_url
 from path_graph.config import Settings, get_settings
 from path_graph.contracts.s3_keys import s3_key_batch_manifest, s3_key_raw
 from path_graph.ids import document_id, sha256_bytes
-from path_graph.storage.blob import make_blob_store, write_jsonl
+from path_graph.storage.blob import BlobStore, make_blob_store, write_jsonl
 
 
 class GDriveCollector:
@@ -313,12 +313,13 @@ def store_raw(
     mime: str,
     *,
     settings: Settings | None = None,
+    store: BlobStore | None = None,
 ) -> dict[str, Any]:
     content_hash = sha256_bytes(data)
     doc_id = document_id(tenant, content_hash)
     key = s3_key_raw(tenant, source_id, content_hash, filename)
-    store = make_blob_store(settings or get_settings())
-    uri = store.put_bytes(key, data, skip_if_exists=True)
+    blob = store or make_blob_store(settings or get_settings())
+    uri = blob.put_bytes(key, data, skip_if_exists=True)
     return {
         "tenant": tenant,
         "source_id": source_id,

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     s3_bucket: str = "path-graph"
     s3_access_key: str = ""
     s3_secret_key: str = ""
+    s3_region: str = "us-east-1"
 
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_api_key: str = ""

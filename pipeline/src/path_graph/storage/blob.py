@@ -10,6 +10,36 @@ from botocore.client import BaseClient
 from path_graph.config import Settings, get_settings
 
 
+def clear_blob_store_cache() -> None:
+    _s3_store_cache.clear()
+
+
+def s3_client_kwargs(settings: Settings) -> dict:
+    from botocore.config import Config
+
+    config_kwargs: dict = {
+        "signature_version": "s3v4",
+        "request_checksum_calculation": "when_required",
+        "response_checksum_validation": "when_required",
+        "retries": {"max_attempts": 10, "mode": "adaptive"},
+    }
+    if settings.s3_endpoint_url:
+        # Garage/MinIO/NCP: path-style avoids virtual-host 400 on custom endpoints.
+        config_kwargs["s3"] = {"addressing_style": "path"}
+
+    kwargs: dict = {
+        "region_name": settings.s3_region,
+        "config": Config(**config_kwargs),
+    }
+    if settings.s3_endpoint_url:
+        kwargs["endpoint_url"] = settings.s3_endpoint_url
+    if settings.s3_access_key:
+        kwargs["aws_access_key_id"] = settings.s3_access_key
+    if settings.s3_secret_key:
+        kwargs["aws_secret_access_key"] = settings.s3_secret_key
+    return kwargs
+
+
 class BlobStore(Protocol):
     def put_bytes(self, key: str, data: bytes, *, skip_if_exists: bool = False) -> str: ...
     def get_bytes(self, key: str) -> bytes: ...
@@ -74,16 +104,26 @@ class S3BlobStore:
         return f"s3://{self._bucket}/{key}"
 
 
+_s3_store_cache: dict[tuple[str, str, str, str, str], S3BlobStore] = {}
+
+
 def make_blob_store(settings: Settings | None = None) -> BlobStore:
     s = settings or get_settings()
     if s.pipeline_storage_backend == "s3":
-        client = boto3.client(
-            "s3",
-            endpoint_url=s.s3_endpoint_url or None,
-            aws_access_key_id=s.s3_access_key or None,
-            aws_secret_access_key=s.s3_secret_key or None,
+        cache_key = (
+            s.s3_endpoint_url,
+            s.s3_bucket,
+            s.s3_access_key,
+            s.s3_secret_key,
+            s.s3_region,
         )
-        return S3BlobStore(client, s.s3_bucket, s.s3_endpoint_url)
+        cached = _s3_store_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        client = boto3.client("s3", **s3_client_kwargs(s))
+        store = S3BlobStore(client, s.s3_bucket, s.s3_endpoint_url)
+        _s3_store_cache[cache_key] = store
+        return store
     return LocalBlobStore(Path(s.pipeline_storage_dir))
 
 

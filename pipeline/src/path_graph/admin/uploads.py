@@ -17,6 +17,22 @@ class UploadValidationError(ValueError):
     """Client-facing upload validation failure."""
 
 
+MANUAL_DEFAULT_ALLOWED_EXTENSIONS = (
+    ".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.txt,.md"
+)
+_LEGACY_MANUAL_ALLOWED_EXTENSIONS = ".pdf,.hwp,.docx,.txt,.md"
+
+
+def effective_allowed_extensions(config: dict[str, Any]) -> str:
+    raw = config.get("allowed_extensions")
+    if not isinstance(raw, str) or not raw.strip():
+        return MANUAL_DEFAULT_ALLOWED_EXTENSIONS
+    stripped = raw.strip()
+    if stripped.replace(" ", "") == _LEGACY_MANUAL_ALLOWED_EXTENSIONS.replace(" ", ""):
+        return MANUAL_DEFAULT_ALLOWED_EXTENSIONS
+    return stripped
+
+
 def filename_from_raw_uri(uri: str) -> str:
     path_part = uri.split("://", 1)[-1]
     if not path_part.startswith("/") and "/" in path_part:
@@ -48,7 +64,7 @@ def validate_upload_file(
     *,
     server_max_mb: int,
 ) -> None:
-    ext_set = _parse_extensions(config.get("allowed_extensions"))
+    ext_set = _parse_extensions(effective_allowed_extensions(config))
     if ext_set:
         lower = filename.lower()
         if not any(lower.endswith(ext) for ext in ext_set):
@@ -110,7 +126,7 @@ def upload_raw_file(
     blob = make_blob_store(s)
     already_exists = blob.exists(key)
 
-    meta = store_raw(data, filename, tenant, source_id, mime, settings=s)
+    meta = store_raw(data, filename, tenant, source_id, mime, settings=s, store=blob)
 
     if not already_exists and s.path_graph_dsn:
         pg = PgMetaStore(s.path_graph_dsn)
