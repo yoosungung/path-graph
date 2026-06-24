@@ -41,6 +41,8 @@ def parse_hwp_json(data: bytes, rhwp_bin: str = "rhwp-batch") -> dict:
 
 def parse_document(data: bytes, filename: str, *, rhwp_bin: str = "rhwp-batch") -> tuple[str, dict | None]:
     lower = filename.lower()
+    if Path(filename).suffix.lower() == ".doc":
+        raise ValueError("legacy .doc is not supported; convert to .docx")
     if lower.endswith((".hwp", ".hwpx")):
         doc_json = parse_hwp_json(data, rhwp_bin=rhwp_bin)
         return json.dumps(doc_json, ensure_ascii=False), doc_json

@@ -5,7 +5,7 @@ description = "RAG / Graph / Wiki knowledge pipeline"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.27",
-    "markitdown[pdf,docx,pptx]>=0.1.0",
+    "markitdown[pdf,docx,xlsx,xls]>=0.1.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",

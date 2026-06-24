@@ -1,6 +1,6 @@
 .PHONY: venv test install wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
-	ensure-namespace ensure-registry-secret k8s-apply-dev build-images \
+	ensure-namespace ensure-registry-secret k8s-apply-dev build-images build-pipeline-image \
 	e2e-ingest-rag e2e-downstream
 
 VENV := .venv
@@ -98,6 +98,10 @@ bootstrap-k8s: argo-install k8s-apply-dev
 build-images:
 	gh workflow run "Build and push images" --ref $(REF)
 	@echo "Triggered. Watch: gh run list --workflow=build-images.yml --limit=1"
+
+build-pipeline-image:
+	chmod +x ./scripts/build-pipeline-image.sh
+	PUSH=1 ./scripts/build-pipeline-image.sh
 
 e2e-ingest-rag: install
 	./scripts/submit-ingest-rag-e2e.sh

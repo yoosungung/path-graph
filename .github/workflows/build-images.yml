@@ -37,6 +37,8 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          build-args: |
+            RHWP_BATCH_VERSION=0.7.15
           tags: |
             ghcr.io/${{ github.repository_owner }}/path-graph/${{ matrix.image }}:latest
             ghcr.io/${{ github.repository_owner }}/path-graph/${{ matrix.image }}:${{ github.sha }}

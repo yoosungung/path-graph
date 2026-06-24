@@ -25,10 +25,10 @@ htmlcov/
 
 # Local pipeline blob storage (raw / parsed / chunks)
 .data/
+pipeline/.data/
 
 # Cursor (agent plans, local IDE state)
 .cursor/
 
-# OS
 .DS_Store
 Thumbs.db
