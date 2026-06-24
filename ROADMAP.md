@@ -107,7 +107,7 @@
 | 2.2.2 | graph-extractor agent invoke | [x] | |
 | 2.2.3 | Nebula upsert (project shard) | [x] | |
 | 2.2.4 | `partition_chunks_by_project` | [x] | |
-| 2.2.5 | WorkflowTemplate `pipeline-graph` | [~] | YAML only |
+| 2.2.5 | WorkflowTemplate `pipeline-graph` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
 
 ### 2.3 Wiki pipeline
 
@@ -115,7 +115,7 @@
 |---|---|---|---|
 | 2.3.1 | wiki-synthesizer invoke | [x] | |
 | 2.3.2 | wiki page → S3 + PG | [x] | |
-| 2.3.3 | WorkflowTemplate `pipeline-wiki` | [~] | YAML only |
+| 2.3.3 | WorkflowTemplate `pipeline-wiki` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
 
 ### 2.4 배치 오케스트레이션 갭
 
@@ -139,7 +139,7 @@
 | 3.1.1 | Leiden community detection | [x] | `community_detector.py` |
 | 3.1.2 | community metadata → S3/PG | [x] | |
 | 3.1.3 | graph_context artifact | [x] | |
-| 3.1.4 | `graphrag_pipeline` / WF `pipeline-graphrag` | [~] | 코드+YAML; E2E on cluster 미검증 |
+| 3.1.4 | `graphrag_pipeline` / WF `pipeline-graphrag` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
 | 3.1.5 | Graph-enhanced Wiki **프롬프트** (MS GraphRAG 템플릿) | [ ] | |
 
 ### 3.2 agents-runtime 연동
@@ -179,6 +179,49 @@
 | Argo Workflows controller | test_infra 또는 별도 Helm | SETUP.md |
 | TEI `bge-m3` | llm-serving NS | `EMBEDDING_BASE_URL` |
 | rhwp-batch 이미지 | rhwp_batch | HWP parse |
+
+---
+
+## Phase 4 — Admin Console (agents-runtime 통합)
+
+목표: 운영자가 **로그인 한 번**으로 수집·ingest·상태 확인. path-graph repo에는 UI 없음 — agents-runtime `backend` + `frontend` 확장.
+
+### 4.0 계약 (ARCHITECTURE §1 Admin Console)
+
+| 항목 | 결정 |
+|------|------|
+| DB | runtime Postgres 단일 — `public.users` + `path_graph.*` |
+| `users.tenant` | NOT NULL (agents-runtime `0009_users_tenant_not_null.sql`) |
+| 멀티 tenant | **없음** — 1 user = 1 tenant |
+| Pipeline UI/API | **`role = admin` 만** — `pipeline_source` ACL 없음 |
+| Pipeline Pod | `users` 미사용 (WF `tenant` 파라미터) |
+
+### 4.1 Backend (`/api/pipeline/*`)
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 4.1.1 | `path_graph.sources` 테이블·마이그레이션 | [x] | `tenant`, `name`, `driver`, `config` (OAuth는 `path-graph-env` Secret) |
+| 4.1.2 | Sources CRUD + 연결 테스트 | [x] | SharePoint/GDrive/OneDrive dry-run (`probe_source`) |
+| 4.1.3 | Run now → collect → Argo `pipeline-ingest-rag` | [x] | BFF가 manifest jsonl → JSON 배열 submit (MVP) |
+| 4.1.4 | Runs / dead-letter 조회 | [x] | `pipeline_runs`, `documents.ingest_state=dead_letter` |
+| 4.1.5 | `require_admin` 가드 전 API | [x] | agents-runtime `UserRole.ADMIN` |
+
+### 4.2 Frontend (`/pipeline/*`)
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 4.2.1 | Nav + Sources 목록/생성 폼 | [x] | `frontend/src/pipeline/`, Layout Pipeline 링크 |
+| 4.2.2 | OAuth 마법사 (SharePoint/GDrive) | [x] | `source_credentials` + K8s Secret; `/api/pipeline/credentials/*/oauth/start` |
+| 4.2.3 | Run now + Runs 테이블 | [~] | Test/Run/Runs UI; Argo 링크는 후속 |
+| 4.2.4 | `<RequireAdmin />` 라우트 가드 | [x] | `RequireRole min="admin"` |
+
+### 4.3 오케스트레이션
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 4.3.1 | WF `batch_manifest_key` (S3 manifest 경로) | [ ] | inline JSON 배열 대체 |
+| 4.3.2 | `pipeline-collect-ingest-rag` WorkflowTemplate | [ ] | ROADMAP 2.1.8 |
+| 4.3.3 | CronWorkflow per source (Console에서 스케줄) | [ ] | ROADMAP 1.4.9 |
 
 ---
 

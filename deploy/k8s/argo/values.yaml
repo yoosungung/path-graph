@@ -15,8 +15,21 @@ controller:
 server:
   enabled: true
   serviceType: ClusterIP
+  secure: false
   authModes:
     - server
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - argo.k8s-test
+    paths:
+      - /
+    pathType: Prefix
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 
 executor:
   resources:

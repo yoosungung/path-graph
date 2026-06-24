@@ -13,6 +13,8 @@ spec:
       - name: tenant
       - name: batch_id
       - name: chunks_key
+      - name: skip_agent
+        value: "0"
   synchronization:
     semaphore:
       configMapKeyRef:
@@ -50,6 +52,8 @@ spec:
             value: "{{workflow.parameters.batch_id}}"
           - name: CHUNKS_KEY
             value: "{{workflow.parameters.chunks_key}}"
+          - name: SKIP_AGENT
+            value: "{{workflow.parameters.skip_agent}}"
         envFrom:
           - secretRef:
               name: path-graph-env

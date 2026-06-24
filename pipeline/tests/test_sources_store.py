@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from path_graph.admin.sources import SourceStore
+from path_graph.contracts.source import SourceCreate, SourceDriver, SourceUpdate
+
+
+def _row(**overrides):
+    base = (
+        "dev",
+        "11111111-1111-4111-8111-111111111111",
+        "kms",
+        "sharepoint",
+        "sharepoint:kms",
+        {"folder": "회사규정"},
+        True,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    items = list(base)
+    for key, val in overrides.items():
+        idx = {
+            "tenant": 0,
+            "id": 1,
+            "name": 2,
+            "driver": 3,
+            "source_id": 4,
+            "config": 5,
+        }[key]
+        items[idx] = val
+    return tuple(items)
+
+
+@patch("path_graph.admin.sources.psycopg.connect")
+def test_list_sources(mock_connect):
+    conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = conn
+    conn.execute.return_value.fetchall.return_value = [_row()]
+
+    store = SourceStore("postgresql://localhost/test")
+    profiles = store.list_sources("dev")
+
+    assert len(profiles) == 1
+    assert profiles[0].name == "kms"
+    assert profiles[0].driver == SourceDriver.SHAREPOINT
+
+
+@patch("path_graph.admin.sources.psycopg.connect")
+def test_create_source(mock_connect):
+    conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = conn
+    conn.execute.return_value.fetchone.return_value = _row(name="new-src")
+
+    store = SourceStore("postgresql://localhost/test")
+    body = SourceCreate(
+        name="new-src",
+        driver=SourceDriver.GDRIVE,
+        source_id="gdrive:reports",
+        config={"folder_path": "Reports"},
+    )
+    profile = store.create_source("dev", body)
+
+    assert profile.name == "new-src"
+    conn.commit.assert_called_once()
+
+
+@patch("path_graph.admin.sources.psycopg.connect")
+def test_delete_source(mock_connect):
+    conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = conn
+    conn.execute.return_value.rowcount = 1
+
+    store = SourceStore("postgresql://localhost/test")
+    assert store.delete_source("dev", "11111111-1111-4111-8111-111111111111") is True

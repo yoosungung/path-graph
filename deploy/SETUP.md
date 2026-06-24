@@ -49,6 +49,25 @@ PIPELINE_AGENT_ACCESS_TOKEN=... ./scripts/create-path-graph-secrets.sh
 ./scripts/submit-ingest-rag-e2e.sh   # S3 fixture + Argo withParam E2E
 ```
 
+## Submit graph / wiki / graphrag
+
+```bash
+./scripts/submit-downstream-e2e.sh                    # all three (skip_agent=1)
+TEMPLATE=pipeline-graph ./scripts/submit-downstream-e2e.sh
+```
+
+## Argo UI
+
+| 항목 | 값 |
+|------|-----|
+| URL | http://argo.k8s-test (`/etc/hosts` → ingress IP `10.43.115.145`) |
+| auth | `server` 모드 — UI 로그인 없음 (dev 전용) |
+| port-forward (대안) | `kubectl -n argo port-forward svc/argo-workflows-server 2746:2746` |
+
+```bash
+make argo-install   # Ingress 포함 Helm upgrade
+```
+
 ## Troubleshooting
 
 | 증상 | 조치 |

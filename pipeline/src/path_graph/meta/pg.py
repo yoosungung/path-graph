@@ -86,9 +86,52 @@ ALTER TABLE path_graph.communities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE path_graph.wiki_pages ENABLE ROW LEVEL SECURITY;
 """
 
+SOURCES_MIGRATION_SQL = """
+CREATE TABLE IF NOT EXISTS path_graph.sources (
+    tenant TEXT NOT NULL,
+    id UUID NOT NULL,
+    name TEXT NOT NULL,
+    driver TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    config JSONB NOT NULL DEFAULT '{}',
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    schedule_cron TEXT,
+    last_batch_id TEXT,
+    last_run_at TIMESTAMPTZ,
+    last_run_status TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant, id),
+    UNIQUE (tenant, name)
+);
+
+ALTER TABLE path_graph.sources ENABLE ROW LEVEL SECURITY;
+"""
+
+CREDENTIALS_MIGRATION_SQL = """
+CREATE TABLE IF NOT EXISTS path_graph.source_credentials (
+    tenant TEXT NOT NULL,
+    id UUID NOT NULL,
+    label TEXT NOT NULL,
+    driver TEXT NOT NULL,
+    config JSONB NOT NULL DEFAULT '{}',
+    secret_keys TEXT[] NOT NULL DEFAULT '{}',
+    oauth_status TEXT NOT NULL DEFAULT 'pending',
+    k8s_secret_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant, id)
+);
+
+ALTER TABLE path_graph.source_credentials ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE path_graph.sources
+    ADD COLUMN IF NOT EXISTS credential_id UUID;
+"""
+
 
 def iter_migration_sql() -> list[str]:
-    return [MIGRATION_SQL]
+    return [MIGRATION_SQL, SOURCES_MIGRATION_SQL, CREDENTIALS_MIGRATION_SQL]
 
 
 class PgMetaStore:
