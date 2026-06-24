@@ -12,6 +12,9 @@ spec:
     parameters:
       - name: tenant
       - name: batch_manifest
+        value: ""
+      - name: batch_manifest_key
+        value: ""
       - name: rag
         value: "true"
   synchronization:
@@ -22,6 +25,14 @@ spec:
   templates:
     - name: ingest-rag
       steps:
+        - - name: resolve-manifest
+            template: resolve-manifest
+            arguments:
+              parameters:
+                - name: batch_manifest
+                  value: "{{workflow.parameters.batch_manifest}}"
+                - name: batch_manifest_key
+                  value: "{{workflow.parameters.batch_manifest_key}}"
         - - name: map-ingest
             template: ingest-one
             arguments:
@@ -30,7 +41,40 @@ spec:
                   value: "{{workflow.parameters.tenant}}"
                 - name: manifest_line
                   value: "{{item}}"
-            withParam: "{{workflow.parameters.batch_manifest}}"
+            withParam: "{{steps.resolve-manifest.outputs.parameters.batch_manifest}}"
+    - name: resolve-manifest
+      inputs:
+        parameters:
+          - name: batch_manifest
+          - name: batch_manifest_key
+      container:
+        image: path-graph/pipeline:latest
+        imagePullPolicy: Always
+        command: [python, -m, path_graph.steps.load_batch_manifest]
+        args:
+          - --tenant
+          - "{{workflow.parameters.tenant}}"
+          - --manifest-key
+          - "{{inputs.parameters.batch_manifest_key}}"
+          - --batch-manifest
+          - "{{inputs.parameters.batch_manifest}}"
+          - --output
+          - /tmp/batch_manifest.json
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      outputs:
+        parameters:
+          - name: batch_manifest
+            valueFrom:
+              path: /tmp/batch_manifest.json
     - name: ingest-one
       inputs:
         parameters:

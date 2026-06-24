@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -47,6 +48,35 @@ def resolve_source_settings(
     credential = store.get_credential(profile.tenant, profile.credential_id)
     if credential is None:
         return base
+    return merge_credential_into_settings(
+        base,
+        profile=profile,
+        credential=credential,
+        secret_values=secret_values,
+        platform_client_id=platform_client_id,
+        platform_client_secret=platform_client_secret,
+        platform_ms_tenant_id=platform_ms_tenant_id,
+    )
+
+
+def resolve_settings_from_env(
+    profile: SourceProfile,
+    *,
+    dsn: str | None = None,
+    platform_client_id: str = "",
+    platform_client_secret: str = "",
+    platform_ms_tenant_id: str = "",
+    settings: Settings | None = None,
+) -> Settings:
+    """Resolve Settings using credential metadata from PG and token env vars in the pod."""
+    base = settings or get_settings()
+    if not profile.credential_id:
+        return base
+    store = CredentialStore(dsn or base.path_graph_dsn)
+    credential = store.get_credential(profile.tenant, profile.credential_id)
+    if credential is None:
+        raise ValueError(f"credential not found: {profile.credential_id}")
+    secret_values = {key: os.environ.get(key, "").strip() for key in credential.secret_keys}
     return merge_credential_into_settings(
         base,
         profile=profile,

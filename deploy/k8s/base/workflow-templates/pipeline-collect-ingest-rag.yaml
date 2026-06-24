@@ -1,0 +1,85 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-collect-ingest-rag
+  namespace: path-graph
+spec:
+  serviceAccountName: path-graph-pipeline
+  imagePullSecrets:
+    - name: registry-creds
+  entrypoint: collect-ingest-rag
+  arguments:
+    parameters:
+      - name: tenant
+      - name: source_id
+      - name: batch_id
+      - name: credential_secret
+        value: ""
+      - name: rag
+        value: "true"
+  templates:
+    - name: collect-ingest-rag
+      steps:
+        - - name: collect
+            template: collect
+            arguments:
+              parameters:
+                - name: credential_secret
+                  value: "{{workflow.parameters.credential_secret}}"
+        - - name: ingest
+            templateRef:
+              name: pipeline-ingest-rag
+              template: ingest-rag
+            arguments:
+              parameters:
+                - name: tenant
+                  value: "{{workflow.parameters.tenant}}"
+                - name: batch_manifest
+                  value: ""
+                - name: batch_manifest_key
+                  value: "{{steps.collect.outputs.parameters.manifest_key}}"
+                - name: rag
+                  value: "{{workflow.parameters.rag}}"
+            when: "{{steps.collect.outputs.parameters.file_count}} != 0"
+    - name: collect
+      inputs:
+        parameters:
+          - name: credential_secret
+      container:
+        image: path-graph/pipeline:latest
+        imagePullPolicy: Always
+        command: [python, -m, path_graph.steps.collect_source_step]
+        args:
+          - --tenant
+          - "{{workflow.parameters.tenant}}"
+          - --source-id
+          - "{{workflow.parameters.source_id}}"
+          - --batch-id
+          - "{{workflow.parameters.batch_id}}"
+          - --output-dir
+          - /tmp/collect-out
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+          - secretRef:
+              name: "{{inputs.parameters.credential_secret}}"
+              optional: true
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+      activeDeadlineSeconds: 3600
+      outputs:
+        parameters:
+          - name: batch_id
+            valueFrom:
+              path: /tmp/collect-out/batch_id
+          - name: manifest_key
+            valueFrom:
+              path: /tmp/collect-out/manifest_key
+          - name: file_count
+            valueFrom:
+              path: /tmp/collect-out/file_count

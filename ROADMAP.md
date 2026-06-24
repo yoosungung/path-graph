@@ -212,15 +212,15 @@
 |---|---|---|---|
 | 4.2.1 | Nav + Sources 목록/생성 폼 | [x] | `frontend/src/pipeline/`, Layout Pipeline 링크 |
 | 4.2.2 | OAuth 마법사 (SharePoint/GDrive) | [x] | `source_credentials` + K8s Secret; `/api/pipeline/credentials/*/oauth/start` |
-| 4.2.3 | Run now + Runs 테이블 | [~] | Test/Run/Runs UI; Argo 링크는 후속 |
+| 4.2.3 | Run now + Runs 테이블 | [x] | Run now → 202 + `pipeline-collect-ingest-rag` WF |
 | 4.2.4 | `<RequireAdmin />` 라우트 가드 | [x] | `RequireRole min="admin"` |
 
 ### 4.3 오케스트레이션
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
-| 4.3.1 | WF `batch_manifest_key` (S3 manifest 경로) | [ ] | inline JSON 배열 대체 |
-| 4.3.2 | `pipeline-collect-ingest-rag` WorkflowTemplate | [ ] | ROADMAP 2.1.8 |
+| 4.3.1 | WF `batch_manifest_key` (S3 manifest 경로) | [x] | `load_batch_manifest` step; inline JSON legacy |
+| 4.3.2 | `pipeline-collect-ingest-rag` WorkflowTemplate | [x] | BFF Run now 202 + collect→ingest chain |
 | 4.3.3 | CronWorkflow per source (Console에서 스케줄) | [ ] | ROADMAP 1.4.9 |
 
 ---
