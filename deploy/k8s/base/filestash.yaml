@@ -1,0 +1,117 @@
+# Garage S3 browser UI (dev). OSS image: machines/filestash:latest
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: filestash-state
+  labels:
+    app.kubernetes.io/name: filestash
+    app.kubernetes.io/component: filestash
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: filestash
+  labels:
+    app.kubernetes.io/name: filestash
+    app.kubernetes.io/component: filestash
+spec:
+  selector:
+    app.kubernetes.io/name: filestash
+    app.kubernetes.io/component: filestash
+  ports:
+    - name: http
+      port: 8334
+      targetPort: 8334
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filestash
+  labels:
+    app.kubernetes.io/name: filestash
+    app.kubernetes.io/component: filestash
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: filestash
+      app.kubernetes.io/component: filestash
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: filestash
+        app.kubernetes.io/component: filestash
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: seed-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /state/config
+              if [ ! -f /state/config/config.json ]; then
+                cp /seed/config.json /state/config/config.json
+              fi
+              chown -R 1000:1000 /state/config
+              chmod 775 /state/config
+              chmod 664 /state/config/config.json
+          volumeMounts:
+            - name: state
+              mountPath: /state
+            - name: seed-config
+              mountPath: /seed
+              readOnly: true
+      containers:
+        - name: filestash
+          image: machines/filestash:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8334
+          envFrom:
+            - secretRef:
+                name: filestash-env
+                optional: true
+          env:
+            - name: CANARY
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /about
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /about
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          volumeMounts:
+            - name: state
+              mountPath: /app/data/state
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: filestash-state
+        - name: seed-config
+          configMap:
+            name: filestash-seed-config

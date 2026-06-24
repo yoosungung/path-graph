@@ -71,6 +71,7 @@
 | 1.4.7 | **Argo Workflows controller** 설치 | [x] | `install-argo.sh` + `deploy/k8s/argo/values.yaml` |
 | 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [~] | `workflow-validate` + bootstrap; WF E2E는 2.4.1 |
 | 1.4.9 | CronWorkflow / 이벤트 트리거 | [x] | Console `schedule_cron` → `pg-cron-{tenant}-{source}` |
+| 1.4.10 | Filestash (Garage S3 dev UI) | [x] | `deploy/k8s/base/filestash*.yaml`, `bootstrap-filestash.sh` |
 
 ### 1.5 Agents (MVP 스켈레ton)
 

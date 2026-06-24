@@ -199,4 +199,4 @@ Agent I/O: §2.5 및 `GraphExtractorInput`, `WikiSynthesizerInput`.
 | [test_infra](../test_infra) | Qdrant, NebulaGraph (설치·운영) |
 | [rhwp_batch](../rhwp_batch) | HWP/HWPX `to-json` 컨테이너 이미지 |
 
-**로컬 개발 연결**: [`scripts/wire-dev.sh`](scripts/wire-dev.sh) — PG `:5432`, Envoy `:8084`, Qdrant `:6333`, Nebula `:9669`, Garage `:3900`(profile s3). 포트 맵: [`scripts/wire-dev.env.example`](scripts/wire-dev.env.example). TEI(선택): `llm-serving/bge-m3-tei` → `:8085`.
+**로컬 개발 연결**: [`scripts/wire-dev.sh`](scripts/wire-dev.sh) — PG `:5432`, Envoy `:8084`, Qdrant `:6333`, Nebula `:9669`, Garage `:3900`(profile s3). 포트 맵: [`scripts/wire-dev.env.example`](scripts/wire-dev.env.example). TEI(선택): `llm-serving/bge-m3-tei` → `:8085`. **Garage 브라우저 UI**(k8s dev): Filestash → [`deploy/SETUP.md`](deploy/SETUP.md#filestash-garage-s3-ui).

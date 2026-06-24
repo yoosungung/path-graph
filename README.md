@@ -21,6 +21,7 @@
 | parse → chunk → (선택) RAG | RLS policy, `pipeline_runs` 전 단계 기록 |
 | `wire-dev.sh` port-forward | WF E2E on cluster (이미지 import 후) |
 | `make bootstrap-k8s` | Argo + secrets + dev overlay |
+| Filestash (Garage UI) | http://filestash.k8s-test — [deploy/SETUP.md](deploy/SETUP.md) |
 | `./scripts/submit-ingest-rag-e2e.sh` | WF E2E (manifest line → ingest) |
 
 ## 아키텍처 (한 장)

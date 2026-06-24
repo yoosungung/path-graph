@@ -88,6 +88,7 @@ _bootstrap-registry-secret:
 
 k8s-apply-dev: ensure-registry-secret
 	./scripts/create-path-graph-secrets.sh
+	./scripts/bootstrap-filestash.sh
 	kubectl apply -k deploy/k8s/overlays/dev
 	./scripts/patch-runtime-ingress-for-path-graph.sh
 
