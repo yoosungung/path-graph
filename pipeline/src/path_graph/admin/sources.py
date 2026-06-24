@@ -243,6 +243,31 @@ class SourceStore:
             for r in rows
         ]
 
+    def get_pipeline_run_by_batch(
+        self, tenant: str, batch_id: str
+    ) -> dict[str, Any] | None:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            row = conn.execute(
+                """
+                SELECT id::text, workflow_name, argo_uid, batch_id, status
+                FROM path_graph.pipeline_runs
+                WHERE tenant = %s AND batch_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (tenant, batch_id),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "workflow_name": row[1],
+            "argo_uid": row[2],
+            "batch_id": row[3],
+            "status": row[4],
+        }
+
     def list_pipeline_runs(self, tenant: str, limit: int = 50) -> list[dict[str, Any]]:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)

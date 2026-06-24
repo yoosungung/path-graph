@@ -73,6 +73,26 @@ def test_create_source(mock_connect):
 
 
 @patch("path_graph.admin.sources.psycopg.connect")
+def test_get_pipeline_run_by_batch(mock_connect):
+    conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = conn
+    conn.execute.return_value.fetchone.return_value = (
+        "run-uuid",
+        "ingest-manual-docs-abc",
+        "argo-uid",
+        "batch-1",
+        "submitted",
+    )
+
+    store = SourceStore("postgresql://localhost/test")
+    run = store.get_pipeline_run_by_batch("dev", "batch-1")
+
+    assert run is not None
+    assert run["workflow_name"] == "ingest-manual-docs-abc"
+    assert run["batch_id"] == "batch-1"
+
+
+@patch("path_graph.admin.sources.psycopg.connect")
 def test_delete_source(mock_connect):
     conn = MagicMock()
     mock_connect.return_value.__enter__.return_value = conn
