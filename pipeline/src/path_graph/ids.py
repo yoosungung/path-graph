@@ -15,10 +15,12 @@ def sha256_text(text: str) -> str:
     return sha256_bytes(text.encode("utf-8"))
 
 
-def document_id(tenant: str, content_hash: str) -> str:
+def document_id(tenant: str, project_id: str, content_hash: str) -> str:
     if not tenant:
         raise ValueError("tenant is required")
-    return str(uuid.uuid5(PATH_GRAPH_NAMESPACE, f"{tenant}:{content_hash}"))
+    if not project_id:
+        raise ValueError("project_id is required")
+    return str(uuid.uuid5(PATH_GRAPH_NAMESPACE, f"{tenant}:{project_id}:{content_hash}"))
 
 
 def chunk_id(
@@ -40,50 +42,37 @@ def normalize_tenant_slug(tenant: str) -> str:
     return slug
 
 
-def tenant_project_index(partition_key: str, project_count: int) -> int:
-    if project_count < 1:
-        raise ValueError("project_count must be >= 1")
-    digest = hashlib.sha256(partition_key.encode()).digest()
-    return int.from_bytes(digest[:8], "big") % project_count
+def normalize_project_slug(project_slug: str) -> str:
+    slug = re.sub(r"[^a-z0-9_-]+", "_", project_slug.lower()).strip("_")
+    if not slug:
+        raise ValueError("invalid project slug")
+    return slug
 
 
-def qdrant_collection_name(tenant: str, project: int) -> str:
-    if project < 0:
-        raise ValueError("project must be >= 0")
-    return f"path_graph_{normalize_tenant_slug(tenant)}_{project}"
+def qdrant_collection_name(tenant: str, project_slug: str) -> str:
+    return f"path_graph_{normalize_tenant_slug(tenant)}_{normalize_project_slug(project_slug)}"
 
 
-def qdrant_collection_for_chunk(tenant: str, chunk_id_value: str, project_count: int) -> str:
-    project = tenant_project_index(chunk_id_value, project_count)
-    return qdrant_collection_name(tenant, project)
-
-
-def nebula_space_name(tenant: str, project: int) -> str:
-    if project < 0:
-        raise ValueError("project must be >= 0")
-    return f"path_graph_{normalize_tenant_slug(tenant)}_{project}"
-
-
-def nebula_space_for_chunk(tenant: str, chunk_id_value: str, project_count: int) -> str:
-    project = tenant_project_index(chunk_id_value, project_count)
-    return nebula_space_name(tenant, project)
+def nebula_space_name(tenant: str, project_slug: str) -> str:
+    return qdrant_collection_name(tenant, project_slug)
 
 
 def community_id(
     tenant: str,
-    project: int,
+    project_id: str,
     batch_id: str,
     level: int,
     cluster_key: str,
 ) -> str:
     if not tenant:
         raise ValueError("tenant is required")
-    if project < 0:
-        raise ValueError("project must be >= 0")
-    key = f"{tenant}:{project}:{batch_id}:{level}:{cluster_key}"
+    if not project_id:
+        raise ValueError("project_id is required")
+    key = f"{tenant}:{project_id}:{batch_id}:{level}:{cluster_key}"
     return str(uuid.uuid5(PATH_GRAPH_NAMESPACE, key))
 
 
-def wiki_slug_for_community(project: int, level: int, community_id_value: str) -> str:
+def wiki_slug_for_community(project_slug: str, level: int, community_id_value: str) -> str:
     short = community_id_value.replace("-", "")[:8]
-    return f"p{project}-community-L{level}-{short}"
+    slug = normalize_project_slug(project_slug)
+    return f"{slug}-community-L{level}-{short}"

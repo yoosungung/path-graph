@@ -3,6 +3,9 @@ from path_graph.steps.graphrag_pipeline import run_graphrag_pipeline
 from path_graph.storage.blob import LocalBlobStore, write_jsonl
 
 
+from constants import PROJECT_ID
+
+
 def test_graphrag_pipeline_skip_agent(local_store, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     monkeypatch.setenv("PIPELINE_STORAGE_DIR", str(local_store))
@@ -31,8 +34,10 @@ def test_graphrag_pipeline_skip_agent(local_store, monkeypatch):
         lambda settings=None: nebula,
     )
 
-    result = run_graphrag_pipeline("dev", "b1", chunks_key, "sess", skip_agent=True)
+    result = run_graphrag_pipeline(
+        "dev", PROJECT_ID, "default", "b1", chunks_key, "sess", skip_agent=True
+    )
 
     assert result["communities"]
     assert result["wiki"]["communities"]
-    assert 0 <= result["communities"][0]["project"] < 4
+    assert result["communities"][0]["project_id"] == PROJECT_ID

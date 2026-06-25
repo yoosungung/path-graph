@@ -11,6 +11,7 @@ from path_graph.collectors.remote import GDriveCollector, OneDriveCollector
 from path_graph.collectors.gdrive import GDriveClient
 from path_graph.collectors.onedrive import OneDriveClient
 from path_graph.config import Settings
+from constants import PROJECT_ID
 
 
 @pytest.fixture
@@ -76,7 +77,7 @@ def test_gdrive_collect_folder(local_store):
     client = GDriveClient(provider, http_client=httpx.Client(transport=_gdrive_transport()))
     collector = GDriveCollector(client=client)
     items = collector.collect_folder(
-        "dev", "gdrive", folder_id="folder-1", extensions={".txt", ".pdf"}
+        "dev", PROJECT_ID, "gdrive", folder_id="folder-1", extensions={".txt", ".pdf"}
     )
     assert len(items) == 2
     assert {i["filename"] for i in items} == {"note.txt", "deep.pdf"}
@@ -119,7 +120,7 @@ def test_onedrive_collect_folder(local_store):
     provider.get_token.return_value = "token"
     client = OneDriveClient(provider, http_client=httpx.Client(transport=_onedrive_transport()))
     collector = OneDriveCollector(client=client)
-    items = collector.collect_folder("dev", "onedrive", folder="Docs")
+    items = collector.collect_folder("dev", PROJECT_ID, "onedrive", folder="Docs")
     assert len(items) == 2
     assert {i["filename"] for i in items} == {"a.txt", "b.pdf"}
 
@@ -132,9 +133,15 @@ def test_ingest_gdrive_cli(local_store, monkeypatch):
         "path_graph.steps.ingest_gdrive.GDriveCollector",
         lambda: GDriveCollector(client=client),
     )
+    monkeypatch.setattr(
+        "path_graph.steps.ingest_gdrive.resolve_project_slug",
+        lambda *a, **k: "default",
+    )
     from path_graph.steps import ingest_gdrive
 
-    assert ingest_gdrive.main(["--tenant", "dev", "--folder-id", "folder-1", "--batch-id", "g1"]) == 0
+    assert ingest_gdrive.main(
+        ["--tenant", "dev", "--project-id", PROJECT_ID, "--folder-id", "folder-1", "--batch-id", "g1"]
+    ) == 0
 
 
 def test_ingest_onedrive_dry_run(capsys, monkeypatch):
@@ -145,8 +152,14 @@ def test_ingest_onedrive_dry_run(capsys, monkeypatch):
         "path_graph.steps.ingest_onedrive.OneDriveCollector",
         lambda: OneDriveCollector(client=client),
     )
+    monkeypatch.setattr(
+        "path_graph.steps.ingest_onedrive.resolve_project_slug",
+        lambda *a, **k: "default",
+    )
     from path_graph.steps import ingest_onedrive
 
-    rc = ingest_onedrive.main(["--tenant", "dev", "--folder", "Docs", "--dry-run"])
+    rc = ingest_onedrive.main(
+        ["--tenant", "dev", "--project-id", PROJECT_ID, "--folder", "Docs", "--dry-run"]
+    )
     assert rc == 0
     assert "a.txt" in capsys.readouterr().out

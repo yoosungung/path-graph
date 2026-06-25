@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from path_graph.collectors.remote import SharePointCollector
 from path_graph.config import get_settings
-from path_graph.steps.ingest_helpers import run_ingest_loop
+from path_graph.steps.ingest_helpers import resolve_project_slug, run_ingest_loop
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -14,6 +14,7 @@ def main(argv: list[str] | None = None) -> int:
         description="SharePoint collect → parse → chunk → optional RAG"
     )
     parser.add_argument("--tenant", required=True)
+    parser.add_argument("--project-id", required=True)
     parser.add_argument("--source-id", default="sharepoint:kms")
     parser.add_argument("--site", help="SharePoint site path (host:/sites/name)")
     parser.add_argument("--drive", help="Document library drive name")
@@ -40,8 +41,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"would collect {len(items)} file(s)", file=sys.stderr)
         return 0
 
+    project_slug = resolve_project_slug(args.tenant, args.project_id, settings)
+
     items = collector.collect_folder(
         args.tenant,
+        args.project_id,
         args.source_id,
         site=args.site,
         drive_name=args.drive,
@@ -56,7 +60,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"collected {len(items)} file(s)")
         return 0
 
-    return run_ingest_loop(items, args.tenant, args.source_id, rag=args.rag, settings=settings)
+    return run_ingest_loop(
+        items,
+        args.tenant,
+        args.source_id,
+        args.project_id,
+        project_slug,
+        rag=args.rag,
+        settings=settings,
+    )
 
 
 if __name__ == "__main__":

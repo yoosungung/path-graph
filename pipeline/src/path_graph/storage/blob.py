@@ -44,6 +44,9 @@ class BlobStore(Protocol):
     def put_bytes(self, key: str, data: bytes, *, skip_if_exists: bool = False) -> str: ...
     def get_bytes(self, key: str) -> bytes: ...
     def exists(self, key: str) -> bool: ...
+    def delete_object(self, key: str) -> bool: ...
+    def list_keys(self, prefix: str) -> list[str]: ...
+    def delete_prefix(self, prefix: str) -> int: ...
     def uri_for(self, key: str) -> str: ...
 
 
@@ -68,6 +71,33 @@ class LocalBlobStore:
 
     def exists(self, key: str) -> bool:
         return self._path(key).exists()
+
+    def delete_object(self, key: str) -> bool:
+        path = self._path(key)
+        if not path.exists():
+            return False
+        path.unlink()
+        return True
+
+    def list_keys(self, prefix: str) -> list[str]:
+        base = self._path(prefix)
+        if not base.exists():
+            return []
+        if base.is_file():
+            return [prefix]
+        keys: list[str] = []
+        for path in base.rglob("*"):
+            if path.is_file():
+                rel = path.relative_to(self._root).as_posix()
+                keys.append(rel)
+        return sorted(keys)
+
+    def delete_prefix(self, prefix: str) -> int:
+        count = 0
+        for key in self.list_keys(prefix):
+            if self.delete_object(key):
+                count += 1
+        return count
 
     def uri_for(self, key: str) -> str:
         return f"file://{self._path(key).resolve()}"
@@ -99,6 +129,32 @@ class S3BlobStore:
             return True
         except self._client.exceptions.ClientError:
             return False
+
+    def delete_object(self, key: str) -> bool:
+        if not self.exists(key):
+            return False
+        self._client.delete_object(Bucket=self._bucket, Key=key)
+        return True
+
+    def list_keys(self, prefix: str) -> list[str]:
+        keys: list[str] = []
+        paginator = self._client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            for obj in page.get("Contents") or []:
+                keys.append(obj["Key"])
+        return keys
+
+    def delete_prefix(self, prefix: str) -> int:
+        keys = self.list_keys(prefix)
+        if not keys:
+            return 0
+        for i in range(0, len(keys), 1000):
+            batch = keys[i : i + 1000]
+            self._client.delete_objects(
+                Bucket=self._bucket,
+                Delete={"Objects": [{"Key": k} for k in batch], "Quiet": True},
+            )
+        return len(keys)
 
     def uri_for(self, key: str) -> str:
         return f"s3://{self._bucket}/{key}"

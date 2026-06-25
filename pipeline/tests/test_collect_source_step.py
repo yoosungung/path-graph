@@ -8,10 +8,14 @@ from path_graph.contracts.source import SourceDriver, SourceProfile
 from path_graph.steps.collect_source_step import run_collect
 
 
+from constants import PROJECT_ID
+
+
 def _profile(**kwargs) -> SourceProfile:
     defaults = dict(
         tenant="dev",
         id="11111111-1111-4111-8111-111111111111",
+        project_id=PROJECT_ID,
         name="kms",
         driver=SourceDriver.SHAREPOINT,
         source_id="sharepoint:kms",

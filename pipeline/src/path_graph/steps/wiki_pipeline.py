@@ -14,7 +14,7 @@ from path_graph.storage.blob import make_blob_store
 
 def wiki_synthesize(
     tenant: str,
-    project: int,
+    project_id: str,
     community_id: str,
     community_level: int,
     graph_context_s3: str,
@@ -27,18 +27,18 @@ def wiki_synthesize(
         return {"pages": []}
     inp = WikiSynthesizerInput(
         tenant=tenant,
-        project=project,
+        project_id=project_id,
         community_id=community_id,
         community_level=community_level,
         graph_context_s3=graph_context_s3,
-        idempotency_key=f"{batch_id}:{project}:{community_id}",
+        idempotency_key=f"{batch_id}:{project_id}:{community_id}",
     )
     return invoke_agent("wiki-synthesizer", inp, session_id)
 
 
 def store_wiki_pages(
     tenant: str,
-    project: int,
+    project_id: str,
     pages: list[dict],
     *,
     community_id: str | None = None,
@@ -50,13 +50,13 @@ def store_wiki_pages(
     for page in pages:
         slug = page["slug"]
         body = page.get("markdown") or page.get("content") or ""
-        key = s3_key_wiki(tenant, project, slug)
+        key = s3_key_wiki(tenant, project_id, slug)
         uri = store.put_bytes(key, body.encode("utf-8"))
         uris.append(uri)
         if pg:
             pg.upsert_wiki_page(
                 tenant,
-                project,
+                project_id,
                 slug,
                 uri,
                 title=page.get("title"),
@@ -71,10 +71,12 @@ def _stub_page_from_context(graph_context_key: str, record: CommunityRecord) -> 
     raw = store.get_bytes(graph_context_key)
     ctx = json.loads(raw)
     entities = ", ".join(e.get("name", "") for e in ctx.get("entities", [])[:10])
-    slug = wiki_slug_for_community(record.project, record.level, record.community_id)
+    slug = wiki_slug_for_community(
+        record.project_slug, record.level, record.community_id
+    )
     return {
         "slug": slug,
-        "title": f"Community L{record.level} ({record.project})",
+        "title": f"Community L{record.level} ({record.project_slug})",
         "markdown": f"# Community Report\n\nEntities: {entities}\n",
     }
 
@@ -91,7 +93,7 @@ def run_wiki_for_community(
     ctx_uri = store.uri_for(record.graph_context_key)
     result = wiki_synthesize(
         tenant,
-        record.project,
+        record.project_id,
         record.community_id,
         record.level,
         ctx_uri,
@@ -105,7 +107,7 @@ def run_wiki_for_community(
     uris = (
         store_wiki_pages(
             tenant,
-            record.project,
+            record.project_id,
             pages,
             community_id=record.community_id,
             batch_id=record.batch_id,
@@ -140,34 +142,3 @@ def run_wiki_pipeline(
             )
         )
     return {"communities": results}
-
-
-def run_wiki_pipeline_legacy(
-    tenant: str,
-    batch_id: str,
-    chunks_key: str,
-    session_id: str,
-    *,
-    skip_agent: bool = False,
-) -> dict:
-    """Deprecated: chunks-based wiki. Use run_wiki_pipeline with community records."""
-    from path_graph.steps.community_pipeline import run_community_pipeline_for_project
-    from path_graph.graph.chunk_partition import partition_chunks_by_project
-
-    settings = get_settings()
-    project_chunks = partition_chunks_by_project(
-        tenant, batch_id, chunks_key, settings.path_graph_projects_per_tenant
-    )
-    all_records: list[CommunityRecord] = []
-    nebula = None
-    from path_graph.graph.chunk_partition import make_nebula_store
-
-    nebula = make_nebula_store(settings)
-    for project, key in project_chunks.items():
-        comm = run_community_pipeline_for_project(
-            tenant, project, batch_id, key, nebula=nebula, settings=settings
-        )
-        all_records.extend(comm.get("records") or [])
-    return run_wiki_pipeline(
-        tenant, batch_id, all_records, session_id, skip_agent=skip_agent
-    )

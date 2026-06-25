@@ -6,17 +6,17 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 
 | 항목 | 상태 |
 |------|------|
-| invoke payload 계약 | [x] `WikiSynthesizerInput` — ARCHITECTURE §2.5 |
+| invoke payload 계약 | [x] `WikiSynthesizerInput` — `project_id`, `project_slug` |
 | pipeline 연동 | [x] `wiki_pipeline.py` + `test_wiki.py` (mock) |
 | LLM community report 본구현 | [ ] 프롬프트만 존재 |
 | agents-runtime 번들 배포 | 수동 zip |
 
 ## 입출력
 
-- **input**: `{tenant, project, community_id, community_level, graph_context_s3, output_schema, idempotency_key}`
-- **output**: `{pages: [{slug, title, markdown}], tenant, project}`
+- **input**: `{tenant, project_id, project_slug, community_id, community_level, graph_context_s3, output_schema, idempotency_key}`
+- **output**: `{pages: [{slug, title, markdown}], tenant, project_id}`
 
-`graph_context_s3`는 `graph_context/{tenant}/{project}/{batch_id}/{community_id}.json` artifact URI.
+`graph_context_s3`는 `graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json` artifact URI. wiki S3는 `wiki/{tenant}/{project_id}/{slug}.md`.
 
 ## 프롬프트
 

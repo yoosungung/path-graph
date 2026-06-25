@@ -9,6 +9,9 @@ from path_graph.steps.ingest import ingest_raw_bytes
 from path_graph.storage.blob import LocalBlobStore
 
 
+from constants import PROJECT_ID
+
+
 @pytest.fixture
 def local_store(tmp_path, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
@@ -23,8 +26,9 @@ def test_collect_and_ingest_txt(local_store, monkeypatch):
     )
     f = local_store / "sample.txt"
     f.write_text("hello", encoding="utf-8")
-    meta = collect_local_file(f, "dev", "local")
+    meta = collect_local_file(f, "dev", PROJECT_ID, "local")
     data = f.read_bytes()
+    meta["project_id"] = PROJECT_ID
     result = ingest_raw_bytes(data, "sample.txt", "dev", "local", meta)
     assert "chunks_key" in result
     assert result["chunks"]
@@ -40,6 +44,7 @@ def test_ingest_parse_failure_dead_letter(local_store, monkeypatch):
         "document_id": "00000000-0000-0000-0000-000000000001",
         "content_hash": "abc",
         "source_id": "x",
+        "project_id": PROJECT_ID,
         "s3_raw_uri": "file://x",
         "filename": "bad.bin",
     }

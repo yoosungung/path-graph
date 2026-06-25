@@ -28,7 +28,7 @@ class SourceStore:
         conn.execute("SELECT set_config('app.tenant', %s, false)", (tenant,))
 
     _SELECT_COLS = """
-        tenant, id, name, driver, source_id, config, enabled, schedule_cron,
+        tenant, id, project_id, name, driver, source_id, config, enabled, schedule_cron,
         credential_id, last_batch_id, last_run_at, last_run_status, created_at, updated_at
     """
 
@@ -66,13 +66,14 @@ class SourceStore:
             row = conn.execute(
                 f"""
                 INSERT INTO path_graph.sources
-                    (tenant, id, name, driver, source_id, config, enabled, schedule_cron, credential_id)
-                VALUES (%s, %s::uuid, %s, %s, %s, %s::jsonb, %s, %s, %s::uuid)
+                    (tenant, id, project_id, name, driver, source_id, config, enabled, schedule_cron, credential_id)
+                VALUES (%s, %s::uuid, %s::uuid, %s, %s, %s, %s::jsonb, %s, %s, %s::uuid)
                 RETURNING {self._SELECT_COLS}
                 """,
                 (
                     tenant,
                     sid,
+                    body.project_id,
                     body.name,
                     body.driver.value,
                     body.source_id,

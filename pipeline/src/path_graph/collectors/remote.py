@@ -65,6 +65,7 @@ class GDriveCollector:
     def collect_folder(
         self,
         tenant: str,
+        project_id: str,
         source_id: str,
         *,
         folder_id: str | None = None,
@@ -83,15 +84,15 @@ class GDriveCollector:
             data, filename, mime = self._client.download_file(
                 item["id"], item.get("mimeType", ""), item.get("name", "file")
             )
-            metas.append(store_raw(data, filename, tenant, source_id, mime))
+            metas.append(store_raw(data, filename, tenant, project_id, source_id, mime))
         return metas
 
-    def collect_file(self, file_id: str, tenant: str, source_id: str) -> dict[str, Any]:
+    def collect_file(self, file_id: str, tenant: str, project_id: str, source_id: str) -> dict[str, Any]:
         meta = self._client.get_file_metadata(file_id)
         data, filename, mime = self._client.download_file(
             meta["id"], meta.get("mimeType", ""), meta.get("name", "file")
         )
-        return store_raw(data, filename, tenant, source_id, mime)
+        return store_raw(data, filename, tenant, project_id, source_id, mime)
 
     def write_batch_manifest(self, tenant: str, batch_id: str, items: list[dict[str, Any]]) -> str:
         return write_batch_manifest(tenant, batch_id, items, self._settings)
@@ -137,6 +138,7 @@ class OneDriveCollector:
     def collect_folder(
         self,
         tenant: str,
+        project_id: str,
         source_id: str,
         *,
         folder: str | None = None,
@@ -149,15 +151,15 @@ class OneDriveCollector:
             name = item.get("name", "")
             mime = item.get("file", {}).get("mimeType", "application/octet-stream")
             data = self._client.download_item(item["id"])
-            metas.append(store_raw(data, name, tenant, source_id, mime))
+            metas.append(store_raw(data, name, tenant, project_id, source_id, mime))
         return metas
 
-    def collect_file(self, item_id: str, tenant: str, source_id: str) -> dict[str, Any]:
+    def collect_file(self, item_id: str, tenant: str, project_id: str, source_id: str) -> dict[str, Any]:
         meta = self._client.get_item_metadata(item_id)
         name = meta.get("name", "file")
         mime = meta.get("file", {}).get("mimeType", "application/octet-stream")
         data = self._client.download_item(item_id)
-        return store_raw(data, name, tenant, source_id, mime)
+        return store_raw(data, name, tenant, project_id, source_id, mime)
 
     def write_batch_manifest(self, tenant: str, batch_id: str, items: list[dict[str, Any]]) -> str:
         return write_batch_manifest(tenant, batch_id, items, self._settings)
@@ -166,9 +168,9 @@ class OneDriveCollector:
 class AgentChatCollector:
     """Export agent conversation JSON from path or S3."""
 
-    def collect_json(self, export_path: Path, tenant: str, source_id: str) -> dict[str, Any]:
+    def collect_json(self, export_path: Path, tenant: str, project_id: str, source_id: str) -> dict[str, Any]:
         data = export_path.read_bytes()
-        return store_raw(data, "conversation.json", tenant, source_id, "application/json")
+        return store_raw(data, "conversation.json", tenant, project_id, source_id, "application/json")
 
 
 class SharePointCollector:
@@ -233,6 +235,7 @@ class SharePointCollector:
     def collect_folder(
         self,
         tenant: str,
+        project_id: str,
         source_id: str,
         *,
         site: str | None = None,
@@ -253,8 +256,77 @@ class SharePointCollector:
             name = item.get("name", "")
             mime = item.get("file", {}).get("mimeType", "application/octet-stream")
             data = self._client.download_item(drive_id, item["id"])
-            metas.append(store_raw(data, name, tenant, source_id, mime))
+            metas.append(store_raw(data, name, tenant, project_id, source_id, mime))
         return metas
+
+    def collect_delta(
+        self,
+        tenant: str,
+        project_id: str,
+        source_id: str,
+        *,
+        site: str | None = None,
+        drive_name: str | None = None,
+        folder: str | None = None,
+        delta_link: str | None = None,
+        extensions: set[str] | None = None,
+    ) -> dict[str, Any]:
+        """Incremental sync via Graph delta. Returns metas, purged, new delta_link."""
+        from path_graph.lifecycle.purge import purge_document
+        from path_graph.meta.pg import PgMetaStore
+
+        site_path = site or self._settings.sharepoint_site
+        drive = drive_name or self._settings.sharepoint_drive_name
+        folder_path = folder or self._settings.sharepoint_folder
+        ext_set = extensions or _parse_extensions(self._settings.sharepoint_file_extensions)
+
+        site_info = self._client.resolve_site(site_path)
+        drive_info = self._client.resolve_drive(site_info["id"], drive)
+        drive_id = drive_info["id"]
+
+        items, new_link = self._client.list_delta(
+            drive_id, delta_link=delta_link, folder_path=folder_path
+        )
+
+        metas: list[dict[str, Any]] = []
+        purged: list[str] = []
+        pg = PgMetaStore(self._settings.path_graph_dsn) if self._settings.path_graph_dsn else None
+
+        for item in items:
+            if item.get("deleted"):
+                if pg is None:
+                    continue
+                remote_id = item.get("id", "")
+                docs = pg.list_documents_for_project(
+                    tenant, project_id, source_id=source_id
+                )
+                for doc in docs:
+                    if remote_id and remote_id in (doc.get("s3_raw_uri") or ""):
+                        purge_document(
+                            tenant,
+                            project_id,
+                            doc["document_id"],
+                            reason="sharepoint_delta_delete",
+                            settings=self._settings,
+                        )
+                        purged.append(doc["document_id"])
+                continue
+            if "file" not in item:
+                continue
+            name = item.get("name", "")
+            if ext_set and not any(name.lower().endswith(ext) for ext in ext_set):
+                continue
+            mime = item.get("file", {}).get("mimeType", "application/octet-stream")
+            data = self._client.download_item(drive_id, item["id"])
+            meta = store_raw(data, name, tenant, project_id, source_id, mime)
+            metas.append(meta)
+
+        return {
+            "items": metas,
+            "purged_document_ids": purged,
+            "delta_link": new_link,
+            "project_id": project_id,
+        }
 
     def write_batch_manifest(self, tenant: str, batch_id: str, items: list[dict[str, Any]]) -> str:
         return write_batch_manifest(tenant, batch_id, items, self._settings)
@@ -269,6 +341,7 @@ def write_batch_manifest(
     lines = [
         {
             "tenant": item["tenant"],
+            "project_id": item["project_id"],
             "source_id": item["source_id"],
             "content_hash": item["content_hash"],
             "document_id": item["document_id"],
@@ -309,6 +382,7 @@ def store_raw(
     data: bytes,
     filename: str,
     tenant: str,
+    project_id: str,
     source_id: str,
     mime: str,
     *,
@@ -316,12 +390,13 @@ def store_raw(
     store: BlobStore | None = None,
 ) -> dict[str, Any]:
     content_hash = sha256_bytes(data)
-    doc_id = document_id(tenant, content_hash)
-    key = s3_key_raw(tenant, source_id, content_hash, filename)
+    doc_id = document_id(tenant, project_id, content_hash)
+    key = s3_key_raw(tenant, project_id, source_id, content_hash, filename)
     blob = store or make_blob_store(settings or get_settings())
     uri = blob.put_bytes(key, data, skip_if_exists=True)
     return {
         "tenant": tenant,
+        "project_id": project_id,
         "source_id": source_id,
         "content_hash": content_hash,
         "document_id": doc_id,
@@ -331,12 +406,12 @@ def store_raw(
     }
 
 
-def collect_web(url: str, tenant: str, source_id: str = "web") -> dict[str, Any]:
+def collect_web(url: str, tenant: str, project_id: str, source_id: str = "web") -> dict[str, Any]:
     data, mime = fetch_url(url)
     filename = filename_from_url(url)
-    return store_raw(data, filename, tenant, source_id, mime)
+    return store_raw(data, filename, tenant, project_id, source_id, mime)
 
 
-def collect_local_file(path: Path, tenant: str, source_id: str) -> dict[str, Any]:
+def collect_local_file(path: Path, tenant: str, project_id: str, source_id: str) -> dict[str, Any]:
     data = path.read_bytes()
-    return store_raw(data, path.name, tenant, source_id, "application/octet-stream")
+    return store_raw(data, path.name, tenant, project_id, source_id, "application/octet-stream")

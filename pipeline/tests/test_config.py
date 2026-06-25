@@ -31,5 +31,4 @@ def test_env_file_fields(monkeypatch):
     s = Settings()
     assert s.path_graph_tenant == "acme"
     assert s.qdrant_url == "http://localhost:6333"
-    assert s.path_graph_projects_per_tenant == 4
     get_settings.cache_clear()

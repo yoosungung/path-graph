@@ -18,6 +18,7 @@ class SourceDriver(StrEnum):
 class SourceProfile(BaseModel):
     tenant: str
     id: str
+    project_id: str
     name: str
     driver: SourceDriver
     source_id: str
@@ -31,7 +32,7 @@ class SourceProfile(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-    @field_validator("tenant", "name", "source_id")
+    @field_validator("tenant", "name", "source_id", "project_id")
     @classmethod
     def _non_empty(cls, value: str) -> str:
         stripped = value.strip()
@@ -41,6 +42,7 @@ class SourceProfile(BaseModel):
 
 
 class SourceCreate(BaseModel):
+    project_id: str
     name: str
     driver: SourceDriver
     source_id: str
@@ -49,7 +51,7 @@ class SourceCreate(BaseModel):
     enabled: bool = True
     schedule_cron: str | None = None
 
-    @field_validator("name", "source_id")
+    @field_validator("project_id", "name", "source_id")
     @classmethod
     def _non_empty(cls, value: str) -> str:
         stripped = value.strip()
@@ -81,6 +83,7 @@ def row_to_profile(row: tuple) -> SourceProfile:
     (
         tenant,
         sid,
+        project_id,
         name,
         driver,
         source_id,
@@ -98,6 +101,7 @@ def row_to_profile(row: tuple) -> SourceProfile:
     return SourceProfile(
         tenant=tenant,
         id=str(sid) if not isinstance(sid, str) else sid,
+        project_id=str(project_id) if project_id else "",
         name=name,
         driver=SourceDriver(driver),
         source_id=source_id,

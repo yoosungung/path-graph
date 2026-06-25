@@ -13,7 +13,7 @@ def build_graph_context(
     max_entities: int = 50,
     source_chunk_ids: list[str] | None = None,
 ) -> dict:
-    space = record.nebula_space or nebula_space_name(record.tenant, record.project)
+    space = record.nebula_space or nebula_space_name(record.tenant, record.project_slug)
     entity_ids = record.entity_ids[:max_entities]
     entity_id_set = set(entity_ids)
     entities = nebula.get_entities(space, entity_ids)
@@ -21,7 +21,8 @@ def build_graph_context(
     return {
         "community_id": record.community_id,
         "tenant": record.tenant,
-        "project": record.project,
+        "project_id": record.project_id,
+        "project_slug": record.project_slug,
         "batch_id": record.batch_id,
         "level": record.level,
         "nebula_space": space,
@@ -48,5 +49,5 @@ def build_graph_context(
 
 def graph_context_key_for(record: CommunityRecord) -> str:
     return s3_key_graph_context(
-        record.tenant, record.project, record.batch_id, record.community_id
+        record.tenant, record.project_id, record.batch_id, record.community_id
     )

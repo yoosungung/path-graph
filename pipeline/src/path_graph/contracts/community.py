@@ -10,7 +10,8 @@ from path_graph.ids import nebula_space_name
 class CommunityRecord(BaseModel):
     community_id: str
     tenant: str
-    project: int
+    project_id: str
+    project_slug: str
     batch_id: str
     level: int
     parent_community_id: str | None = None
@@ -24,23 +25,25 @@ class CommunityRecord(BaseModel):
         cls,
         *,
         tenant: str,
-        project: int,
+        project_id: str,
+        project_slug: str,
         batch_id: str,
         level: int,
         cluster_key: str,
         entity_ids: list[str],
         parent_community_id: str | None = None,
     ) -> CommunityRecord:
-        cid = make_community_id(tenant, project, batch_id, level, cluster_key)
+        cid = make_community_id(tenant, project_id, batch_id, level, cluster_key)
         return cls(
             community_id=cid,
             tenant=tenant,
-            project=project,
+            project_id=project_id,
+            project_slug=project_slug,
             batch_id=batch_id,
             level=level,
             parent_community_id=parent_community_id,
             entity_ids=entity_ids,
             member_count=len(entity_ids),
-            nebula_space=nebula_space_name(tenant, project),
-            graph_context_key=s3_key_graph_context(tenant, project, batch_id, cid),
+            nebula_space=nebula_space_name(tenant, project_slug),
+            graph_context_key=s3_key_graph_context(tenant, project_id, batch_id, cid),
         )

@@ -90,3 +90,30 @@ class SharePointClient:
     def download_item(self, drive_id: str, item_id: str) -> bytes:
         url = f"{GRAPH_BASE}/drives/{drive_id}/items/{item_id}/content"
         return self._request("GET", url).content
+
+    def list_delta(
+        self,
+        drive_id: str,
+        *,
+        delta_link: str | None = None,
+        folder_path: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Return (items, new_delta_link). Items include removed entries when deleted."""
+        if delta_link:
+            url = delta_link
+        elif folder_path:
+            encoded = quote(folder_path, safe="/")
+            url = f"{GRAPH_BASE}/drives/{drive_id}/root:/{encoded}:/delta"
+        else:
+            url = f"{GRAPH_BASE}/drives/{drive_id}/root/delta"
+        items: list[dict[str, Any]] = []
+        new_link: str | None = None
+        while url:
+            data = self._request("GET", url).json()
+            items.extend(data.get("value", []))
+            url = data.get("@odata.nextLink")
+            if data.get("@odata.deltaLink"):
+                new_link = data["@odata.deltaLink"]
+            if url:
+                time.sleep(self._page_sleep)
+        return items, new_link

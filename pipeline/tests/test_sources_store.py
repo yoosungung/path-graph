@@ -12,6 +12,7 @@ def _row(**overrides):
     base = (
         "dev",
         "11111111-1111-4111-8111-111111111111",
+        "550e8400-e29b-41d4-a716-446655440000",
         "kms",
         "sharepoint",
         "sharepoint:kms",
@@ -30,10 +31,11 @@ def _row(**overrides):
         idx = {
             "tenant": 0,
             "id": 1,
-            "name": 2,
-            "driver": 3,
-            "source_id": 4,
-            "config": 5,
+            "project_id": 2,
+            "name": 3,
+            "driver": 4,
+            "source_id": 5,
+            "config": 6,
         }[key]
         items[idx] = val
     return tuple(items)
@@ -61,6 +63,7 @@ def test_create_source(mock_connect):
 
     store = SourceStore("postgresql://localhost/test")
     body = SourceCreate(
+        project_id="550e8400-e29b-41d4-a716-446655440000",
         name="new-src",
         driver=SourceDriver.GDRIVE,
         source_id="gdrive:reports",

@@ -21,10 +21,14 @@ def local_store(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+from constants import PROJECT_ID
+
+
 def _profile() -> SourceProfile:
     return SourceProfile(
         tenant="dev",
         id="11111111-1111-4111-8111-111111111111",
+        project_id=PROJECT_ID,
         name="kms",
         driver=SourceDriver.SHAREPOINT,
         source_id="sharepoint:kms",
@@ -49,6 +53,7 @@ def test_collect_and_read_manifest(local_store, monkeypatch):
     mock_collector.collect_folder.return_value = [
         {
             "tenant": "dev",
+            "project_id": PROJECT_ID,
             "source_id": "sharepoint:kms",
             "content_hash": "abc",
             "document_id": "doc-1",

@@ -12,6 +12,7 @@ def index_rag_for_document(
     tenant: str,
     chunks_key: str,
     document_id: str,
+    project_slug: str,
     *,
     skip_pg: bool = False,
     skip_qdrant: bool = False,
@@ -30,6 +31,7 @@ def index_rag_for_document(
         payloads = [
             {
                 "tenant": c.tenant,
+                "project_id": c.project_id,
                 "document_id": c.document_id,
                 "chunk_id": c.chunk_id,
                 "chunk_index": c.chunk_index,
@@ -40,6 +42,7 @@ def index_rag_for_document(
         ]
         qdrant.upsert_chunks(
             tenant,
+            project_slug,
             [c.chunk_id for c in chunks],
             vectors,
             payloads,

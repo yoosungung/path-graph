@@ -16,7 +16,8 @@ from path_graph.storage.blob import make_blob_store, read_jsonl, write_jsonl
 
 def clusters_to_records(
     tenant: str,
-    project: int,
+    project_id: str,
+    project_slug: str,
     batch_id: str,
     clusters: list[HierarchicalCluster],
 ) -> list[CommunityRecord]:
@@ -30,7 +31,8 @@ def clusters_to_records(
             )
         rec = CommunityRecord.build(
             tenant=tenant,
-            project=project,
+            project_id=project_id,
+            project_slug=project_slug,
             batch_id=batch_id,
             level=cluster.level,
             cluster_key=cluster.cluster_key,
@@ -44,7 +46,8 @@ def clusters_to_records(
 
 def run_community_pipeline_for_project(
     tenant: str,
-    project: int,
+    project_id: str,
+    project_slug: str,
     batch_id: str,
     chunks_key: str,
     *,
@@ -55,7 +58,7 @@ def run_community_pipeline_for_project(
     s = settings or get_settings()
     store = make_blob_store(s)
     nebula = nebula or make_nebula_store(s)
-    space = nebula_space_name(tenant, project)
+    space = nebula_space_name(tenant, project_slug)
 
     lines = read_jsonl(store, chunks_key)
     batch_chunk_ids = {line["chunk_id"] for line in lines}
@@ -66,9 +69,9 @@ def run_community_pipeline_for_project(
         use_lcc=s.community_use_lcc,
         seed=s.community_seed,
     )
-    records = clusters_to_records(tenant, project, batch_id, clusters)
+    records = clusters_to_records(tenant, project_id, project_slug, batch_id, clusters)
 
-    comm_key = s3_key_communities(tenant, project, batch_id)
+    comm_key = s3_key_communities(tenant, project_id, batch_id)
     comm_uri = write_jsonl(comm_key, [r.model_dump() for r in records], store)
 
     context_uris: list[str] = []
@@ -87,7 +90,8 @@ def run_community_pipeline_for_project(
         pg.upsert_communities(records, comm_uri)
 
     return {
-        "project": project,
+        "project_id": project_id,
+        "project_slug": project_slug,
         "communities_uri": comm_uri,
         "communities_key": comm_key,
         "community_count": len(records),
@@ -99,20 +103,22 @@ def run_community_pipeline_for_project(
 def run_community_pipeline(
     tenant: str,
     batch_id: str,
-    project_chunks: dict[int, str],
+    project_chunks: dict[str, str],
+    project_slug: str,
     *,
     nebula: NebulaGraphStore | None = None,
     settings: Settings | None = None,
     pg: PgMetaStore | None = None,
 ) -> list[dict]:
     results: list[dict] = []
-    for project in sorted(project_chunks):
+    for project_id in sorted(project_chunks):
         results.append(
             run_community_pipeline_for_project(
                 tenant,
-                project,
+                project_id,
+                project_slug,
                 batch_id,
-                project_chunks[project],
+                project_chunks[project_id],
                 nebula=nebula,
                 settings=settings,
                 pg=pg,

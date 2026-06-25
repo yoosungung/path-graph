@@ -10,6 +10,8 @@ from path_graph.steps.wiki_pipeline import run_wiki_pipeline
 
 def run_graphrag_pipeline(
     tenant: str,
+    project_id: str,
+    project_slug: str,
     batch_id: str,
     chunks_key: str,
     session_id: str,
@@ -22,6 +24,8 @@ def run_graphrag_pipeline(
 
     graph_result = run_graph_pipeline(
         tenant,
+        project_id,
+        project_slug,
         batch_id,
         chunks_key,
         session_id,
@@ -33,6 +37,7 @@ def run_graphrag_pipeline(
         tenant,
         batch_id,
         project_chunks,
+        project_slug,
         nebula=nebula,
         settings=settings,
         pg=pg,

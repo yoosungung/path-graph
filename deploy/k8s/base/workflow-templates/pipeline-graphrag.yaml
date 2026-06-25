@@ -11,6 +11,8 @@ spec:
   arguments:
     parameters:
       - name: tenant
+      - name: project_id
+      - name: project_slug
       - name: batch_id
       - name: chunks_key
       - name: skip_agent
@@ -36,6 +38,8 @@ spec:
             import os, json
             result = run_graphrag_pipeline(
                 os.environ["TENANT"],
+                os.environ["PROJECT_ID"],
+                os.environ["PROJECT_SLUG"],
                 os.environ["BATCH_ID"],
                 os.environ["CHUNKS_KEY"],
                 os.environ.get("SESSION_ID", "graphrag-session"),
@@ -48,6 +52,10 @@ spec:
         env:
           - name: TENANT
             value: "{{workflow.parameters.tenant}}"
+          - name: PROJECT_ID
+            value: "{{workflow.parameters.project_id}}"
+          - name: PROJECT_SLUG
+            value: "{{workflow.parameters.project_slug}}"
           - name: BATCH_ID
             value: "{{workflow.parameters.batch_id}}"
           - name: CHUNKS_KEY

@@ -22,3 +22,6 @@ resources:
   - workflow-templates/pipeline-graph.yaml
   - workflow-templates/pipeline-wiki.yaml
   - workflow-templates/pipeline-graphrag.yaml
+  - workflow-templates/pipeline-purge-document.yaml
+  - workflow-templates/pipeline-reconcile-index.yaml
+  - workflow-templates/pipeline-artifact-cleanup.yaml

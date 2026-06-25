@@ -5,14 +5,17 @@ from path_graph.collectors.ms_graph_auth import GraphAuthError
 from path_graph.collectors.remote import AgentChatCollector, GDriveCollector, OneDriveCollector
 
 
+from constants import PROJECT_ID
+
+
 def test_gdrive_requires_token():
     with pytest.raises(GDriveAuthError):
-        GDriveCollector().collect_file("fid", "dev", "gdrive")
+        GDriveCollector().collect_file("fid", "dev", PROJECT_ID, "gdrive")
 
 
 def test_onedrive_requires_token():
     with pytest.raises(GraphAuthError):
-        OneDriveCollector().collect_file("iid", "dev", "onedrive")
+        OneDriveCollector().collect_file("iid", "dev", PROJECT_ID, "onedrive")
 
 
 def test_agent_chat_collect(tmp_path, monkeypatch):
@@ -23,7 +26,7 @@ def test_agent_chat_collect(tmp_path, monkeypatch):
     get_settings.cache_clear()
     p = tmp_path / "chat.json"
     p.write_text('{"messages":[]}', encoding="utf-8")
-    meta = AgentChatCollector().collect_json(p, "dev", "chat")
+    meta = AgentChatCollector().collect_json(p, "dev", PROJECT_ID, "chat")
     assert meta["tenant"] == "dev"
     assert meta["filename"] == "conversation.json"
     get_settings.cache_clear()

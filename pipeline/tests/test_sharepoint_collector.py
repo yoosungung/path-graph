@@ -17,6 +17,7 @@ from path_graph.collectors.sharepoint import SharePointClient, SharePointError
 from path_graph.config import Settings
 from path_graph.contracts.s3_keys import s3_key_batch_manifest
 from path_graph.storage.blob import read_jsonl
+from constants import PROJECT_ID
 
 
 @pytest.fixture
@@ -180,6 +181,7 @@ def test_collect_folder_stores_raw(local_store):
     collector = SharePointCollector(client=client)
     items = collector.collect_folder(
         "dev",
+        PROJECT_ID,
         "sharepoint:kms",
         site="tripodoffice.sharepoint.com:/sites/kms",
         drive_name="Documents",
@@ -192,6 +194,7 @@ def test_collect_folder_stores_raw(local_store):
     # idempotent second run
     again = collector.collect_folder(
         "dev",
+        PROJECT_ID,
         "sharepoint:kms",
         site="tripodoffice.sharepoint.com:/sites/kms",
         drive_name="Documents",
@@ -209,7 +212,7 @@ def test_write_batch_manifest(local_store):
         http_client=httpx.Client(transport=_graph_transport()),
     )
     collector = SharePointCollector(client=client)
-    items = collector.collect_folder("dev", "sharepoint:kms", folder="회사규정")
+    items = collector.collect_folder("dev", PROJECT_ID, "sharepoint:kms", folder="회사규정")
     uri = collector.write_batch_manifest("dev", "batch-1", items)
     assert "batches/dev/batch-1/manifest.jsonl" in uri
     from path_graph.config import get_settings
@@ -248,12 +251,18 @@ def test_ingest_sharepoint_cli(local_store, monkeypatch):
         "path_graph.steps.ingest_sharepoint.SharePointCollector",
         lambda: SharePointCollector(client=client),
     )
+    monkeypatch.setattr(
+        "path_graph.steps.ingest_sharepoint.resolve_project_slug",
+        lambda *a, **k: "default",
+    )
     from path_graph.steps import ingest_sharepoint
 
     rc = ingest_sharepoint.main(
         [
             "--tenant",
             "dev",
+            "--project-id",
+            PROJECT_ID,
             "--source-id",
             "sharepoint:kms",
             "--folder",
@@ -283,7 +292,11 @@ def test_ingest_sharepoint_rag_flag(local_store, monkeypatch):
     )
     rag_calls: list[str] = []
 
-    def fake_rag(tenant, chunks_key, document_id, **kwargs):
+    monkeypatch.setattr(
+        "path_graph.steps.ingest_sharepoint.resolve_project_slug",
+        lambda *a, **k: "default",
+    )
+    def fake_rag(tenant, chunks_key, document_id, project_slug, **kwargs):
         rag_calls.append(document_id)
         return 1
 
@@ -294,6 +307,8 @@ def test_ingest_sharepoint_rag_flag(local_store, monkeypatch):
         [
             "--tenant",
             "dev",
+            "--project-id",
+            PROJECT_ID,
             "--folder",
             "회사규정",
             "--batch-id",
@@ -321,9 +336,15 @@ def test_ingest_sharepoint_dry_run(capsys, monkeypatch):
         "path_graph.steps.ingest_sharepoint.SharePointCollector",
         lambda: SharePointCollector(client=client),
     )
+    monkeypatch.setattr(
+        "path_graph.steps.ingest_sharepoint.resolve_project_slug",
+        lambda *a, **k: "default",
+    )
     from path_graph.steps import ingest_sharepoint
 
-    rc = ingest_sharepoint.main(["--tenant", "dev", "--folder", "회사규정", "--dry-run"])
+    rc = ingest_sharepoint.main(
+        ["--tenant", "dev", "--project-id", PROJECT_ID, "--folder", "회사규정", "--dry-run"]
+    )
     assert rc == 0
     out = capsys.readouterr().out
     assert "규정.txt" in out

@@ -142,6 +142,7 @@ def collect_source(
         collector = _sharepoint_collector(s)
         items = collector.collect_folder(
             tenant,
+            profile.project_id,
             source_id,
             site=cfg.get("site"),
             drive_name=cfg.get("drive"),
@@ -152,6 +153,7 @@ def collect_source(
         collector = _gdrive_collector(s)
         items = collector.collect_folder(
             tenant,
+            profile.project_id,
             source_id,
             folder_id=cfg.get("folder_id"),
             folder_path=cfg.get("folder_path"),
@@ -161,6 +163,7 @@ def collect_source(
         collector = _onedrive_collector(s)
         items = collector.collect_folder(
             tenant,
+            profile.project_id,
             source_id,
             folder=cfg.get("folder"),
             recursive=cfg.get("recursive", True),

@@ -2,13 +2,14 @@ from path_graph.contracts.community import CommunityRecord
 from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.steps.community_pipeline import run_community_pipeline_for_project
 from path_graph.steps.wiki_pipeline import run_wiki_for_community
+from constants import PROJECT_ID
 
 
 def test_community_and_wiki_stub_pipeline(local_store, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     memory: dict = {}
     nebula = NebulaGraphStore("h", 1, "u", "p", memory=memory)
-    space = "path_graph_dev_0"
+    space = "path_graph_dev_default"
     nebula.ensure_space(space)
     nebula.upsert_mentions(space, "chunk-1", ["Alpha", "Beta"])
     nebula.upsert_edges(
@@ -37,7 +38,8 @@ def test_community_and_wiki_stub_pipeline(local_store, monkeypatch):
 
     comm = run_community_pipeline_for_project(
         "dev",
-        0,
+        PROJECT_ID,
+        "default",
         "b1",
         chunks_key,
         nebula=nebula,
@@ -45,7 +47,7 @@ def test_community_and_wiki_stub_pipeline(local_store, monkeypatch):
     assert comm["community_count"] >= 1
     record = comm["records"][0]
     assert isinstance(record, CommunityRecord)
-    assert record.project == 0
+    assert record.project_id == PROJECT_ID
 
     wiki = run_wiki_for_community("dev", record, "sess", skip_agent=True)
     assert wiki["wiki_uris"]

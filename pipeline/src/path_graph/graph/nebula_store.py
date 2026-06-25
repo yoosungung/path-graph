@@ -222,6 +222,63 @@ class NebulaGraphStore:
         return []
 
 
+    def delete_chunks(self, space: str, chunk_ids: list[str]) -> int:
+        if not chunk_ids:
+            return 0
+        if self._memory is not None:
+            mem = self._mem(space)
+            chunk_set = set(chunk_ids)
+            mem.mentions = [
+                (cid, eid) for cid, eid in mem.mentions if cid not in chunk_set
+            ]
+            for cid in chunk_ids:
+                mem.entities.pop(f"chunk:{cid}", None)
+                mem.entities.pop(cid, None)
+            return len(chunk_ids)
+        sess = self._session()
+        deleted = 0
+        try:
+            sess.execute(f"USE {space};")
+            for cid in chunk_ids:
+                sess.execute(f'DELETE VERTEX "{cid}";')
+                deleted += 1
+        finally:
+            sess.release()
+        return deleted
+
+    def prune_orphan_entities(self, space: str) -> int:
+        if self._memory is not None:
+            mem = self._mem(space)
+            referenced = {eid for _, eid in mem.mentions}
+            for edge in mem.edges:
+                referenced.add(edge["source"])
+                referenced.add(edge["target"])
+            orphans = [eid for eid in list(mem.entities) if eid not in referenced]
+            for eid in orphans:
+                mem.entities.pop(eid, None)
+            return len(orphans)
+        return 0
+
+    def drop_space(self, space: str) -> bool:
+        if self._memory is not None:
+            if space in self._memory:
+                del self._memory[space]
+                return True
+            return False
+        sess = self._session()
+        try:
+            sess.execute(f"DROP SPACE IF EXISTS {space};")
+            return True
+        finally:
+            sess.release()
+
+    def list_chunk_vertices(self, space: str) -> list[str]:
+        if self._memory is not None:
+            mem = self._memory.get(space, _MemorySpace())
+            return sorted({cid for cid, _ in mem.mentions})
+        return []
+
+
 def _decode_value(val: Any) -> str:
     if val is None:
         return ""

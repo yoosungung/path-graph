@@ -36,7 +36,6 @@ class Settings(BaseSettings):
 
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_api_key: str = ""
-    path_graph_projects_per_tenant: int = 4  # PATH_GRAPH_PROJECTS_PER_TENANT
 
     nebula_host: str = "127.0.0.1"
     nebula_port: int = 9669

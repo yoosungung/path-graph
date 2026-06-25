@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-artifact-cleanup
+  namespace: path-graph
+spec:
+  serviceAccountName: path-graph-pipeline
+  imagePullSecrets:
+    - name: registry-creds
+  entrypoint: cleanup
+  arguments:
+    parameters:
+      - name: tenant
+      - name: project_id
+        value: ""
+      - name: execute
+        value: "false"
+  templates:
+    - name: cleanup
+      container:
+        image: path-graph/pipeline:latest
+        imagePullPolicy: Always
+        command: [sh, -c]
+        args:
+          - |
+            set -eu
+            extra=""
+            if [ "$EXECUTE" = "true" ]; then extra="--execute"; fi
+            pid=""
+            if [ -n "$PROJECT_ID" ]; then pid="--project-id $PROJECT_ID"; fi
+            exec python -m path_graph.steps.cleanup_step --tenant "$TENANT" $pid $extra
+        env:
+          - name: TENANT
+            value: "{{workflow.parameters.tenant}}"
+          - name: PROJECT_ID
+            value: "{{workflow.parameters.project_id}}"
+          - name: EXECUTE
+            value: "{{workflow.parameters.execute}}"
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

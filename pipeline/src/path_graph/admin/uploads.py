@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from path_graph.admin.lifecycle import TombstoneError, check_tombstone
 from path_graph.admin.sources import SourceStore
 from path_graph.collectors.remote import store_raw, write_batch_manifest
 from path_graph.config import Settings, get_settings
@@ -122,11 +123,20 @@ def upload_raw_file(
     tenant = profile.tenant
     source_id = profile.source_id
     content_hash = sha256_bytes(data)
-    key = s3_key_raw(tenant, source_id, content_hash, filename)
+    key = s3_key_raw(tenant, profile.project_id, source_id, content_hash, filename)
     blob = make_blob_store(s)
     already_exists = blob.exists(key)
 
-    meta = store_raw(data, filename, tenant, source_id, mime, settings=s, store=blob)
+    if s.path_graph_dsn:
+        pg = PgMetaStore(s.path_graph_dsn)
+        try:
+            check_tombstone(pg, tenant, profile.project_id, content_hash)
+        except TombstoneError as exc:
+            raise UploadValidationError(str(exc)) from exc
+
+    meta = store_raw(
+        data, filename, tenant, profile.project_id, source_id, mime, settings=s, store=blob
+    )
 
     if not already_exists and s.path_graph_dsn:
         pg = PgMetaStore(s.path_graph_dsn)
@@ -134,6 +144,7 @@ def upload_raw_file(
             tenant,
             meta["document_id"],
             source_id,
+            profile.project_id,
             content_hash,
             meta["s3_raw_uri"],
             "",
@@ -227,6 +238,7 @@ def build_ingest_manifest(
     manifest_items = [
         {
             "tenant": profile.tenant,
+            "project_id": profile.project_id,
             "source_id": profile.source_id,
             "content_hash": d["content_hash"],
             "document_id": d["document_id"],

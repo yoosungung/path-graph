@@ -10,6 +10,7 @@ from path_graph.contracts.source import (
     SourceProfile,
     row_to_profile,
 )
+from constants import PROJECT_ID
 
 
 def test_row_to_profile():
@@ -17,6 +18,7 @@ def test_row_to_profile():
     row = (
         "dev",
         "11111111-1111-4111-8111-111111111111",
+        PROJECT_ID,
         "kms",
         "sharepoint",
         "sharepoint:kms",
@@ -32,6 +34,7 @@ def test_row_to_profile():
     )
     profile = row_to_profile(row)
     assert profile.tenant == "dev"
+    assert profile.project_id == PROJECT_ID
     assert profile.name == "kms"
     assert profile.driver == SourceDriver.SHAREPOINT
     assert profile.config["folder"] == "회사규정"
@@ -39,7 +42,12 @@ def test_row_to_profile():
 
 def test_source_create_requires_name():
     with pytest.raises(ValueError):
-        SourceCreate(name="  ", driver=SourceDriver.SHAREPOINT, source_id="sp:kms")
+        SourceCreate(
+            project_id=PROJECT_ID,
+            name="  ",
+            driver=SourceDriver.SHAREPOINT,
+            source_id="sp:kms",
+        )
 
 
 def test_source_driver_includes_manual():
@@ -50,6 +58,7 @@ def test_source_profile_roundtrip_fields():
     p = SourceProfile(
         tenant="dev",
         id="11111111-1111-4111-8111-111111111111",
+        project_id=PROJECT_ID,
         name="gdrive-reports",
         driver=SourceDriver.GDRIVE,
         source_id="gdrive:reports",

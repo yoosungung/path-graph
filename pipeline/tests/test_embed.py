@@ -6,6 +6,7 @@ import pytest
 from path_graph.config import Settings
 from path_graph.rag.embed import EmbeddingClient, embed_chunks
 from path_graph.contracts.schemas import ChunkRecord
+from constants import PROJECT_ID
 
 
 def test_embedding_defaults():
@@ -89,6 +90,7 @@ def test_embed_chunks(mock_embed):
             chunk_id="c1",
             document_id="d1",
             tenant="t",
+            project_id=PROJECT_ID,
             chunk_index=0,
             text="hi",
             text_hash="h",

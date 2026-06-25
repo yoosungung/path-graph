@@ -4,6 +4,9 @@ from path_graph.contracts.credential import CredentialProfile, OAuthStatus, k8s_
 from path_graph.contracts.source import SourceDriver, SourceProfile
 
 
+from constants import PROJECT_ID
+
+
 def test_merge_gdrive_refresh_token():
     base = Settings(gdrive_client_id="", gdrive_refresh_token="")
     cred = CredentialProfile(
@@ -18,6 +21,7 @@ def test_merge_gdrive_refresh_token():
     profile = SourceProfile(
         tenant="dev",
         id="22222222-2222-4222-8222-222222222222",
+        project_id=PROJECT_ID,
         name="docs",
         driver=SourceDriver.GDRIVE,
         source_id="gdrive:docs",

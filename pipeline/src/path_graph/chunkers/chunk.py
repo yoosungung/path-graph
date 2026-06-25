@@ -34,10 +34,11 @@ def chunk_from_markdown(
     text: str,
     tenant: str,
     content_hash: str,
+    project_id: str,
     *,
     max_chars: int = 1000,
 ) -> list[ChunkRecord]:
-    doc_id = document_id(tenant, content_hash)
+    doc_id = document_id(tenant, project_id, content_hash)
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     if not paragraphs:
         paragraphs = [text.strip()] if text.strip() else []
@@ -65,6 +66,7 @@ def chunk_from_markdown(
                 chunk_id=chunk_id(tenant, doc_id, idx, th),
                 document_id=doc_id,
                 tenant=tenant,
+                project_id=project_id,
                 chunk_index=idx,
                 text=body,
                 text_hash=th,
@@ -87,6 +89,7 @@ def chunk_from_markdown(
                         chunk_id=chunk_id(tenant, doc_id, idx, sha256_text(sub)),
                         document_id=doc_id,
                         tenant=tenant,
+                        project_id=project_id,
                         chunk_index=idx,
                         text=sub,
                         text_hash=sha256_text(sub),
@@ -109,10 +112,11 @@ def chunk_from_rhwp_json(
     doc: dict[str, Any],
     tenant: str,
     content_hash: str,
+    project_id: str,
     *,
     max_chars: int = 1000,
 ) -> list[ChunkRecord]:
-    doc_id = document_id(tenant, content_hash)
+    doc_id = document_id(tenant, project_id, content_hash)
     blocks = doc.get("blocks") or []
     chunks: list[ChunkRecord] = []
     idx = 0
@@ -131,6 +135,7 @@ def chunk_from_rhwp_json(
                     chunk_id=chunk_id(tenant, doc_id, idx, th),
                     document_id=doc_id,
                     tenant=tenant,
+                    project_id=project_id,
                     chunk_index=idx,
                     text=body,
                     text_hash=th,

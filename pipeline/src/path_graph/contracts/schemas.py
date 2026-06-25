@@ -9,6 +9,7 @@ class ChunkRecord(BaseModel):
     chunk_id: str
     document_id: str
     tenant: str
+    project_id: str
     chunk_index: int
     text: str
     text_hash: str
@@ -18,6 +19,7 @@ class ChunkRecord(BaseModel):
 
 class BatchManifestLine(BaseModel):
     tenant: str
+    project_id: str
     source_id: str
     content_hash: str
     s3_raw_uri: str
@@ -27,7 +29,7 @@ class BatchManifestLine(BaseModel):
 
 class GraphExtractorInput(BaseModel):
     tenant: str
-    project: int
+    project_id: str
     batch_id: str
     chunks_s3: str
     output_schema: str = "graph_v1"
@@ -36,7 +38,7 @@ class GraphExtractorInput(BaseModel):
 
 class WikiSynthesizerInput(BaseModel):
     tenant: str
-    project: int
+    project_id: str
     community_id: str
     community_level: int
     graph_context_s3: str

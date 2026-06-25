@@ -6,7 +6,11 @@ import os
 import sys
 
 from path_graph.config import get_settings
-from path_graph.steps.ingest_helpers import ingest_item, parse_manifest_line
+from path_graph.steps.ingest_helpers import (
+    ingest_item,
+    parse_manifest_line,
+    resolve_project_slug,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,10 +36,15 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     settings = get_settings()
+    project_slug = resolve_project_slug(
+        meta["tenant"], meta["project_id"], settings, project_slug=meta.get("project_slug")
+    )
     success, detail = ingest_item(
         meta,
         meta["tenant"],
         meta["source_id"],
+        meta["project_id"],
+        project_slug,
         rag=args.rag,
         settings=settings,
     )

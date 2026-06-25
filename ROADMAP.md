@@ -10,7 +10,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **91 tests** (2026-06) |
+| pipeline 패키지 | v0.1.0, `make test` **102 tests** (2026-06) |
 | 로컬 ingest | CLI로 **web / local file / SharePoint / GDrive / OneDrive** → parse → chunk → (선택) RAG |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward 가능 (`wire-dev.sh`) |
 | Argo Workflows | `argo` NS — `make argo-install` |
@@ -34,17 +34,19 @@
 | 1.1.5 | parse → chunk → meta 적재 | [x] | markitdown + rhwp-batch |
 | 1.1.6 | `CHUNK_MAX_CHARS` (기본 1000) + 긴 문단 hard-split | [x] | embed context 안전 |
 | 1.1.7 | dead-letter (parse 실패 격리) | [x] | S3 + PG `dead_letter` |
-| 1.1.8 | PG `path_graph.*` 스키마·마이그레이션 | [~] | 테이블·RLS **enable**만; **POLICY 미정의** |
+| 1.1.8 | PG `path_graph.*` 스키마·마이그레이션 | [x] | lifecycle 테이블·RLS POLICY 포함 |
 | 1.1.9 | `pipeline_runs` / ingest_state **전 단계 기록** | [~] | 테이블 있음; **RAG·DLQ만 write**, graph/wiki 커서·run 미연동 |
-| 1.1.10 | RLS 정책 (`tenant = current_setting('app.tenant')`) | [ ] | ARCHITECTURE §1 요구 |
-| 1.1.11 | document **compensation** (재처리 시 Qdrant/Nebula 삭제) | [ ] | ARCHITECTURE §1 보상 규칙 |
+| 1.1.10 | RLS 정책 (`tenant = current_setting('app.tenant')`) | [x] | `meta/pg.py` `RLS_POLICY_MIGRATION_SQL` |
+| 1.1.11 | document **compensation** (재처리 시 Qdrant/Nebula 삭제) | [x] | `lifecycle/compensation.py` |
+| 1.1.12 | **purge** · tombstone · reconcile | [x] | `lifecycle/purge.py`, `reconcile.py`, Argo WF |
+| 1.1.13 | SharePoint **delta sync** | [~] | `SharePointClient.list_delta`, `collect_delta` |
 
 ### 1.2 RAG
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 1.2.1 | TEI OpenAI-compatible embed (`bge-m3`, dim 1024) | [x] | `rag/embed.py` |
-| 1.2.2 | Qdrant upsert (tenant×project shard) | [x] | |
+| 1.2.2 | Qdrant upsert (project Silo collection) | [x] | `path_graph_{tenant}_{project_slug}` |
 | 1.2.3 | PG `chunks` + `document_ingest_state.rag_at` | [x] | |
 | 1.2.4 | 로컬 RAG E2E (`ingest_web --rag`) | [~] | `EMBEDDING_BASE_URL` k8s 내부 주소 — 로컬은 port-forward 또는 URL override 필요 |
 | 1.2.5 | embed 실패 재시도·배치 (`EMBEDDING_BATCH_SIZE`) | [x] | |
@@ -97,7 +99,7 @@
 | 2.1.4 | OneDrive (`/me/drive`) | [x] | `ingest_onedrive` |
 | 2.1.5 | agent-chat JSON export | [x] | `AgentChatCollector` |
 | 2.1.6 | `batches/{tenant}/{batch_id}/manifest.jsonl` writer | [x] | collect CLI가 생성 |
-| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [ ] | |
+| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | `list_delta` + `collect_delta`; source config `delta_link` |
 | 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [ ] | |
 
 ### 2.2 Graph pipeline
@@ -106,8 +108,8 @@
 |---|---|---|---|
 | 2.2.1 | wikilink deterministic extract | [x] | `graph_pipeline.py` |
 | 2.2.2 | graph-extractor agent invoke | [x] | |
-| 2.2.3 | Nebula upsert (project shard) | [x] | |
-| 2.2.4 | `partition_chunks_by_project` | [x] | |
+| 2.2.3 | Nebula upsert (project Space) | [x] | `project_id` + `project_slug` |
+| 2.2.4 | `copy_chunks_to_project_batch` | [x] | hash 샤드 `partition_chunks_by_project` **폐기** |
 | 2.2.5 | WorkflowTemplate `pipeline-graph` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
 
 ### 2.3 Wiki pipeline
@@ -147,7 +149,8 @@
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
-| 3.2.1 | VFS wiki mount | [ ] | agents-runtime 측 |
+| 3.2.0 | **Agent `path_graph_project_id` + Knowledge Binding resolve** | [~] | path-graph `resolve_knowledge_binding`; runtime 저장·retrieval/VFS는 [ ] |
+| 3.2.1 | VFS wiki mount | [ ] | agents-runtime 측 — binding `wiki.s3_prefix` |
 | 3.2.2 | async job API + Argo **suspend/resume** | [ ] | Phase 1은 extended sync poll |
 
 ### 3.3 검색 · 파싱 고도화
@@ -187,21 +190,23 @@
 
 목표: 운영자가 **로그인 한 번**으로 수집·ingest·상태 확인. path-graph repo에는 UI 없음 — agents-runtime `backend` + `frontend` 확장.
 
-### 4.0 계약 (ARCHITECTURE §1 Admin Console)
+### 4.0 계약 (ARCHITECTURE §1 Admin Console · Knowledge Project)
 
 | 항목 | 결정 |
 |------|------|
 | DB | runtime Postgres 단일 — `public.users` + `path_graph.*` |
 | `users.tenant` | NOT NULL (agents-runtime `0009_users_tenant_not_null.sql`) |
 | 멀티 tenant | **없음** — 1 user = 1 tenant |
+| **Knowledge Project** | `path_graph.projects` — 사용자 정의 정보 집합; source·RAG·graph·wiki·에이전트 binding 스코프 |
 | Pipeline UI/API | **`role = admin` 만** — `pipeline_source` ACL 없음 |
-| Pipeline Pod | `users` 미사용 (WF `tenant` 파라미터) |
+| Pipeline Pod | `users` 미사용 (WF `tenant` + `project_id` 파라미터) |
 
 ### 4.1 Backend (`/api/pipeline/*`)
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
-| 4.1.1 | `path_graph.sources` 테이블·마이그레이션 | [x] | `tenant`, `name`, `driver`, `config` (OAuth는 `path-graph-env` Secret) |
+| 4.1.0 | **`projects` 테이블·CRUD·`resolve_binding`** | [x] | path-graph `admin/projects.py`; BFF `/api/pipeline/projects`는 agents-runtime |
+| 4.1.1 | `path_graph.sources` + **`project_id` FK** | [x] | Source 생성 시 project 필수 |
 | 4.1.2 | Sources CRUD + 연결 테스트 | [x] | SharePoint/GDrive/OneDrive dry-run (`probe_source`) |
 | 4.1.3 | Run now → collect → Argo `pipeline-ingest-rag` | [x] | BFF가 manifest jsonl → JSON 배열 submit (MVP) |
 | 4.1.4 | Runs / dead-letter 조회 | [x] | `pipeline_runs`, `documents.ingest_state=dead_letter` |
@@ -212,6 +217,7 @@
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
+| 4.2.0 | **Projects 목록/생성 + Source project 선택** | [ ] | agents-runtime UI; path-graph 도메인 준비됨 |
 | 4.2.1 | Nav + Sources 목록/생성 폼 | [x] | `frontend/src/pipeline/`, Layout Pipeline 링크 |
 | 4.2.2 | OAuth 마법사 (SharePoint/GDrive) | [x] | `source_credentials` + K8s Secret; `/api/pipeline/credentials/*/oauth/start` |
 | 4.2.3 | Run now + Runs 테이블 | [x] | Run now → 202 + `pipeline-collect-ingest-rag` WF |
@@ -225,6 +231,16 @@
 | 4.3.1 | WF `batch_manifest_key` (S3 manifest 경로) | [x] | `load_batch_manifest` step; inline JSON legacy |
 | 4.3.2 | `pipeline-collect-ingest-rag` WorkflowTemplate | [x] | BFF Run now 202 + collect→ingest chain |
 | 4.3.3 | CronWorkflow per source (Console에서 스케줄) | [x] | BFF reconcile on create/update/delete |
+| 4.3.4 | WF `pipeline-purge-document` / `pipeline-reconcile-index` / `pipeline-artifact-cleanup` | [x] | `deploy/k8s/base/workflow-templates/` |
+
+### 4.4 Lifecycle (agents-runtime BFF 연동)
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 4.4.1 | path-graph `admin.lifecycle` 도메인 API | [x] | purge/restore/reingest/cleanup/reconcile/tombstones |
+| 4.4.2 | BFF `/api/pipeline/documents/{id}/purge` 등 | [ ] | agents-runtime `pipeline.py` 래핑 |
+| 4.4.3 | UI purge·tombstones·reconcile 리포트 | [ ] | Projects→Sources→Documents 액션 |
+| 4.4.4 | CronWorkflow `pipeline-reconcile-index` per project | [ ] | 일 1회 |
 
 ---
 

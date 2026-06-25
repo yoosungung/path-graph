@@ -29,6 +29,7 @@ def _manual_profile(**overrides) -> SourceProfile:
     base = dict(
         tenant="dev",
         id="11111111-1111-4111-8111-111111111111",
+        project_id="550e8400-e29b-41d4-a716-446655440000",
         name="manual-docs",
         driver=SourceDriver.MANUAL,
         source_id="manual:docs",
