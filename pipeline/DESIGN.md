@@ -43,6 +43,8 @@ collect / ingest_web
 
 관리 계층: `tenant → project → source → document → chunk`. Agent: `tenant → project → (rag, graph, wiki)` ([`contracts/project.py`](src/path_graph/contracts/project.py)).
 
+**Project slug**: `slug` 미지정 시 `name`에서 `[a-z0-9_-]`만 남겨 derive. 라틴 문자가 없으면(예: 한글 전용 name) `p_{sha256(name)[:8]}` fallback. 명시 `slug`가 규칙 위반이면 API 422.
+
 | 모듈 | 역할 |
 |------|------|
 | `lifecycle/tombstone.py` | `(tenant, project_id, content_hash)` 차단 |

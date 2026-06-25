@@ -1,6 +1,6 @@
 import pytest
 
-from path_graph.contracts.project import ProjectCreate, resolve_knowledge_binding
+from path_graph.contracts.project import ProjectCreate, resolve_knowledge_binding, slug_from_name
 from path_graph.ids import qdrant_collection_name
 
 
@@ -17,3 +17,14 @@ def test_resolve_knowledge_binding_collection_matches_slug():
 def test_project_create_slug_optional():
     body = ProjectCreate(name="Product Docs")
     assert body.slug is None
+
+
+def test_slug_from_name_latin():
+    assert slug_from_name("Product Docs") == "product_docs"
+
+
+def test_slug_from_name_non_latin_fallback():
+    slug = slug_from_name("문서 프로젝트")
+    assert slug.startswith("p_")
+    assert len(slug) == 10
+    assert slug_from_name("문서 프로젝트") == slug

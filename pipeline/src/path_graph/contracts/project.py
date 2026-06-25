@@ -7,7 +7,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from path_graph.contracts.s3_keys import s3_key_wiki_prefix
-from path_graph.ids import nebula_space_name, normalize_project_slug, qdrant_collection_name
+from path_graph.ids import nebula_space_name, normalize_project_slug, qdrant_collection_name, sha256_text
 
 
 class ProjectProfile(BaseModel):
@@ -68,9 +68,10 @@ class KnowledgeBinding(BaseModel):
 
 
 def slug_from_name(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9_-]+", "_", name.lower()).strip("_")
+    stripped = name.strip()
+    slug = re.sub(r"[^a-z0-9_-]+", "_", stripped.lower()).strip("_")
     if not slug:
-        raise ValueError("invalid project slug from name")
+        slug = f"p_{sha256_text(stripped)[:8]}"
     return normalize_project_slug(slug)
 
 
