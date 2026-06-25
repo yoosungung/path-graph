@@ -106,6 +106,28 @@ def list_documents_for_source(
     return [_document_row(d) for d in docs]
 
 
+def list_documents_for_project(
+    tenant: str,
+    project_id: str,
+    *,
+    source_id: str | None = None,
+    ingest_state: str | None = None,
+    dsn: str | None = None,
+) -> list[dict[str, Any]]:
+    s = get_settings()
+    resolved = dsn or s.path_graph_dsn
+    if not resolved:
+        return []
+    pg = PgMetaStore(resolved)
+    docs = pg.list_documents_for_project(
+        tenant,
+        project_id,
+        source_id=source_id,
+        ingest_state=ingest_state,
+    )
+    return [_document_row(d) for d in docs]
+
+
 def upload_raw_file(
     profile: SourceProfile,
     data: bytes,

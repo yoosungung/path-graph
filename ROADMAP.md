@@ -213,16 +213,17 @@
 | 4.1.5 | `require_admin` 가드 전 API | [x] | agents-runtime `UserRole.ADMIN` |
 | 4.1.6 | Manual raw upload / ingest / documents API | [x] | `driver=manual`, multipart upload, pending ingest |
 
-### 4.2 Frontend (`/pipeline/*`)
+### 4.2 Frontend (`/pipeline/*` + `/files/*`)
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
-| 4.2.0 | **Projects 목록/생성 + Source project 선택** | [ ] | agents-runtime UI; path-graph 도메인 준비됨 |
-| 4.2.1 | Nav + Sources 목록/생성 폼 | [x] | `frontend/src/pipeline/`, Layout Pipeline 링크 |
-| 4.2.2 | OAuth 마법사 (SharePoint/GDrive) | [x] | `source_credentials` + K8s Secret; `/api/pipeline/credentials/*/oauth/start` |
-| 4.2.3 | Run now + Runs 테이블 | [x] | Run now → 202 + `pipeline-collect-ingest-rag` WF |
+| 4.2.0 | **Project-first IA** | [x] | Nav Pipeline + **파일관리**; `/pipeline/projects/:id/*`; `knowledge/` 공유 context |
+| 4.2.1 | Pipeline Sources·Runs·Credentials | [x] | project nested 라우트; flat `/pipeline/sources` 제거 |
+| 4.2.2 | OAuth 마법사 (SharePoint/GDrive) | [x] | `source_credentials` + K8s Secret |
+| 4.2.3 | Run now + Runs (WF만) | [x] | dead-letter 탭 → 파일관리 |
 | 4.2.4 | `<RequireAdmin />` 라우트 가드 | [x] | `RequireRole min="admin"` |
-| 4.2.5 | Manual source UI (upload + documents + ingest) | [x] | `FileDropZone` multi, pending ingest |
+| 4.2.5 | Manual upload + ingest (Pipeline source) | [x] | 상세 문서 테이블 → 파일관리 링크 |
+| 4.2.6 | **파일관리** (`frontend/src/files/`) | [x] | documents·lifecycle·purge UI |
 
 ### 4.3 오케스트레이션
 
@@ -238,8 +239,8 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 4.4.1 | path-graph `admin.lifecycle` 도메인 API | [x] | purge/restore/reingest/cleanup/reconcile/tombstones |
-| 4.4.2 | BFF `/api/pipeline/documents/{id}/purge` 등 | [ ] | agents-runtime `pipeline.py` 래핑 |
-| 4.4.3 | UI purge·tombstones·reconcile 리포트 | [ ] | Projects→Sources→Documents 액션 |
+| 4.4.2 | BFF `/api/pipeline/documents/{id}/purge` 등 | [x] | agents-runtime `pipeline.py` 래핑 |
+| 4.4.3 | UI purge·tombstones·reconcile 리포트 | [x] | `/files/projects/:id/*` |
 | 4.4.4 | CronWorkflow `pipeline-reconcile-index` per project | [ ] | 일 1회 |
 
 ---
