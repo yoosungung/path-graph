@@ -118,6 +118,34 @@ class ProjectStore:
             return existing
         return self.create_project(tenant, ProjectCreate(name="Default", slug="default"))
 
+    def backfill_orphan_project_ids(self, tenant: str) -> int:
+        """Assign tenant default project to rows missing project_id (legacy data)."""
+        default = self.ensure_default_project(tenant)
+        updated = 0
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            for table in ("sources", "documents", "chunks"):
+                cur = conn.execute(
+                    f"""
+                    UPDATE path_graph.{table}
+                    SET project_id = %s::uuid
+                    WHERE tenant = %s AND project_id IS NULL
+                    """,
+                    (default.id, tenant),
+                )
+                updated += cur.rowcount
+            if updated:
+                conn.execute(
+                    """
+                    UPDATE path_graph.sources
+                    SET updated_at = now()
+                    WHERE tenant = %s AND project_id = %s::uuid
+                    """,
+                    (tenant, default.id),
+                )
+            conn.commit()
+        return updated
+
     def resolve_binding(self, tenant: str, project_id: str):
         profile = self.get_project(tenant, project_id)
         if profile is None:

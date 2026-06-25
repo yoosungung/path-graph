@@ -5,6 +5,7 @@ from typing import Any
 
 import psycopg
 
+from path_graph.admin.projects import ProjectStore
 from path_graph.contracts.source import (
     SourceCreate,
     SourceProfile,
@@ -33,6 +34,7 @@ class SourceStore:
     """
 
     def list_sources(self, tenant: str) -> list[SourceProfile]:
+        ProjectStore(self._dsn).backfill_orphan_project_ids(tenant)
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
             rows = conn.execute(

@@ -52,6 +52,7 @@ collect / ingest_web
 | `lifecycle/artifact_cleanup.py` | temp S3 정리 (indexed 미접촉) |
 | `lifecycle/wiki_stale.py` | purge 후 stale_communities 기록 |
 | `admin/lifecycle.py` | BFF용 `api_*` (agents-runtime 래핑) |
+| `admin/projects.py` | `ensure_default_project`, `backfill_orphan_project_ids` — legacy `project_id IS NULL` 행 복구 |
 | `steps/purge_step.py` | Argo/CLI purge |
 | `steps/reconcile_step.py` | Argo/CLI reconcile |
 | `steps/cleanup_step.py` | Argo/CLI artifact cleanup |

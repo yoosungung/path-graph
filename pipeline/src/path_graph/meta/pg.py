@@ -271,6 +271,47 @@ ALTER TABLE path_graph.stale_communities ENABLE ROW LEVEL SECURITY;
 """
 
 
+SOURCE_PROJECT_BACKFILL_MIGRATION_SQL = """
+DO $$
+DECLARE
+  rec RECORD;
+  default_id UUID;
+BEGIN
+  FOR rec IN
+    SELECT DISTINCT tenant FROM (
+      SELECT tenant FROM path_graph.sources WHERE project_id IS NULL
+      UNION
+      SELECT tenant FROM path_graph.documents WHERE project_id IS NULL
+      UNION
+      SELECT tenant FROM path_graph.chunks WHERE project_id IS NULL
+    ) t
+  LOOP
+    SELECT id INTO default_id
+    FROM path_graph.projects
+    WHERE tenant = rec.tenant AND slug = 'default';
+
+    IF default_id IS NULL THEN
+      default_id := gen_random_uuid();
+      INSERT INTO path_graph.projects (tenant, id, slug, name)
+      VALUES (rec.tenant, default_id, 'default', 'Default');
+    END IF;
+
+    UPDATE path_graph.sources
+    SET project_id = default_id, updated_at = now()
+    WHERE tenant = rec.tenant AND project_id IS NULL;
+
+    UPDATE path_graph.documents
+    SET project_id = default_id
+    WHERE tenant = rec.tenant AND project_id IS NULL;
+
+    UPDATE path_graph.chunks
+    SET project_id = default_id
+    WHERE tenant = rec.tenant AND project_id IS NULL;
+  END LOOP;
+END $$;
+"""
+
+
 def iter_migration_sql() -> list[str]:
     return [
         MIGRATION_SQL,
@@ -278,6 +319,7 @@ def iter_migration_sql() -> list[str]:
         CREDENTIALS_MIGRATION_SQL,
         PROJECTS_MIGRATION_SQL,
         LEGACY_PROJECT_MIGRATION_SQL,
+        SOURCE_PROJECT_BACKFILL_MIGRATION_SQL,
         LIFECYCLE_MIGRATION_SQL,
         RLS_POLICY_MIGRATION_SQL,
     ]

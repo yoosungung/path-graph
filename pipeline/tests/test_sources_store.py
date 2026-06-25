@@ -41,14 +41,18 @@ def _row(**overrides):
     return tuple(items)
 
 
+@patch("path_graph.admin.sources.ProjectStore")
 @patch("path_graph.admin.sources.psycopg.connect")
-def test_list_sources(mock_connect):
+def test_list_sources(mock_connect, mock_project_store_cls):
     conn = MagicMock()
     mock_connect.return_value.__enter__.return_value = conn
     conn.execute.return_value.fetchall.return_value = [_row()]
+    mock_project_store_cls.return_value.backfill_orphan_project_ids.return_value = 0
 
     store = SourceStore("postgresql://localhost/test")
     profiles = store.list_sources("dev")
+
+    mock_project_store_cls.return_value.backfill_orphan_project_ids.assert_called_once_with("dev")
 
     assert len(profiles) == 1
     assert profiles[0].name == "kms"
