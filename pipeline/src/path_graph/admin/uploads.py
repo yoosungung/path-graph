@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from path_graph.admin.lifecycle import TombstoneError, check_tombstone
+from path_graph.lifecycle.tombstone import TombstoneError, check_tombstone
 from path_graph.admin.sources import SourceStore
 from path_graph.collectors.remote import store_raw, write_batch_manifest
 from path_graph.config import Settings, get_settings

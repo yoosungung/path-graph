@@ -62,3 +62,15 @@ def test_compensate_document_index(mock_proj, mock_nebula, mock_qdrant):
     )
     assert result["qdrant_deleted"] == 1
     assert result["nebula_deleted"] == 1
+
+
+def test_lifecycle_step_modules_import_without_cycle():
+    """Argo entrypoints must load without admin↔lifecycle circular imports."""
+    import importlib
+
+    for mod in (
+        "path_graph.steps.cleanup_step",
+        "path_graph.steps.purge_step",
+        "path_graph.steps.reconcile_step",
+    ):
+        importlib.import_module(mod)
