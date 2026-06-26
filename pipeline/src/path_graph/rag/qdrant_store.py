@@ -140,8 +140,23 @@ class QdrantStore:
 
 
 def make_qdrant_store(settings: Settings | None = None) -> QdrantStore:
+    import warnings
+
     from qdrant_client import QdrantClient
 
     s = settings or get_settings()
-    client = QdrantClient(url=s.qdrant_url, api_key=s.qdrant_api_key or None)
+    if not s.qdrant_url:
+        raise ValueError("QDRANT_URL is required for RAG index")
+    if s.qdrant_url.startswith("http://") and not s.qdrant_api_key:
+        raise ValueError(
+            "QDRANT_API_KEY is required when Qdrant has apiKey enabled "
+            "(sync: ./scripts/create-path-graph-secrets.sh)"
+        )
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Api key is used with an insecure connection.*",
+            category=UserWarning,
+        )
+        client = QdrantClient(url=s.qdrant_url, api_key=s.qdrant_api_key or None)
     return QdrantStore(client, s)

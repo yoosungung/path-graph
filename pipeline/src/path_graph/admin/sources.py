@@ -14,6 +14,35 @@ from path_graph.contracts.source import (
     row_to_profile,
 )
 
+TERMINAL_PIPELINE_RUN_STATUSES = frozenset({"Succeeded", "Failed", "Error"})
+
+
+def _format_pipeline_run_ts(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    iso = value.isoformat()  # type: ignore[union-attr]
+    if iso.endswith("+00:00"):
+        return iso[:-6] + "Z"
+    return iso
+
+
+def _pipeline_run_row(row: tuple[Any, ...]) -> dict[str, Any]:
+    return {
+        "id": row[0],
+        "workflow_name": row[1],
+        "argo_uid": row[2],
+        "batch_id": row[3],
+        "status": row[4],
+        "started_at": _format_pipeline_run_ts(row[5]),
+        "ended_at": _format_pipeline_run_ts(row[6]),
+    }
+
+
+def _pipeline_run_row_with_tenant(row: tuple[Any, ...]) -> dict[str, Any]:
+    return {"tenant": row[0], **_pipeline_run_row(row[1:])}
+
 
 class SourceStore:
     """CRUD for path_graph.sources (tenant-scoped)."""
@@ -209,32 +238,31 @@ class SourceStore:
         source_id: str,
         *,
         ingest_state: str | None = None,
-        limit: int = 50,
+        limit: int | None = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
+            clauses = ["tenant = %s", "source_id = %s"]
+            params: list[Any] = [tenant, source_id]
             if ingest_state:
-                rows = conn.execute(
-                    """
-                    SELECT id::text, source_id, content_hash, ingest_state, s3_raw_uri
-                    FROM path_graph.documents
-                    WHERE tenant = %s AND source_id = %s AND ingest_state = %s
-                    ORDER BY id DESC
-                    LIMIT %s
-                    """,
-                    (tenant, source_id, ingest_state, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT id::text, source_id, content_hash, ingest_state, s3_raw_uri
-                    FROM path_graph.documents
-                    WHERE tenant = %s AND source_id = %s
-                    ORDER BY id DESC
-                    LIMIT %s
-                    """,
-                    (tenant, source_id, limit),
-                ).fetchall()
+                clauses.append("ingest_state = %s")
+                params.append(ingest_state)
+            where = " AND ".join(clauses)
+            paging = ""
+            if limit is not None:
+                paging = " LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
+            rows = conn.execute(
+                f"""
+                SELECT id::text, source_id, content_hash, ingest_state, s3_raw_uri
+                FROM path_graph.documents
+                WHERE {where}
+                ORDER BY id DESC
+                {paging}
+                """,
+                params,
+            ).fetchall()
         return [
             {
                 "document_id": r[0],
@@ -246,14 +274,43 @@ class SourceStore:
             for r in rows
         ]
 
+    def count_documents_by_source(
+        self,
+        tenant: str,
+        source_id: str,
+        *,
+        ingest_state: str | None = None,
+    ) -> int:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            clauses = ["tenant = %s", "source_id = %s"]
+            params: list[Any] = [tenant, source_id]
+            if ingest_state:
+                clauses.append("ingest_state = %s")
+                params.append(ingest_state)
+            where = " AND ".join(clauses)
+            row = conn.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM path_graph.documents
+                WHERE {where}
+                """,
+                params,
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    _PIPELINE_RUN_COLS = """
+        id::text, workflow_name, argo_uid, batch_id, status, started_at, ended_at
+    """
+
     def get_pipeline_run_by_batch(
         self, tenant: str, batch_id: str
     ) -> dict[str, Any] | None:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
             row = conn.execute(
-                """
-                SELECT id::text, workflow_name, argo_uid, batch_id, status
+                f"""
+                SELECT {self._PIPELINE_RUN_COLS}
                 FROM path_graph.pipeline_runs
                 WHERE tenant = %s AND batch_id = %s
                 ORDER BY id DESC
@@ -263,37 +320,79 @@ class SourceStore:
             ).fetchone()
         if not row:
             return None
-        return {
-            "id": row[0],
-            "workflow_name": row[1],
-            "argo_uid": row[2],
-            "batch_id": row[3],
-            "status": row[4],
-        }
+        return _pipeline_run_row(row)
 
-    def list_pipeline_runs(self, tenant: str, limit: int = 50) -> list[dict[str, Any]]:
+    def list_pipeline_runs(
+        self, tenant: str, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
             rows = conn.execute(
-                """
-                SELECT id::text, workflow_name, argo_uid, batch_id, status
+                f"""
+                SELECT {self._PIPELINE_RUN_COLS}
                 FROM path_graph.pipeline_runs
                 WHERE tenant = %s
+                ORDER BY started_at DESC NULLS LAST, id DESC
+                LIMIT %s OFFSET %s
+                """,
+                (tenant, limit, offset),
+            ).fetchall()
+        return [_pipeline_run_row(r) for r in rows]
+
+    def count_pipeline_runs(self, tenant: str) -> int:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM path_graph.pipeline_runs
+                WHERE tenant = %s
+                """,
+                (tenant,),
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def list_non_finalized_pipeline_runs(self, limit: int = 200) -> list[dict[str, Any]]:
+        """Return open runs across tenants (backend reconciler; table owner bypasses RLS)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT tenant, {self._PIPELINE_RUN_COLS}
+                FROM path_graph.pipeline_runs
+                WHERE status NOT IN ('Succeeded', 'Failed', 'Error')
                 ORDER BY id DESC
                 LIMIT %s
                 """,
-                (tenant, limit),
+                (limit,),
             ).fetchall()
-        return [
-            {
-                "id": r[0],
-                "workflow_name": r[1],
-                "argo_uid": r[2],
-                "batch_id": r[3],
-                "status": r[4],
-            }
-            for r in rows
-        ]
+        return [_pipeline_run_row_with_tenant(r) for r in rows]
+
+    def finalize_pipeline_run(
+        self,
+        tenant: str,
+        run_id: str,
+        status: str,
+        started_at: str | None = None,
+        ended_at: str | None = None,
+    ) -> bool:
+        if status not in TERMINAL_PIPELINE_RUN_STATUSES:
+            return False
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            cur = conn.execute(
+                """
+                UPDATE path_graph.pipeline_runs
+                SET status = %s,
+                    started_at = COALESCE(%s::timestamptz, started_at),
+                    ended_at = COALESCE(%s::timestamptz, ended_at)
+                WHERE tenant = %s
+                  AND id = %s::uuid
+                  AND status NOT IN ('Succeeded', 'Failed', 'Error')
+                """,
+                (status, started_at, ended_at, tenant, run_id),
+            )
+            conn.commit()
+        return cur.rowcount > 0
 
     def insert_pipeline_run(
         self,

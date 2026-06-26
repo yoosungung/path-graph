@@ -60,3 +60,15 @@ assert mapped["path"] == "/runtime-bundles/"
 PY
 
 ok "render-filestash-config.sh produces valid Garage S3 config.json"
+
+BOOTSTRAP="${ROOT_DIR}/scripts/bootstrap-filestash.sh"
+
+[[ -x "${BOOTSTRAP}" ]] || fail "Missing executable ${BOOTSTRAP}"
+
+grep -q 'APPLICATION_URL="filestash.k8s-test"' "${BOOTSTRAP}" \
+  || fail "bootstrap-filestash.sh must set APPLICATION_URL to bare hostname (no http:// scheme)"
+
+grep -q 'APPLICATION_URL="http://' "${BOOTSTRAP}" \
+  && fail "bootstrap-filestash.sh must not prefix APPLICATION_URL with http:// (Filestash redirect bug)"
+
+ok "bootstrap-filestash.sh sets APPLICATION_URL to bare hostname"

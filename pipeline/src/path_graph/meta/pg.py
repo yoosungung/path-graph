@@ -10,6 +10,10 @@ from path_graph.contracts.community import CommunityRecord
 from path_graph.contracts.schemas import ChunkRecord
 
 
+def _escape_ilike(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 MIGRATION_SQL = """
 CREATE SCHEMA IF NOT EXISTS path_graph;
 
@@ -45,6 +49,8 @@ CREATE TABLE IF NOT EXISTS path_graph.pipeline_runs (
     argo_uid TEXT,
     batch_id TEXT,
     status TEXT NOT NULL,
+    started_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ,
     PRIMARY KEY (tenant, id)
 );
 
@@ -209,6 +215,12 @@ BEGIN
 END $$;
 """
 
+PIPELINE_RUNS_PERSIST_MIGRATION_SQL = """
+ALTER TABLE path_graph.pipeline_runs
+    ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
+"""
+
 LIFECYCLE_MIGRATION_SQL = """
 ALTER TABLE path_graph.documents
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ,
@@ -321,6 +333,7 @@ def iter_migration_sql() -> list[str]:
         LEGACY_PROJECT_MIGRATION_SQL,
         SOURCE_PROJECT_BACKFILL_MIGRATION_SQL,
         LIFECYCLE_MIGRATION_SQL,
+        PIPELINE_RUNS_PERSIST_MIGRATION_SQL,
         RLS_POLICY_MIGRATION_SQL,
     ]
 
@@ -523,6 +536,9 @@ class PgMetaStore:
         *,
         source_id: str | None = None,
         ingest_state: str | None = None,
+        filename_contains: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
@@ -534,13 +550,22 @@ class PgMetaStore:
             if ingest_state:
                 clauses.append("ingest_state = %s")
                 params.append(ingest_state)
+            if filename_contains:
+                clauses.append("s3_raw_uri ILIKE %s ESCAPE '\\'")
+                params.append(f"%{_escape_ilike(filename_contains)}%")
             where = " AND ".join(clauses)
+            paging = ""
+            if limit is not None:
+                paging = " LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
             rows = conn.execute(
                 f"""
                 SELECT id::text, source_id, project_id::text, content_hash,
                        s3_raw_uri, ingest_state
                 FROM path_graph.documents
                 WHERE {where}
+                ORDER BY id DESC
+                {paging}
                 """,
                 params,
             ).fetchall()
@@ -555,6 +580,39 @@ class PgMetaStore:
             }
             for r in rows
         ]
+
+    def count_documents_for_project(
+        self,
+        tenant: str,
+        project_id: str,
+        *,
+        source_id: str | None = None,
+        ingest_state: str | None = None,
+        filename_contains: str | None = None,
+    ) -> int:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            clauses = ["tenant = %s", "project_id = %s::uuid"]
+            params: list[Any] = [tenant, project_id]
+            if source_id:
+                clauses.append("source_id = %s")
+                params.append(source_id)
+            if ingest_state:
+                clauses.append("ingest_state = %s")
+                params.append(ingest_state)
+            if filename_contains:
+                clauses.append("s3_raw_uri ILIKE %s ESCAPE '\\'")
+                params.append(f"%{_escape_ilike(filename_contains)}%")
+            where = " AND ".join(clauses)
+            row = conn.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM path_graph.documents
+                WHERE {where}
+                """,
+                params,
+            ).fetchone()
+        return int(row[0]) if row else 0
 
     def list_chunk_ids_for_document(self, tenant: str, document_id: str) -> list[str]:
         with self._conn() as conn:

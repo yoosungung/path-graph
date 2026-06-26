@@ -90,6 +90,7 @@ def list_documents_for_source(
     *,
     ingest_state: str | None = None,
     limit: int = 50,
+    offset: int = 0,
     dsn: str | None = None,
 ) -> list[dict[str, Any]]:
     s = get_settings()
@@ -102,8 +103,28 @@ def list_documents_for_source(
         profile.source_id,
         ingest_state=ingest_state,
         limit=limit,
+        offset=offset,
     )
     return [_document_row(d) for d in docs]
+
+
+def count_documents_for_source(
+    tenant: str,
+    profile: SourceProfile,
+    *,
+    ingest_state: str | None = None,
+    dsn: str | None = None,
+) -> int:
+    s = get_settings()
+    resolved = dsn or s.path_graph_dsn
+    if not resolved:
+        return 0
+    store = SourceStore(resolved)
+    return store.count_documents_by_source(
+        tenant,
+        profile.source_id,
+        ingest_state=ingest_state,
+    )
 
 
 def list_documents_for_project(
@@ -112,6 +133,9 @@ def list_documents_for_project(
     *,
     source_id: str | None = None,
     ingest_state: str | None = None,
+    filename_contains: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
     dsn: str | None = None,
 ) -> list[dict[str, Any]]:
     s = get_settings()
@@ -124,8 +148,34 @@ def list_documents_for_project(
         project_id,
         source_id=source_id,
         ingest_state=ingest_state,
+        filename_contains=filename_contains,
+        limit=limit,
+        offset=offset,
     )
     return [_document_row(d) for d in docs]
+
+
+def count_documents_for_project(
+    tenant: str,
+    project_id: str,
+    *,
+    source_id: str | None = None,
+    ingest_state: str | None = None,
+    filename_contains: str | None = None,
+    dsn: str | None = None,
+) -> int:
+    s = get_settings()
+    resolved = dsn or s.path_graph_dsn
+    if not resolved:
+        return 0
+    pg = PgMetaStore(resolved)
+    return pg.count_documents_for_project(
+        tenant,
+        project_id,
+        source_id=source_id,
+        ingest_state=ingest_state,
+        filename_contains=filename_contains,
+    )
 
 
 def upload_raw_file(

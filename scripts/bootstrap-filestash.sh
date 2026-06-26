@@ -60,7 +60,7 @@ ADMIN_HASH="$(bcrypt_hash "$ADMIN_PASSWORD")" || {
 
 kubectl -n "$TARGET_NS" create secret generic filestash-env \
   --from-literal=ADMIN_PASSWORD="$ADMIN_HASH" \
-  --from-literal=APPLICATION_URL="http://filestash.k8s-test" \
+  --from-literal=APPLICATION_URL="filestash.k8s-test" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Secret applied in ${TARGET_NS}: filestash-env (admin password set)"

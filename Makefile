@@ -1,7 +1,7 @@
 .PHONY: venv test install wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
 	ensure-namespace ensure-registry-secret k8s-apply-dev build-images build-pipeline-image \
-	e2e-ingest-rag e2e-downstream test-infra-config deploy-qdrant-nebula verify-qdrant-nebula teardown-qdrant-nebula
+	e2e-ingest-rag e2e-downstream test-infra-config deploy-qdrant-nebula verify-qdrant-nebula teardown-qdrant-nebula tune-node-inotify
 
 VENV := .venv
 PY := $(VENV)/bin/python3
@@ -129,3 +129,7 @@ verify-qdrant-nebula:
 teardown-qdrant-nebula:
 	chmod +x scripts/teardown-qdrant-nebula.sh
 	./scripts/teardown-qdrant-nebula.sh --force
+
+tune-node-inotify:
+	chmod +x ./scripts/tune-node-inotify.sh
+	./scripts/tune-node-inotify.sh

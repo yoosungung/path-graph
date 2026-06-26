@@ -13,6 +13,8 @@ def test_rls_migration_includes_policies():
     assert "CREATE POLICY tenant_isolation" in sql
     assert "document_tombstones" in sql
     assert "reconcile_reports" in sql
+    assert "pipeline_runs" in sql
+    assert "started_at TIMESTAMPTZ" in sql
 
 
 def test_local_blob_delete_prefix(tmp_path):

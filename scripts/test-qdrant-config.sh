@@ -49,4 +49,13 @@ grep -q '6334: "qdrant/qdrant:6334"' "${INGRESS_SNIPPET}" || fail "Expected gRPC
 grep -q 'socat TCP-LISTEN:6333' "${INGRESS_SNIPPET}" || fail "Expected socat listener on 6333 in snippet"
 ok "ingress-nginx snippet documents Qdrant REST/gRPC routing"
 
+SETUP="${ROOT_DIR}/deploy/SETUP.md"
+grep -q 'qdrant.k8s-test:6333/dashboard' "${SETUP}" \
+  || fail "SETUP.md must document Qdrant dashboard URL"
+grep -q 'test-qdrant-api-key' "${SETUP}" \
+  || fail "SETUP.md must document dev Qdrant API key for dashboard"
+grep -q 'apiKey: "test-qdrant-api-key"' "${VALUES_FILE}" \
+  || fail "qdrant.yaml must set dev apiKey test-qdrant-api-key"
+ok "SETUP.md documents Qdrant dashboard API key"
+
 ok "Qdrant config validation passed"

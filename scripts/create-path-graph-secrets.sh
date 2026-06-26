@@ -57,6 +57,10 @@ S3_BUCKET_RUNTIME="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o j
 S3_BUCKET="${PATH_GRAPH_S3_BUCKET:-$S3_BUCKET_RUNTIME}"
 
 QDRANT_KEY="$(b64dec "$(kubectl -n "$QDRANT_NS" get secret qdrant-apikey -o jsonpath='{.data.api-key}')")"
+if [[ -z "$QDRANT_KEY" ]]; then
+  echo "error: qdrant/qdrant-apikey secret missing or empty — run make deploy-qdrant-nebula" >&2
+  exit 1
+fi
 
 AGENT_TOKEN="${PIPELINE_AGENT_ACCESS_TOKEN:-}"
 

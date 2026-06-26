@@ -89,6 +89,8 @@ def test_get_pipeline_run_by_batch(mock_connect):
         "argo-uid",
         "batch-1",
         "submitted",
+        None,
+        None,
     )
 
     store = SourceStore("postgresql://localhost/test")

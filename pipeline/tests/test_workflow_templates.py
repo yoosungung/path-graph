@@ -10,11 +10,13 @@ COLLECT_INGEST = REPO_ROOT / "deploy/k8s/base/workflow-templates/pipeline-collec
 def test_pipeline_ingest_rag_parallelism_and_pod_gc():
     text = INGEST_RAG.read_text(encoding="utf-8")
     assert "parallelism: 10" in text
-    assert "strategy: OnWorkflowCompletion" in text
+    assert "strategy: OnPodCompletion" in text
+    assert "deleteDelayDuration: 60s" in text
     assert "secondsAfterCompletion: 600" in text
 
 
 def test_pipeline_collect_ingest_rag_pod_gc():
     text = COLLECT_INGEST.read_text(encoding="utf-8")
     assert "parallelism: 10" in text
-    assert "strategy: OnWorkflowCompletion" in text
+    assert "strategy: OnPodCompletion" in text
+    assert "deleteDelayDuration: 60s" in text

@@ -1,9 +1,18 @@
 from unittest.mock import MagicMock, patch
 
 from path_graph.contracts.schemas import ChunkRecord
-from path_graph.rag.qdrant_store import QdrantStore
+from path_graph.rag.qdrant_store import QdrantStore, make_qdrant_store
 from path_graph.config import Settings
 from constants import PROJECT_ID
+
+
+def test_make_qdrant_store_requires_api_key_for_http():
+    import pytest
+
+    with pytest.raises(ValueError, match="QDRANT_API_KEY"):
+        make_qdrant_store(
+            Settings(qdrant_url="http://qdrant:6333", qdrant_api_key="")
+        )
 
 
 def test_qdrant_upsert_calls_client():

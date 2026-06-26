@@ -11,6 +11,9 @@ controller:
   workflowDefaults:
     spec:
       serviceAccountName: path-graph-pipeline
+      podGC:
+        strategy: OnPodCompletion
+        deleteDelayDuration: 60s
 
 server:
   enabled: true
