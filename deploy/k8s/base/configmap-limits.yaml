@@ -9,3 +9,4 @@ data:
   agent-invoke: "8"
   parse-hwp: "4"
   embed: "16"
+  ocr-vision: "2"

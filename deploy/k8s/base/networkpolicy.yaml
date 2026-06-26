@@ -51,7 +51,7 @@ spec:
       ports:
         - protocol: TCP
           port: 9669
-    # llm-serving: TEI embed
+    # llm-serving: TEI embed + sglang VL OCR
     - to:
         - namespaceSelector:
             matchLabels:
@@ -59,6 +59,8 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+        - protocol: TCP
+          port: 30000
     # Cluster Service CIDR (k3s default 10.43.0.0/16) — NP namespaceSelector does not match ClusterIP
     - to:
         - ipBlock:
@@ -74,5 +76,7 @@ spec:
           port: 9669
         - protocol: TCP
           port: 8080
+        - protocol: TCP
+          port: 30000
         - protocol: TCP
           port: 443

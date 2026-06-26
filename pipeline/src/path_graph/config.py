@@ -63,6 +63,17 @@ class Settings(BaseSettings):
 
     rhwp_batch_bin: str = "rhwp-batch"
 
+    ocr_llm_base_url: str = ""  # OCR_LLM_BASE_URL — unset disables VL OCR fallback
+    ocr_force: bool = False  # OCR_FORCE — PDF markitdown skip (debug)
+    ocr_llm_model: str = ""  # OCR_LLM_MODEL
+    ocr_llm_api_key: str = "EMPTY"  # OCR_LLM_API_KEY
+    ocr_llm_timeout_s: float = 120.0  # OCR_LLM_TIMEOUT_S
+    ocr_render_dpi: int = 200  # OCR_RENDER_DPI
+    ocr_min_text_chars: int = 32  # OCR_MIN_TEXT_CHARS — optional early fallback
+    ocr_max_retries: int = 2  # OCR_MAX_RETRIES
+    ocr_keep_page_images: bool = True  # OCR_KEEP_PAGE_IMAGES
+    ocr_prompt: str = ""  # OCR_PROMPT — empty uses built-in default
+
     ms_tenant_id: str = ""  # MS_TENANT_ID
     ms_client_id: str = ""  # MS_CLIENT_ID
     ms_client_secret: str = ""  # MS_CLIENT_SECRET — app auth

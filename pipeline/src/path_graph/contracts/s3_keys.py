@@ -31,6 +31,14 @@ def s3_key_parsed_meta(tenant: str, doc_id: str) -> str:
     return f"parsed/{tenant}/{doc_id}/meta.json"
 
 
+def s3_key_parsed_page_png(tenant: str, doc_id: str, page: int) -> str:
+    return f"parsed/{tenant}/{doc_id}/pages/{page:04d}.png"
+
+
+def s3_key_parsed_ocr_page_md(tenant: str, doc_id: str, page: int) -> str:
+    return f"parsed/{tenant}/{doc_id}/ocr/{page:04d}.md"
+
+
 def s3_key_chunks(tenant: str, doc_id: str) -> str:
     return f"chunks/{tenant}/{doc_id}/chunks.jsonl"
 

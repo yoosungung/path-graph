@@ -11,6 +11,7 @@ def test_markitdown_extras_cover_manual_spreadsheet_formats():
   root = Path(__file__).resolve().parents[1]
   text = (root / "pyproject.toml").read_text(encoding="utf-8")
   assert 'markitdown[pdf,docx,xlsx,xls]' in text
+  assert "pymupdf>=" in text
 
 
 def test_legacy_doc_rejected_before_markitdown():

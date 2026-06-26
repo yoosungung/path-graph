@@ -80,6 +80,9 @@ kubectl -n "$TARGET_NS" create secret generic path-graph-env \
   --from-literal=ENVOY_URL='http://envoy.runtime.svc:8080' \
   --from-literal=PIPELINE_AGENT_ACCESS_TOKEN="$AGENT_TOKEN" \
   --from-literal=EMBEDDING_BASE_URL='http://bge-m3-tei.llm-serving.svc:8080' \
+  --from-literal=OCR_LLM_BASE_URL='http://sglang-gemma4-12b.llm-serving.svc.cluster.local:30000' \
+  --from-literal=OCR_LLM_MODEL='nmilosev/gemma-4-12B-it-quantized.w4a16' \
+  --from-literal=OCR_LLM_API_KEY='EMPTY' \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Secrets applied in namespace ${TARGET_NS}: path-graph-env, s3-creds"

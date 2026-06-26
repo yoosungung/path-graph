@@ -161,6 +161,7 @@
 | 3.3.1 | **RRF hybrid** (PG BM25 + Qdrant) | [ ] | |
 | 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리 또는 Docling) | [ ] | HWP만 `content.json` |
 | 3.3.3 | ingest 검색 API / retrieval CLI | [ ] | |
+| 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; [pipeline/DESIGN.md §VL OCR](pipeline/DESIGN.md#vl-ocr-ingest--빈-parse-fallback) |
 
 ---
 
@@ -183,6 +184,7 @@
 | Qdrant, Nebula | path-graph `deploy/k8s/infra/` | `make deploy-qdrant-nebula` |
 | Argo Workflows controller | test_infra 또는 별도 Helm | SETUP.md |
 | TEI `bge-m3` | llm-serving NS | `EMBEDDING_BASE_URL` |
+| sglang Gemma 4 12B | llm-serving NS | VL OCR ingest 계획: `OCR_LLM_*` ([pipeline/DESIGN.md](pipeline/DESIGN.md)) |
 | rhwp-batch 이미지 | rhwp_batch | HWP parse |
 
 ---
@@ -261,7 +263,7 @@
 |---|---|---|
 | D1 | Argo controller **설치 주체** | test_infra Helm vs path-graph deploy 문서만 |
 | ~~D2~~ | pipeline 이미지 **레지스트리** | **결정: GHCR** — GHA `build-images` + dev overlay |
-| D3 | PDF 구조화 | md→blocks 후처리 vs Docling vs Azure DI |
+| D3 | PDF 구조화 | md→blocks 후처리 vs Docling vs Azure DI; **스캔 PDF**는 3.3.4 VL OCR(sglang) 우선 |
 | D4 | 로컬 embed | TEI port-forward vs 로컬 mock vs cluster-only RAG |
 | D5 | 회사규정 ingest **주기** | SharePoint cron 주기·delta vs full scan |
 

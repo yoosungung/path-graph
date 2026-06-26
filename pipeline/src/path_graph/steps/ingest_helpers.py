@@ -9,7 +9,7 @@ from path_graph.lifecycle.compensation import compensate_document_index
 from path_graph.lifecycle.tombstone import TombstoneError, check_tombstone
 from path_graph.config import get_settings
 from path_graph.contracts.schemas import BatchManifestLine
-from path_graph.contracts.s3_keys import s3_key_raw
+from path_graph.contracts.s3_keys import s3_key_dead_letter, s3_key_raw
 from path_graph.ids import document_id
 from path_graph.meta.pg import PgMetaStore
 from path_graph.steps.ingest import ParseError, ingest_raw_bytes
@@ -98,8 +98,16 @@ def ingest_item(
         result = ingest_raw_bytes(data, meta["filename"], tenant, source_id, meta)
     except ParseError as exc:
         if settings.path_graph_dsn:
+            store = make_blob_store(settings)
+            dl_key = s3_key_dead_letter(tenant, meta["content_hash"])
+            stage = "parse"
+            if store.exists(dl_key):
+                try:
+                    stage = json.loads(store.get_bytes(dl_key)).get("stage", stage)
+                except Exception:
+                    pass
             PgMetaStore(settings.path_graph_dsn).record_dead_letter(
-                tenant, meta["document_id"], {"stage": "parse", "error": str(exc)}
+                tenant, meta["document_id"], {"stage": stage, "error": str(exc)}
             )
         return False, str(exc)
 
