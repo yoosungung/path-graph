@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-delete-project
+  namespace: path-graph
+spec:
+  serviceAccountName: path-graph-pipeline
+  imagePullSecrets:
+    - name: registry-creds
+  entrypoint: delete-project
+  arguments:
+    parameters:
+      - name: tenant
+      - name: project_id
+      - name: reason
+        value: ""
+  templates:
+    - name: delete-project
+      container:
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
+        command: [python, -m, path_graph.steps.purge_step]
+        args:
+          - --tenant
+          - "{{workflow.parameters.tenant}}"
+          - --project-id
+          - "{{workflow.parameters.project_id}}"
+          - --scope
+          - delete
+          - --reason
+          - "{{workflow.parameters.reason}}"
+        envFrom:
+          - secretRef:
+              name: path-graph-env
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+      activeDeadlineSeconds: 7200

@@ -50,17 +50,19 @@ collect / ingest_web
 |------|------|
 | `lifecycle/tombstone.py` | `(tenant, project_id, content_hash)` 차단 |
 | `lifecycle/compensation.py` | re-ingest 전 Qdrant/Nebula 정리 |
-| `lifecycle/purge.py` | Document/Source/Project purge |
+| `lifecycle/purge.py` | Document/Source/Project purge. **Project purge**는 미처리 문서를 `hard_raw`로 purge한 뒤 `raw/{tenant}/{project_id}/`·`wiki/{tenant}/{project_id}/` prefix 일괄 삭제(이미 `purged` 문서·미 ingest upload 포함). **`delete_project`**는 purge와 동일한 blob·인덱스 정리 + 프로젝트 `parsed`·`communities`·`graph_context` prefix + PG 행 hard delete |
 | `lifecycle/reconcile.py` | PG↔Qdrant↔Nebula 3-way 고아 삭제 |
 | `lifecycle/artifact_cleanup.py` | temp S3 정리 (indexed 미접촉) |
 | `lifecycle/wiki_stale.py` | purge 후 stale_communities 기록 |
 | `admin/lifecycle.py` | BFF용 `api_*` (agents-runtime 래핑) |
 | `admin/projects.py` | `ensure_default_project`, `backfill_orphan_project_ids` — legacy `project_id IS NULL` 행 복구 |
-| `steps/purge_step.py` | Argo/CLI purge |
+| `steps/purge_step.py` | Argo/CLI purge·delete (`--scope project` \| `delete`) |
 | `steps/reconcile_step.py` | Argo/CLI reconcile |
 | `steps/cleanup_step.py` | Argo/CLI artifact cleanup |
 
-**정보삭제**: `python -m path_graph.steps.purge_step --tenant … --project-id … --document-id …`
+**정보삭제**: `python -m path_graph.steps.purge_step --tenant … --project-id … --scope project|delete`
+
+**Project lifecycle WF**: `pipeline-purge-project` · `pipeline-delete-project` — BFF `POST …/purge|delete` → 202 + Argo submit (동기 실행 없음)
 
 **IndexReconcile**: `python -m path_graph.steps.reconcile_step` — Cron WF `pipeline-reconcile-index`
 

@@ -8,7 +8,7 @@ import sys
 
 from path_graph.config import get_settings
 from path_graph.lifecycle.artifact_cleanup import artifact_cleanup
-from path_graph.lifecycle.purge import purge_document, purge_project, purge_source
+from path_graph.lifecycle.purge import delete_project, purge_document, purge_project, purge_source
 from path_graph.lifecycle.reconcile import reconcile_project_index
 
 
@@ -16,7 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Purge documents/sources/projects")
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--project-id", required=True)
-    parser.add_argument("--scope", choices=("document", "source", "project"), default="document")
+    parser.add_argument("--scope", choices=("document", "source", "project", "delete"), default="document")
     parser.add_argument("--document-id", default="")
     parser.add_argument("--source-id", default="")
     parser.add_argument("--reason", default="")
@@ -44,6 +44,13 @@ def main(argv: list[str] | None = None) -> int:
             args.tenant,
             args.project_id,
             args.source_id,
+            reason=args.reason or None,
+            settings=settings,
+        )
+    elif args.scope == "delete":
+        result = delete_project(
+            args.tenant,
+            args.project_id,
             reason=args.reason or None,
             settings=settings,
         )

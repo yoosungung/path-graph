@@ -69,6 +69,10 @@ def s3_key_graph_context(
     return f"graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json"
 
 
+def s3_key_raw_prefix(tenant: str, project_id: str) -> str:
+    return f"raw/{tenant}/{project_id}/"
+
+
 def s3_key_wiki_prefix(tenant: str, project_id: str) -> str:
     return f"wiki/{tenant}/{project_id}/"
 

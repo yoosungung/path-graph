@@ -54,6 +54,47 @@ class ProjectStore:
             ).fetchone()
         return row_to_project(row) if row else None
 
+    def get_purge_state(self, tenant: str, project_id: str) -> str | None:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            row = conn.execute(
+                """
+                SELECT purge_state
+                FROM path_graph.projects
+                WHERE tenant = %s AND id = %s::uuid
+                """,
+                (tenant, project_id),
+            ).fetchone()
+        return str(row[0]) if row and row[0] else None
+
+    def set_purge_state(self, tenant: str, project_id: str, purge_state: str) -> None:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            conn.execute(
+                """
+                UPDATE path_graph.projects
+                SET purge_state = %s
+                WHERE tenant = %s AND id = %s::uuid
+                """,
+                (purge_state, tenant, project_id),
+            )
+            conn.commit()
+
+    def clear_in_progress_purge_state(self, tenant: str, project_id: str) -> bool:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            cur = conn.execute(
+                """
+                UPDATE path_graph.projects
+                SET purge_state = NULL
+                WHERE tenant = %s AND id = %s::uuid
+                  AND purge_state IN ('purging', 'deleting')
+                """,
+                (tenant, project_id),
+            )
+            conn.commit()
+        return cur.rowcount > 0
+
     def get_project_by_slug(self, tenant: str, slug: str) -> ProjectProfile | None:
         normalized = normalize_project_slug(slug)
         with self._conn() as conn:

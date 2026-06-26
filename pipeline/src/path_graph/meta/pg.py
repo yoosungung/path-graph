@@ -952,3 +952,44 @@ class PgMetaStore:
                 (tenant, doc_id, json.dumps(error)),
             )
             conn.commit()
+
+    def delete_project_data(self, tenant: str, project_id: str) -> dict[str, int]:
+        """Hard-delete all PG rows scoped to a project (sources, documents, audit, project)."""
+        counts: dict[str, int] = {}
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            cur = conn.execute(
+                """
+                DELETE FROM path_graph.document_ingest_state
+                WHERE tenant = %s AND document_id IN (
+                    SELECT id FROM path_graph.documents
+                    WHERE tenant = %s AND project_id = %s::uuid
+                )
+                """,
+                (tenant, tenant, project_id),
+            )
+            counts["document_ingest_state"] = cur.rowcount
+            for table in (
+                "chunks",
+                "documents",
+                "document_tombstones",
+                "purge_audit_log",
+                "reconcile_reports",
+                "stale_communities",
+                "wiki_pages",
+                "communities",
+                "sources",
+                "pipeline_runs",
+                "projects",
+            ):
+                if table == "projects":
+                    clause = "tenant = %s AND id = %s::uuid"
+                else:
+                    clause = "tenant = %s AND project_id = %s::uuid"
+                cur = conn.execute(
+                    f"DELETE FROM path_graph.{table} WHERE {clause}",
+                    (tenant, project_id),
+                )
+                counts[table] = cur.rowcount
+            conn.commit()
+        return counts

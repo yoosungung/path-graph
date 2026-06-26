@@ -1,5 +1,5 @@
 from path_graph.lifecycle.compensation import compensate_document_index
-from path_graph.lifecycle.purge import purge_document, purge_project, purge_source
+from path_graph.lifecycle.purge import delete_project, purge_document, purge_project, purge_source
 from path_graph.lifecycle.reconcile import reconcile_project_index
 
 __all__ = [
@@ -7,5 +7,6 @@ __all__ = [
     "purge_document",
     "purge_source",
     "purge_project",
+    "delete_project",
     "reconcile_project_index",
 ]

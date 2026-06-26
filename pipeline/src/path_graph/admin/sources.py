@@ -407,6 +407,25 @@ class SourceStore:
             ).fetchone()
         return row is not None
 
+    def has_active_lifecycle_run(
+        self, tenant: str, project_id: str, run_kind: str
+    ) -> bool:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            row = conn.execute(
+                """
+                SELECT 1
+                FROM path_graph.pipeline_runs
+                WHERE tenant = %s
+                  AND project_id = %s::uuid
+                  AND run_kind = %s
+                  AND status NOT IN ('Succeeded', 'Failed', 'Error')
+                LIMIT 1
+                """,
+                (tenant, project_id, run_kind),
+            ).fetchone()
+        return row is not None
+
     def list_non_finalized_pipeline_runs(self, limit: int = 200) -> list[dict[str, Any]]:
         """Return open runs across tenants (backend reconciler; table owner bypasses RLS)."""
         with self._conn() as conn:

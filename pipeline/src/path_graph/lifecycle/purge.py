@@ -11,6 +11,7 @@ from path_graph.contracts.s3_keys import (
     s3_key_parsed_json,
     s3_key_parsed_md,
     s3_key_parsed_meta,
+    s3_key_raw_prefix,
     s3_key_wiki_prefix,
 )
 from path_graph.graph.chunk_partition import make_nebula_store
@@ -169,7 +170,8 @@ def purge_project(
             )
 
     blob = make_blob_store(s)
-    prefix_deleted = blob.delete_prefix(s3_key_wiki_prefix(tenant, project_id))
+    wiki_prefix_deleted = blob.delete_prefix(s3_key_wiki_prefix(tenant, project_id))
+    raw_prefix_deleted = blob.delete_prefix(s3_key_raw_prefix(tenant, project_id))
 
     if s.qdrant_url:
         qdrant = make_qdrant_store(s)
@@ -195,6 +197,63 @@ def purge_project(
     return {
         "status": "purged",
         "project_id": project_id,
-        "prefix_deleted": prefix_deleted,
+        "prefix_deleted": wiki_prefix_deleted,
+        "raw_prefix_deleted": raw_prefix_deleted,
         "purged_documents": len(results),
+    }
+
+
+def delete_project(
+    tenant: str,
+    project_id: str,
+    *,
+    reason: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    s = settings or get_settings()
+    if not s.path_graph_dsn:
+        raise ValueError("PATH_GRAPH_DSN required")
+    pg = PgMetaStore(s.path_graph_dsn)
+    if ProjectStore(s.path_graph_dsn).get_project(tenant, project_id) is None:
+        raise ValueError(f"project not found: {project_id}")
+
+    doc_ids = [
+        d["document_id"]
+        for d in pg.list_documents_for_project(tenant, project_id)
+    ]
+    purge_result = purge_project(
+        tenant,
+        project_id,
+        reason=reason or "project_delete",
+        settings=s,
+    )
+
+    blob = make_blob_store(s)
+    parsed_prefix_deleted = sum(
+        blob.delete_prefix(f"parsed/{tenant}/{doc_id}/") for doc_id in doc_ids
+    )
+    communities_prefix_deleted = blob.delete_prefix(
+        f"communities/{tenant}/{project_id}/"
+    )
+    graph_context_prefix_deleted = blob.delete_prefix(
+        f"graph_context/{tenant}/{project_id}/"
+    )
+    batch_chunks_prefix_deleted = blob.delete_prefix(
+        f"chunks/{tenant}/{project_id}/"
+    )
+
+    pg_deleted = pg.delete_project_data(tenant, project_id)
+    return {
+        "status": "deleted",
+        "project_id": project_id,
+        "parsed_prefix_deleted": parsed_prefix_deleted,
+        "communities_prefix_deleted": communities_prefix_deleted,
+        "graph_context_prefix_deleted": graph_context_prefix_deleted,
+        "batch_chunks_prefix_deleted": batch_chunks_prefix_deleted,
+        "pg_deleted": pg_deleted,
+        **{
+            k: v
+            for k, v in purge_result.items()
+            if k not in ("status", "project_id")
+        },
     }

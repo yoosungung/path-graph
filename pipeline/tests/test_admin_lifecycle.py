@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from path_graph.admin.lifecycle import (
+    api_delete_project,
     api_get_binding,
     api_list_tombstones,
     api_purge_document,
@@ -66,3 +67,11 @@ def test_api_get_binding(mock_proj, mock_settings, mock_resolve):
 def test_api_list_tombstones_no_dsn(mock_settings):
     mock_settings.return_value.path_graph_dsn = ""
     assert api_list_tombstones("dev") == []
+
+
+@patch("path_graph.admin.lifecycle.delete_project")
+def test_api_delete_project(mock_delete):
+    mock_delete.return_value = {"status": "deleted", "pg_deleted": {"projects": 1}}
+    out = api_delete_project("dev", PROJECT_ID, reason="test")
+    assert out["status"] == "deleted"
+    mock_delete.assert_called_once_with("dev", PROJECT_ID, reason="test")

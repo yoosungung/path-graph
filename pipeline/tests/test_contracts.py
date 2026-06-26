@@ -9,6 +9,7 @@ from path_graph.contracts.s3_keys import (
     s3_key_communities,
     s3_key_graph_context,
     s3_key_raw,
+    s3_key_raw_prefix,
     s3_key_wiki,
     s3_key_wiki_prefix,
 )
@@ -41,6 +42,7 @@ def test_s3_key_layout():
     )
     doc = str(uuid.uuid4())
     assert s3_key_chunks(t, doc) == f"chunks/{t}/{doc}/chunks.jsonl"
+    assert s3_key_raw_prefix(t, PROJECT_ID) == f"raw/{t}/{PROJECT_ID}/"
     assert s3_key_wiki_prefix(t, PROJECT_ID) == f"wiki/{t}/{PROJECT_ID}/"
 
 

@@ -22,6 +22,8 @@ resources:
   - workflow-templates/pipeline-wiki.yaml
   - workflow-templates/pipeline-graphrag.yaml
   - workflow-templates/pipeline-purge-document.yaml
+  - workflow-templates/pipeline-purge-project.yaml
+  - workflow-templates/pipeline-delete-project.yaml
   - workflow-templates/pipeline-reconcile-index.yaml
   - workflow-templates/pipeline-artifact-cleanup.yaml
 configMapGenerator:
