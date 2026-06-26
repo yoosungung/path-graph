@@ -1,4 +1,4 @@
-# Fragment — merge into shared ingress-nginx values (e.g. test_infra helm/values/ingress-nginx.yaml).
+# Fragment — documents hostPorts/TCP for path-graph Qdrant/Nebula on shared ingress-nginx (test_infra helm/values/ingress-nginx.yaml).
 # Qdrant REST :6333 and Nebula Studio :7001 use HTTP Ingress via socat → nginx :80.
 # Qdrant gRPC :6334 uses TCP stream passthrough.
 

@@ -37,7 +37,8 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 - 개발은 TDD 방식으로 진행한다. (코드 스켈레톤 → 테스트 코드 → 기능 구현)
 - 로컬 Python은 **3.12** (`.python-version`, CI, Docker 이미지와 동일). `requires-python = ">=3.12,<3.13"`. venv는 `uv venv .venv --python 3.12` (uv 관리 CPython은 `python -m venv`와 호환되지 않음).
 - 한국어/영어 혼용을 허용한다. 한 문서 내 일관성만 지킨다(현재 AGENTS/ARCHITECTURE/ROADMAP/DESIGN은 한국어 본문 + 영어 식별자).
+- **출시 전 — legacy 없음.** backward-compat 분기·임시 보강·“예전 형식도 받아주기”를 넣지 않는다. 계약·스키마 변경은 문서·테스트와 함께 **지금 형태만** 반영한다. (예: ingest manifest는 `batch_manifest_key` 우선, `project_id` 필수.)
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console MVP (`path_graph.admin.{projects,sources,lifecycle}`, agents-runtime `/api/pipeline/*` + `/pipeline/*`) · GHA `build-images` → GHCR · `make test` (115 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console MVP (`path_graph.admin.{projects,sources,lifecycle}`, agents-runtime `/api/pipeline/*` + `/pipeline/*`) · GHA `build-images` → GHCR · `make test` (120 tests).

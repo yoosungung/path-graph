@@ -193,15 +193,19 @@ def read_manifest_lines(manifest_key: str, *, settings: Settings | None = None) 
     lines = read_jsonl(store, manifest_key)
     out: list[dict[str, Any]] = []
     for line in lines:
-        out.append(
-            {
-                "tenant": line["tenant"],
-                "source_id": line["source_id"],
-                "content_hash": line["content_hash"],
-                "s3_raw_uri": line["s3_raw_uri"],
-                "filename": line["filename"],
-            }
-        )
+        row = {
+            "tenant": line["tenant"],
+            "project_id": line["project_id"],
+            "source_id": line["source_id"],
+            "content_hash": line["content_hash"],
+            "s3_raw_uri": line["s3_raw_uri"],
+            "filename": line["filename"],
+        }
+        if line.get("mime"):
+            row["mime"] = line["mime"]
+        if line.get("document_id"):
+            row["document_id"] = line["document_id"]
+        out.append(row)
     return out
 
 

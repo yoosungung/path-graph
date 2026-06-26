@@ -32,8 +32,9 @@ collect / ingest_web
 
 - **`steps/ingest_manifest.py`** — `BatchManifestLine` JSON 한 줄 → `ingest_item` ([ARCHITECTURE §2.6](../ARCHITECTURE.md#26-공통-json-스키마))
 - **`ingest_helpers.parse_manifest_line`** — `document_id` 보강
-- **WF**: `pipeline-ingest-rag` — `batch_manifest_key` (S3) 또는 legacy `batch_manifest` JSON → `load_batch_manifest` → `withParam` map ingest
+- **WF**: `pipeline-ingest-rag` — `batch_manifest_key`(S3, **우선**) 또는 `batch_manifest` inline JSON → `load_batch_manifest` → `withParam` map ingest. 둘 다 있으면 **key만** 사용(inline 무시).
 - **`steps/load_batch_manifest.py`** — S3 manifest jsonl → JSON 배열 (Argo output parameter)
+- **`admin.runner.read_manifest_lines`** — S3 manifest jsonl → `BatchManifestLine` 필드(`project_id` 포함) 유지
 - **`steps/collect_source_step.py`** — PG source + credential env → collect → Argo output `manifest_key`
 - **WF**: `pipeline-collect-ingest-rag` — collect step → `pipeline-ingest-rag` (`batch_manifest_key`)
 

@@ -13,7 +13,6 @@ resources:
   - configmap-limits.yaml
   - configmap-artifact-repositories.yaml
   - networkpolicy.yaml
-  - filestash-configmap.yaml
   - filestash.yaml
   - filestash-ingress.yaml
   - filestash-networkpolicy.yaml
@@ -25,3 +24,9 @@ resources:
   - workflow-templates/pipeline-purge-document.yaml
   - workflow-templates/pipeline-reconcile-index.yaml
   - workflow-templates/pipeline-artifact-cleanup.yaml
+configMapGenerator:
+  - name: filestash-init
+    files:
+      - render-filestash-config.sh
+    options:
+      disableNameSuffixHash: true

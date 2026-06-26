@@ -110,10 +110,11 @@ e2e-downstream: install
 	./scripts/submit-downstream-e2e.sh
 
 test-infra-config:
-	chmod +x scripts/test-qdrant-config.sh scripts/test-nebula-config.sh scripts/test-nebula-studio-config.sh
+	chmod +x scripts/test-qdrant-config.sh scripts/test-nebula-config.sh scripts/test-nebula-studio-config.sh scripts/test-filestash-config.sh deploy/k8s/base/render-filestash-config.sh scripts/render-filestash-config.sh
 	./scripts/test-qdrant-config.sh
 	./scripts/test-nebula-config.sh
 	./scripts/test-nebula-studio-config.sh
+	./scripts/test-filestash-config.sh
 
 deploy-qdrant-nebula:
 	chmod +x scripts/deploy-qdrant-nebula.sh

@@ -150,3 +150,5 @@ def test_build_ingest_manifest_pending_only(local_store, monkeypatch):
     lines = read_jsonl(make_blob_store(get_settings()), out["manifest_key"])
     assert len(lines) == 1
     assert lines[0]["filename"] == "one.pdf"
+    assert lines[0]["project_id"] == profile.project_id
+    assert out["manifest_lines"][0]["project_id"] == profile.project_id

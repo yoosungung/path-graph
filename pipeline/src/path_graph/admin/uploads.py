@@ -275,4 +275,5 @@ def build_ingest_manifest(
         "batch_id": bid,
         "manifest_key": manifest_key,
         "file_count": len(manifest_items),
+        "manifest_lines": manifest_items,
     }

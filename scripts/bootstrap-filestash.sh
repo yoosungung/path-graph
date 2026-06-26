@@ -60,12 +60,9 @@ ADMIN_HASH="$(bcrypt_hash "$ADMIN_PASSWORD")" || {
 
 kubectl -n "$TARGET_NS" create secret generic filestash-env \
   --from-literal=ADMIN_PASSWORD="$ADMIN_HASH" \
+  --from-literal=APPLICATION_URL="http://filestash.k8s-test" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Secret applied in ${TARGET_NS}: filestash-env (admin password set)"
 echo "  Admin: http://filestash.k8s-test/admin (or port-forward :8334)"
-echo "  S3 login:"
-echo "    Access Key ID  = GARAGE_DEFAULT_ACCESS_KEY (s3-creds S3_ACCESS_KEY_ID)"
-echo "    Secret Key     = GARAGE_DEFAULT_SECRET_KEY (s3-creds S3_SECRET_ACCESS_KEY)"
-echo "    Advanced endpoint: http://garage-s3.runtime.svc.cluster.local:3900"
-echo "    Advanced region:   garage"
+echo "  S3: credentials pre-seeded from path-graph/s3-creds on pod start (select 'Garage S3' on login)"

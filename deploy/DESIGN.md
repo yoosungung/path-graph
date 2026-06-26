@@ -47,12 +47,12 @@ make verify-qdrant-nebula   # post-deploy smoke
 
 | 리소스 | 용도 |
 |--------|------|
-| `filestash.yaml` | Deployment + PVC + Service |
-| `filestash-configmap.yaml` | S3 백엔드만 활성화한 seed `config.json` |
+| `filestash.yaml` | Deployment + PVC + Service; init가 `s3-creds`로 `config.json` 생성 |
+| `filestash-init` ConfigMap | `scripts/render-filestash-config.sh` — Garage key/secret/endpoint/region/버킷 path 주입 |
 | `filestash-ingress.yaml` | nginx Ingress (HTTP, dev) |
 | `filestash-networkpolicy.yaml` | egress → `runtime/garage-s3:3900` |
 
-Secret `filestash-env`는 `scripts/bootstrap-filestash.sh`가 생성 (`ADMIN_PASSWORD` bcrypt, `APPLICATION_URL`). Garage 자격증명은 로그인 화면 또는 `/admin`에서 입력(S3 키는 `s3-creds`와 동일).
+Secret `filestash-env`는 `scripts/bootstrap-filestash.sh`가 생성 (`ADMIN_PASSWORD` bcrypt). Garage S3는 init가 `s3-creds`로 `config.json`을 렌더 — **passthrough `direct` middleware**로 로그인 화면 key/secret 입력 없이 바로 버킷 탐색(dev 전용).
 
 ## 컨테이너 이미지 (GitHub Actions → GHCR)
 

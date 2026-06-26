@@ -71,3 +71,18 @@ def test_collect_and_read_manifest(local_store, monkeypatch):
     lines = read_manifest_lines(out["manifest_key"])
     assert len(lines) == 1
     assert lines[0]["filename"] == "a.pdf"
+    assert lines[0]["project_id"] == PROJECT_ID
+
+
+def test_read_manifest_lines_includes_project_id(local_store):
+    from path_graph.collectors.remote import collect_local_file, write_batch_manifest
+    from path_graph.config import get_settings
+    from path_graph.contracts.s3_keys import s3_key_batch_manifest
+
+    local_store.mkdir(parents=True, exist_ok=True)
+    f = local_store / "doc.txt"
+    f.write_text("hello", encoding="utf-8")
+    meta = collect_local_file(f, "dev", PROJECT_ID, "manual:upload")
+    write_batch_manifest("dev", "batch-read", [meta], get_settings())
+    lines = read_manifest_lines(s3_key_batch_manifest("dev", "batch-read"))
+    assert lines[0]["project_id"] == PROJECT_ID

@@ -4,9 +4,24 @@ import argparse
 import json
 import os
 import sys
+from typing import Any
 
 from path_graph.admin.runner import manifest_lines_to_json
 from path_graph.config import get_settings
+from path_graph.contracts.schemas import BatchManifestLine
+
+
+def _inline_manifest_rows(parsed: list[Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in parsed:
+        if not isinstance(row, dict):
+            raise ValueError("batch_manifest items must be objects")
+        line = BatchManifestLine.model_validate(row)
+        out = line.model_dump(exclude_none=True)
+        if row.get("document_id"):
+            out["document_id"] = row["document_id"]
+        rows.append(out)
+    return rows
 
 
 def resolve_manifest_json(
@@ -16,16 +31,16 @@ def resolve_manifest_json(
     settings=None,
 ) -> str:
     """Return compact JSON array for Argo withParam."""
-    inline = (batch_manifest or os.environ.get("BATCH_MANIFEST", "")).strip()
     key = (manifest_key or os.environ.get("BATCH_MANIFEST_KEY", "")).strip()
+    inline = (batch_manifest or os.environ.get("BATCH_MANIFEST", "")).strip()
+    if key:
+        return manifest_lines_to_json(key, settings=settings or get_settings())
     if inline:
-        # Validate JSON array early.
         parsed = json.loads(inline)
         if not isinstance(parsed, list):
             raise ValueError("batch_manifest must be a JSON array")
-        return json.dumps(parsed, separators=(",", ":"))
-    if key:
-        return manifest_lines_to_json(key, settings=settings or get_settings())
+        rows = _inline_manifest_rows(parsed)
+        return json.dumps(rows, separators=(",", ":"))
     raise ValueError("batch_manifest_key or batch_manifest required")
 
 
@@ -41,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--batch-manifest",
-        help="Inline JSON array (legacy). Falls back to BATCH_MANIFEST env.",
+        help="Inline JSON array when manifest-key is empty. Falls back to BATCH_MANIFEST env.",
     )
     parser.add_argument(
         "--output",
