@@ -18,8 +18,8 @@ spec:
   templates:
     - name: cleanup
       container:
-        image: path-graph/pipeline:latest
-        imagePullPolicy: Always
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
         command: [sh, -c]
         args:
           - |

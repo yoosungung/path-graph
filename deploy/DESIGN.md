@@ -14,7 +14,8 @@ deploy/
       helm/values/
       manifests/
     overlays/
-      dev/                            # GHCR image + :latest
+      dev/                            # GHCR image + git SHA tag (kustomize newTag)
+    pipeline-image-tag                # 현재 배포 중인 pipeline 이미지 SHA (set-dev-image-tag.sh)
 ```
 
 ## Qdrant · NebulaGraph (`k8s/infra/`)
@@ -63,13 +64,21 @@ Secret `filestash-env`는 `scripts/bootstrap-filestash.sh`가 생성 (`ADMIN_PAS
 | `workflow_dispatch` | dev 배포용 — **push 후** `make build-images` |
 | Release **published** | 태그 릴리스와 함께 빌드 |
 
-태그: `ghcr.io/yoosungung/path-graph/pipeline:latest` 및 `:<git-sha>`
+태그: **`:latest` 사용 안 함.** `:<git-sha>`(full SHA, GHA·로컬 빌드 공통). Release published 시 추가로 `:<release-tag>`.
+
+| 항목 | 표준 |
+|------|------|
+| 배포 참조 | `ghcr.io/yoosungung/path-graph/pipeline:<git-sha>` — `deploy/k8s/pipeline-image-tag` |
+| base manifest | `path-graph/pipeline:0.0.0` placeholder → kustomize `images.newTag` |
+| `imagePullPolicy` | `IfNotPresent` (pipeline WorkflowTemplate 전체) |
 
 ```bash
 git push origin main
-make build-images
+make build-images                    # GHA: push :<git-sha>
+# 또는 로컬:
+make build-pipeline-image PUSH=1     # TAG=현재 HEAD SHA
+make k8s-apply-dev                   # set-dev-image-tag + kubectl apply -k dev
 gh run list --workflow=build-images.yml --limit=3
-make k8s-apply-dev
 ```
 
 ## Commands

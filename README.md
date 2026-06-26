@@ -90,8 +90,9 @@ python -m path_graph.steps.ingest_onedrive --tenant dev --folder Documents --dry
 K8s 배포: [deploy/SETUP.md](deploy/SETUP.md)
 
 ```bash
-git push origin main && make build-images   # GHCR 이미지 (로컬 docker 없음)
-make k8s-apply-dev                          # dev overlay apply
+git push origin main && make build-images   # GHCR :<git-sha> (로컬 docker 없음)
+make build-pipeline-image PUSH=1            # 또는 로컬 docker 빌드·push
+make k8s-apply-dev                          # SHA 태그 pin + dev overlay apply
 ```
 
 ## VS Code 디버그

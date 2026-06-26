@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGISTRY="${REGISTRY:-ghcr.io/yoosungung/path-graph}"
-TAG="${TAG:-latest}"
+TAG="${TAG:-$(git -C "$ROOT" rev-parse HEAD)}"
 IMAGE="${REGISTRY}/pipeline:${TAG}"
 RHWP_BATCH_VERSION="${RHWP_BATCH_VERSION:-0.7.15}"
 PLATFORM="${PLATFORM:-linux/amd64}"

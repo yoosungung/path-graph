@@ -1,6 +1,6 @@
 .PHONY: venv test install wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
-	ensure-namespace ensure-registry-secret k8s-apply-dev build-images build-pipeline-image \
+	ensure-namespace ensure-registry-secret k8s-apply-dev set-dev-image-tag deploy-dev build-images build-pipeline-image \
 	e2e-ingest-rag e2e-downstream test-infra-config deploy-qdrant-nebula verify-qdrant-nebula teardown-qdrant-nebula tune-node-inotify
 
 VENV := .venv
@@ -10,6 +10,8 @@ REGISTRY ?= ghcr.io/yoosungung/path-graph
 GHCR_USER ?= $(shell echo $(REGISTRY) | cut -d/ -f2)
 NAMESPACE ?= path-graph
 REF ?= main
+IMAGE_TAG ?= $(shell ./scripts/resolve-image-tag.sh)
+PUSH ?=
 
 venv:
 	$(UV) venv $(VENV) --python 3.12
@@ -86,7 +88,11 @@ _bootstrap-registry-secret:
 		exit 1; \
 	fi
 
-k8s-apply-dev: ensure-registry-secret
+set-dev-image-tag:
+	chmod +x ./scripts/resolve-image-tag.sh ./scripts/set-dev-image-tag.sh
+	./scripts/set-dev-image-tag.sh $(IMAGE_TAG)
+
+k8s-apply-dev: ensure-registry-secret set-dev-image-tag
 	./scripts/create-path-graph-secrets.sh
 	./scripts/bootstrap-filestash.sh
 	kubectl apply -k deploy/k8s/overlays/dev
@@ -100,8 +106,10 @@ build-images:
 	@echo "Triggered. Watch: gh run list --workflow=build-images.yml --limit=1"
 
 build-pipeline-image:
-	chmod +x ./scripts/build-pipeline-image.sh
-	PUSH=1 ./scripts/build-pipeline-image.sh
+	chmod +x ./scripts/build-pipeline-image.sh ./scripts/resolve-image-tag.sh
+	TAG=$(IMAGE_TAG) PUSH=$(PUSH) ./scripts/build-pipeline-image.sh
+
+deploy-dev: build-pipeline-image k8s-apply-dev
 
 e2e-ingest-rag: install
 	./scripts/submit-ingest-rag-e2e.sh

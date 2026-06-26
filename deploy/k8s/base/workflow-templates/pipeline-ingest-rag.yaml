@@ -55,8 +55,8 @@ spec:
           - name: batch_manifest
           - name: batch_manifest_key
       container:
-        image: path-graph/pipeline:latest
-        imagePullPolicy: Always
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
         command: [python, -m, path_graph.steps.load_batch_manifest]
         args:
           - --tenant
@@ -88,8 +88,8 @@ spec:
           - name: tenant
           - name: manifest_line
       container:
-        image: path-graph/pipeline:latest
-        imagePullPolicy: Always
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
         command: [sh, -c]
         args:
           - |

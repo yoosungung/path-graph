@@ -53,8 +53,8 @@ spec:
         parameters:
           - name: credential_secret
       container:
-        image: path-graph/pipeline:latest
-        imagePullPolicy: Always
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
         command: [python, -m, path_graph.steps.collect_source_step]
         args:
           - --tenant

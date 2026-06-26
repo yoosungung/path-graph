@@ -29,8 +29,8 @@ spec:
             template: graphrag-step
     - name: graphrag-step
       container:
-        image: path-graph/pipeline:latest
-        imagePullPolicy: Always
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
         command: [python, -c]
         args:
           - |

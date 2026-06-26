@@ -20,8 +20,8 @@ spec:
   templates:
     - name: purge
       container:
-        image: path-graph/pipeline:latest
-        imagePullPolicy: Always
+        image: path-graph/pipeline:0.0.0
+        imagePullPolicy: IfNotPresent
         command: [python, -m, path_graph.steps.purge_step]
         args:
           - --tenant
