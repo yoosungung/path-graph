@@ -29,7 +29,7 @@ def _format_pipeline_run_ts(value: object) -> str | None:
 
 
 def _pipeline_run_row(row: tuple[Any, ...]) -> dict[str, Any]:
-    return {
+    result = {
         "id": row[0],
         "workflow_name": row[1],
         "argo_uid": row[2],
@@ -38,6 +38,13 @@ def _pipeline_run_row(row: tuple[Any, ...]) -> dict[str, Any]:
         "started_at": _format_pipeline_run_ts(row[5]),
         "ended_at": _format_pipeline_run_ts(row[6]),
     }
+    if len(row) > 7:
+        result["project_id"] = str(row[7]) if row[7] is not None else None
+        result["run_kind"] = row[8] or "ingest"
+    else:
+        result["project_id"] = None
+        result["run_kind"] = "ingest"
+    return result
 
 
 def _pipeline_run_row_with_tenant(row: tuple[Any, ...]) -> dict[str, Any]:
@@ -300,7 +307,8 @@ class SourceStore:
         return int(row[0]) if row else 0
 
     _PIPELINE_RUN_COLS = """
-        id::text, workflow_name, argo_uid, batch_id, status, started_at, ended_at
+        id::text, workflow_name, argo_uid, batch_id, status, started_at, ended_at,
+        project_id::text, run_kind
     """
 
     def get_pipeline_run_by_batch(
@@ -323,34 +331,81 @@ class SourceStore:
         return _pipeline_run_row(row)
 
     def list_pipeline_runs(
-        self, tenant: str, limit: int = 50, offset: int = 0
+        self,
+        tenant: str,
+        limit: int = 50,
+        offset: int = 0,
+        *,
+        project_id: str | None = None,
     ) -> list[dict[str, Any]]:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
-            rows = conn.execute(
-                f"""
-                SELECT {self._PIPELINE_RUN_COLS}
-                FROM path_graph.pipeline_runs
-                WHERE tenant = %s
-                ORDER BY started_at DESC NULLS LAST, id DESC
-                LIMIT %s OFFSET %s
-                """,
-                (tenant, limit, offset),
-            ).fetchall()
+            if project_id:
+                rows = conn.execute(
+                    f"""
+                    SELECT {self._PIPELINE_RUN_COLS}
+                    FROM path_graph.pipeline_runs
+                    WHERE tenant = %s AND project_id = %s::uuid
+                    ORDER BY started_at DESC NULLS LAST, id DESC
+                    LIMIT %s OFFSET %s
+                    """,
+                    (tenant, project_id, limit, offset),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    f"""
+                    SELECT {self._PIPELINE_RUN_COLS}
+                    FROM path_graph.pipeline_runs
+                    WHERE tenant = %s
+                    ORDER BY started_at DESC NULLS LAST, id DESC
+                    LIMIT %s OFFSET %s
+                    """,
+                    (tenant, limit, offset),
+                ).fetchall()
         return [_pipeline_run_row(r) for r in rows]
 
-    def count_pipeline_runs(self, tenant: str) -> int:
+    def count_pipeline_runs(self, tenant: str, *, project_id: str | None = None) -> int:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            if project_id:
+                row = conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM path_graph.pipeline_runs
+                    WHERE tenant = %s AND project_id = %s::uuid
+                    """,
+                    (tenant, project_id),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM path_graph.pipeline_runs
+                    WHERE tenant = %s
+                    """,
+                    (tenant,),
+                ).fetchone()
+        return int(row[0]) if row else 0
+
+    def has_active_graphrag_run(
+        self, tenant: str, project_id: str, batch_id: str
+    ) -> bool:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
             row = conn.execute(
                 """
-                SELECT COUNT(*)
+                SELECT 1
                 FROM path_graph.pipeline_runs
                 WHERE tenant = %s
+                  AND project_id = %s::uuid
+                  AND batch_id = %s
+                  AND run_kind = 'graphrag'
+                  AND status NOT IN ('Succeeded', 'Failed', 'Error')
+                LIMIT 1
                 """,
-                (tenant,),
+                (tenant, project_id, batch_id),
             ).fetchone()
-        return int(row[0]) if row else 0
+        return row is not None
 
     def list_non_finalized_pipeline_runs(self, limit: int = 200) -> list[dict[str, Any]]:
         """Return open runs across tenants (backend reconciler; table owner bypasses RLS)."""
@@ -402,19 +457,34 @@ class SourceStore:
         batch_id: str,
         status: str,
         argo_uid: str | None = None,
+        *,
+        project_id: str | None = None,
+        run_kind: str = "ingest",
     ) -> None:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
             conn.execute(
                 """
                 INSERT INTO path_graph.pipeline_runs
-                    (tenant, id, workflow_name, argo_uid, batch_id, status)
-                VALUES (%s, %s::uuid, %s, %s, %s, %s)
+                    (tenant, id, workflow_name, argo_uid, batch_id, status,
+                     project_id, run_kind)
+                VALUES (%s, %s::uuid, %s, %s, %s, %s, %s::uuid, %s)
                 ON CONFLICT (tenant, id) DO UPDATE SET
                     status = EXCLUDED.status,
-                    argo_uid = COALESCE(EXCLUDED.argo_uid, path_graph.pipeline_runs.argo_uid)
+                    argo_uid = COALESCE(EXCLUDED.argo_uid, path_graph.pipeline_runs.argo_uid),
+                    project_id = COALESCE(EXCLUDED.project_id, path_graph.pipeline_runs.project_id),
+                    run_kind = COALESCE(EXCLUDED.run_kind, path_graph.pipeline_runs.run_kind)
                 """,
-                (tenant, run_id, workflow_name, argo_uid, batch_id, status),
+                (
+                    tenant,
+                    run_id,
+                    workflow_name,
+                    argo_uid,
+                    batch_id,
+                    status,
+                    project_id,
+                    run_kind,
+                ),
             )
             conn.commit()
 

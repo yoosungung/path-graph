@@ -301,6 +301,18 @@ python -m path_graph.steps.ingest_onedrive --tenant dev --item-id ITEM_ID
 
 ---
 
+## Downstream (GraphRAG · Console)
+
+RAG ingest batch → `path_graph.admin.downstream`:
+
+1. `aggregate_batch_chunks` — manifest jsonl → per-doc `chunks/{tenant}/{doc_id}/chunks.jsonl` merge → `chunks/{tenant}/{project_id}/{batch_id}/chunks.jsonl`
+2. `prepare_graphrag_submission` — project slug + Argo parameters
+3. `assert_project_graphrag_idle` — 동일 batch active graphrag run → 409
+
+BFF: `POST /api/pipeline/projects/{id}/graphrag` `{batch_id}`. agents-runtime `pipeline_argo.submit_graphrag`.
+
+---
+
 ## 모듈 맵
 
 ```
@@ -316,7 +328,7 @@ src/path_graph/
   contracts/
     schemas.py, s3_keys.py, community.py, project.py, source.py
   admin/
-    projects.py, sources.py, runner.py, uploads.py
+    projects.py, sources.py, runner.py, uploads.py, downstream.py
   storage/blob.py
   meta/pg.py
   rag/embed.py, qdrant_store.py

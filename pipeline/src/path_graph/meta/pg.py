@@ -221,6 +221,15 @@ ALTER TABLE path_graph.pipeline_runs
     ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
 """
 
+PIPELINE_RUNS_KIND_MIGRATION_SQL = """
+ALTER TABLE path_graph.pipeline_runs
+    ADD COLUMN IF NOT EXISTS project_id UUID,
+    ADD COLUMN IF NOT EXISTS run_kind TEXT NOT NULL DEFAULT 'ingest';
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_tenant_project
+    ON path_graph.pipeline_runs (tenant, project_id);
+"""
+
 LIFECYCLE_MIGRATION_SQL = """
 ALTER TABLE path_graph.documents
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ,
@@ -334,6 +343,7 @@ def iter_migration_sql() -> list[str]:
         SOURCE_PROJECT_BACKFILL_MIGRATION_SQL,
         LIFECYCLE_MIGRATION_SQL,
         PIPELINE_RUNS_PERSIST_MIGRATION_SQL,
+        PIPELINE_RUNS_KIND_MIGRATION_SQL,
         RLS_POLICY_MIGRATION_SQL,
     ]
 
@@ -442,6 +452,36 @@ class PgMetaStore:
                 (tenant, document_id),
             )
             conn.commit()
+
+    def mark_graphrag_indexed(self, tenant: str, document_ids: list[str]) -> int:
+        if not document_ids:
+            return 0
+        updated = 0
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            for document_id in document_ids:
+                conn.execute(
+                    """
+                    INSERT INTO path_graph.document_ingest_state
+                        (tenant, document_id, graph_at, wiki_at)
+                    VALUES (%s, %s::uuid, now(), now())
+                    ON CONFLICT (tenant, document_id) DO UPDATE SET
+                        graph_at = now(),
+                        wiki_at = now()
+                    """,
+                    (tenant, document_id),
+                )
+                cur = conn.execute(
+                    """
+                    UPDATE path_graph.documents
+                    SET ingest_state = 'indexed_graph'
+                    WHERE tenant = %s AND id = %s::uuid
+                    """,
+                    (tenant, document_id),
+                )
+                updated += cur.rowcount
+            conn.commit()
+        return updated
 
     def upsert_communities(self, records: list[CommunityRecord], s3_uri: str) -> None:
         if not records:

@@ -10,12 +10,13 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **102 tests** (2026-06) |
+| pipeline 패키지 | v0.1.0, `make test` **135 tests** (2026-06) |
 | 로컬 ingest | CLI로 **web / local file / SharePoint / GDrive / OneDrive** → parse → chunk → (선택) RAG |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward 가능 (`wire-dev.sh`) |
 | Argo Workflows | `argo` NS — `make argo-install` |
-| `path-graph` NS / WorkflowTemplate | **applied** — `make bootstrap-k8s` |
-| agents | graph-extractor / wiki-synthesizer **스켈레ton** (invoke 연동 테스트는 pipeline mock 위주) |
+| `path-graph` NS / WorkflowTemplate | **applied** — ingest·graph·wiki·graphrag·lifecycle WF |
+| Admin Console (agents-runtime) | **RAG + GraphRAG downstream** — ingest·Graph/Wiki 빌드·Runs·파일관리 |
+| agents | graph-extractor / wiki-synthesizer — pipeline invoke + cluster E2E (`skip_agent=1` 또는 live) |
 
 ---
 
@@ -65,13 +66,13 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 1.4.1 | `namespace.yaml` | [x] | |
-| 1.4.2 | WorkflowTemplate `pipeline-ingest-rag` | [~] | YAML + SA; **collect step·manifest 입력 형식 미정합** |
+| 1.4.2 | WorkflowTemplate `pipeline-ingest-rag` | [x] | `resolve-manifest` + `batch_manifest_key` 우선; E2E `submit-ingest-rag-e2e.sh` |
 | 1.4.3 | ServiceAccount · NetworkPolicy | [x] | `serviceaccount.yaml`, `networkpolicy.yaml` |
 | 1.4.4 | ConfigMap `path-graph-limits` (semaphore) | [x] | `configmap-limits.yaml` |
 | 1.4.5 | Secret `path-graph-env` / PG·S3 참조 | [x] | `create-path-graph-secrets.sh` |
 | 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [x] | GHA `build-images.yml` + dev overlay GHCR |
 | 1.4.7 | **Argo Workflows controller** 설치 | [x] | `install-argo.sh` + `deploy/k8s/argo/values.yaml` |
-| 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [~] | `workflow-validate` + bootstrap; WF E2E는 2.4.1 |
+| 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [x] | `make bootstrap-k8s` + ingest/downstream E2E scripts |
 | 1.4.9 | CronWorkflow / 이벤트 트리거 | [x] | Console `schedule_cron` → `pg-cron-{tenant}-{source}` |
 | 1.4.10 | Filestash (Garage S3 dev UI) | [x] | `deploy/k8s/base/filestash*.yaml`, `bootstrap-filestash.sh` |
 
@@ -100,7 +101,7 @@
 | 2.1.5 | agent-chat JSON export | [x] | `AgentChatCollector` |
 | 2.1.6 | `batches/{tenant}/{batch_id}/manifest.jsonl` writer | [x] | collect CLI가 생성 |
 | 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | `list_delta` + `collect_delta`; source config `delta_link` |
-| 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [ ] | |
+| 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [~] | Console Cron → `pipeline-collect-ingest-rag`; **collect-only WF**(ingest 분리)는 미구현 |
 
 ### 2.2 Graph pipeline
 
@@ -165,12 +166,12 @@
 
 ## 권장 실행 순서 (다음 4 sprint)
 
-아래는 **의존성·리스크** 기준 권장 순서. 번호는 ROADMAP # 참조.
+아래는 **의존성·리스크** 기준. 번호는 ROADMAP # 참조. Phase 1·4 ingest MVP는 완료 — **downstream Console·runtime 소비**가 현재 병목.
 
-1. **운영 기반** — 1.4.7 Argo 설치 → 1.4.3–1.4.5 → 1.4.8 → 1.4.6 이미지
-2. **배치 ingest 실동** — 2.4.1 manifest→ingest step → 2.4.2 WF E2E → 2.1.8 SharePoint cron (회사규정)
-3. **PG 완성** — 1.1.10 RLS policy → 1.1.9 pipeline_runs 연동 → 1.1.11 compensation
-4. **품질** — 3.3.2 blocks JSON (표 많은 PDF) → 3.3.1 RRF → 3.1.5 wiki 프롬프트
+1. **Console downstream** — 4.5.1 BFF graph/wiki/graphrag submit → 4.5.2 chunks_key resolve → 4.5.3 UI → 4.5.4 `pipeline_runs` graph/wiki 커서
+2. **운영 마감** — 4.4.4 reconcile Cron per project → 1.1.9 ingest_state 전 단계 write → 2.1.7 SharePoint delta 운영화
+3. **runtime 소비** — 3.2.0 `path_graph_project_id` + binding resolve → 3.2.1 VFS wiki mount (agents-runtime ROADMAP 동기)
+4. **품질** — 3.3.2 blocks JSON → 3.3.1 RRF → 3.1.5 Graph-enhanced Wiki 프롬프트
 
 ---
 
@@ -243,6 +244,15 @@
 | 4.4.3 | UI purge·tombstones·reconcile 리포트 | [x] | `/files/projects/:id/*` |
 | 4.4.4 | CronWorkflow `pipeline-reconcile-index` per project | [ ] | 일 1회 |
 
+### 4.5 Downstream (GraphRAG) — Console
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 4.5.1 | BFF `POST …/projects/{id}/graphrag` | [x] | `pipeline-graphrag` 단일 |
+| 4.5.2 | ingest batch → `chunks_key` aggregate | [x] | `admin/downstream.py` |
+| 4.5.3 | UI Runs 「Graph & Wiki 빌드」+ 재빌드 | [x] | active graphrag만 disabled |
+| 4.5.4 | `pipeline_runs` run_kind + graph_at/wiki_at | [x] | reconciler on Succeeded |
+
 ---
 
 ## 미결정
@@ -250,7 +260,7 @@
 | ID | 주제 | 선택지 / 메모 |
 |---|---|---|
 | D1 | Argo controller **설치 주체** | test_infra Helm vs path-graph deploy 문서만 |
-| D2 | pipeline 이미지 **레지스트리** | **GHCR** — GHA `workflow_dispatch` + release (`make build-images`) |
+| ~~D2~~ | pipeline 이미지 **레지스트리** | **결정: GHCR** — GHA `build-images` + dev overlay |
 | D3 | PDF 구조화 | md→blocks 후처리 vs Docling vs Azure DI |
 | D4 | 로컬 embed | TEI port-forward vs 로컬 mock vs cluster-only RAG |
 | D5 | 회사규정 ingest **주기** | SharePoint cron 주기·delta vs full scan |

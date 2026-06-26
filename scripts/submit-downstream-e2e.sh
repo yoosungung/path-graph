@@ -55,6 +55,9 @@ if [[ "${S3_ENDPOINT_URL:-}" == *".svc"* ]]; then
   export S3_ENDPOINT_URL=http://127.0.0.1:3900
 fi
 
+PROJECT_ID="${PROJECT_ID:-550e8400-e29b-41d4-a716-446655440000}"
+PROJECT_SLUG="${PROJECT_SLUG:-default}"
+
 read -r CHUNKS_KEY DOC_ID <<<"$("$PY" <<'PY'
 import hashlib
 import json
@@ -130,7 +133,47 @@ EOF
   echo "${template} succeeded (${wf_name})."
 }
 
-echo "Fixture: chunks_key=${CHUNKS_KEY} doc_id=${DOC_ID}"
+submit_graphrag_wf() {
+  local batch_id="$1"
+  local wf_name
+  wf_name="$(kubectl create -f - -o jsonpath='{.metadata.name}' <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: pipeline-graphrag-e2e-
+  namespace: ${NS}
+spec:
+  workflowTemplateRef:
+    name: pipeline-graphrag
+  arguments:
+    parameters:
+      - name: tenant
+        value: ${TENANT}
+      - name: project_id
+        value: ${PROJECT_ID}
+      - name: project_slug
+        value: ${PROJECT_SLUG}
+      - name: batch_id
+        value: ${batch_id}
+      - name: chunks_key
+        value: ${CHUNKS_KEY}
+      - name: skip_agent
+        value: "${SKIP_AGENT}"
+EOF
+)"
+  echo "Submitted pipeline-graphrag workflow ${wf_name} (batch_id=${batch_id})..."
+  kubectl -n "$NS" wait "workflow/${wf_name}" --for=condition=Completed --timeout="${TIMEOUT}"
+  local phase
+  phase="$(kubectl -n "$NS" get "workflow/${wf_name}" -o jsonpath='{.status.phase}')"
+  if [[ "$phase" != "Succeeded" ]]; then
+    echo "workflow ${wf_name} failed: phase=${phase}" >&2
+    kubectl -n "$NS" get "workflow/${wf_name}" -o yaml | tail -50 >&2
+    exit 1
+  fi
+  echo "pipeline-graphrag succeeded (${wf_name})."
+}
+
+echo "Fixture: chunks_key=${CHUNKS_KEY} doc_id=${DOC_ID} project_id=${PROJECT_ID}"
 
 case "$TEMPLATE" in
   pipeline-graph)
@@ -140,7 +183,7 @@ case "$TEMPLATE" in
     submit_wf pipeline-wiki "$BATCH_ID"
     ;;
   pipeline-graphrag)
-    submit_wf pipeline-graphrag "$BATCH_ID"
+    submit_graphrag_wf "$BATCH_ID"
     ;;
   all)
     GRAPH_BATCH="${BATCH_ID}-graph"
@@ -148,7 +191,7 @@ case "$TEMPLATE" in
     GRAPHRAG_BATCH="${BATCH_ID}-graphrag"
     submit_wf pipeline-graph "$GRAPH_BATCH"
     submit_wf pipeline-wiki "$WIKI_BATCH"
-    submit_wf pipeline-graphrag "$GRAPHRAG_BATCH"
+    submit_graphrag_wf "$GRAPHRAG_BATCH"
     ;;
   *)
     echo "error: unknown TEMPLATE=${TEMPLATE}" >&2
