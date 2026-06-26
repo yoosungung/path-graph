@@ -17,6 +17,12 @@ spec:
         value: ""
       - name: rag
         value: "true"
+  parallelism: 10
+  podGC:
+    strategy: OnWorkflowCompletion
+  ttlStrategy:
+    secondsAfterCompletion: 600
+    secondsAfterFailure: 7200
   templates:
     - name: collect-ingest-rag
       steps:
