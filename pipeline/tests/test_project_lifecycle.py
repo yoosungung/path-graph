@@ -19,13 +19,17 @@ def test_lifecycle_batch_ids():
     assert LIFECYCLE_BATCH_ID["delete"] == "lifecycle:delete"
 
 
-def test_assert_project_lifecycle_idle_rejects_purged():
+def test_assert_project_lifecycle_idle_allows_purged_for_delete_and_repurge():
     project_store = MagicMock()
     project_store.get_purge_state.return_value = "purged"
-    with pytest.raises(ProjectLifecycleBusyError, match="already purged"):
-        assert_project_lifecycle_idle(
-            project_store, MagicMock(), "dev", PROJECT_ID, operation="purge"
-        )
+    source_store = MagicMock()
+    source_store.has_active_lifecycle_run.return_value = False
+    assert_project_lifecycle_idle(
+        project_store, source_store, "dev", PROJECT_ID, operation="delete"
+    )
+    assert_project_lifecycle_idle(
+        project_store, source_store, "dev", PROJECT_ID, operation="purge"
+    )
 
 
 def test_assert_project_lifecycle_idle_rejects_in_progress():

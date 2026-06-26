@@ -35,14 +35,13 @@ def assert_project_lifecycle_idle(
     operation: str,
 ) -> None:
     state = project_store.get_purge_state(tenant, project_id)
-    if state == "purged":
-        raise ProjectLifecycleBusyError("project already purged")
     if state in ("purging", "deleting"):
         raise ProjectLifecycleBusyError(f"project lifecycle in progress: {state}")
     if source_store.has_active_lifecycle_run(tenant, project_id, operation):
         raise ProjectLifecycleBusyError(
             f"active {operation} workflow already running for project"
         )
+    # purge_state=purged: delete(PG hard delete) and re-purge(cleanup retry) are allowed
 
 
 def mark_project_lifecycle_started(
