@@ -7,7 +7,7 @@
 | 항목 | 확인 |
 |------|------|
 | agents-runtime `runtime` NS | Garage, postgres, envoy |
-| test_infra | Qdrant, Nebula |
+| path-graph infra | Qdrant, Nebula — `make deploy-qdrant-nebula` |
 | Argo Workflows | `make argo-install` |
 | pipeline 이미지 | **GHA** `make build-images` (로컬 docker 없음) |
 | GHCR pull | `registry-creds` in `path-graph` NS (`make ensure-registry-secret`) |
@@ -33,6 +33,36 @@ make bootstrap-k8s    # 최초: Argo + secrets + dev overlay
 # 이후 이미지 갱신 후:
 make k8s-apply-dev    # secrets + dev overlay + runtime NP patch
 ./scripts/patch-runtime-ingress-for-path-graph.sh   # k8s-apply-dev에 포함
+```
+
+## Qdrant · NebulaGraph
+
+path-graph가 [`deploy/k8s/infra/`](k8s/infra/)에서 Qdrant·NebulaGraph를 설치·운영한다 (구 test_infra).
+
+### 배포
+
+```bash
+make test-infra-config       # pre-deploy (helm template + dry-run)
+make deploy-qdrant-nebula    # namespaces + Helm + Studio + Ingress
+make verify-qdrant-nebula    # post-deploy smoke
+```
+
+| 항목 | 값 |
+|------|-----|
+| Qdrant NS | `qdrant` — in-cluster `http://qdrant.qdrant.svc.cluster.local:6333` |
+| Qdrant API key (dev) | `test-qdrant-api-key` (`QDRANT_API_KEY`로 override) |
+| Qdrant external | `http://qdrant.k8s-test:6333/` (Ingress + ingress-nginx socat `:6333`) |
+| Nebula graphd | `nebula-graphd-svc.nebula.svc.cluster.local:9669` — user `root` / `nebula` |
+| Nebula Studio | `http://nebula-studio.k8s-test:7001/` |
+
+로컬 디버그: `./scripts/wire-dev.sh up` → `:6333`, `:9669` port-forward (Ingress 불필요).
+
+**Ingress (LAN)**: `manifests/ingress-routes.yaml` 적용 후, 공유 ingress-nginx에 [`ingress-nginx-qdrant-nebula.snippet.yaml`](k8s/infra/helm/values/ingress-nginx-qdrant-nebula.snippet.yaml)의 socat/TCP 설정이 merge되어 있어야 `qdrant.k8s-test:6333` 등이 동작한다. test_infra ingress-nginx를 쓰는 클러스터는 이미 포함되어 있을 수 있다.
+
+### Teardown
+
+```bash
+make teardown-qdrant-nebula
 ```
 
 ## Secrets

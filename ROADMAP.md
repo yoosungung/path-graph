@@ -179,7 +179,7 @@
 | 컴포넌트 | 소유 | path-graph 소비 |
 |---|---|---|
 | Garage, runtime PG, Envoy | agents-runtime | wire-dev / Secret |
-| Qdrant, Nebula | test_infra | |
+| Qdrant, Nebula | path-graph `deploy/k8s/infra/` | `make deploy-qdrant-nebula` |
 | Argo Workflows controller | test_infra 또는 별도 Helm | SETUP.md |
 | TEI `bge-m3` | llm-serving NS | `EMBEDDING_BASE_URL` |
 | rhwp-batch 이미지 | rhwp_batch | HWP parse |

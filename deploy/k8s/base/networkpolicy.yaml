@@ -36,7 +36,7 @@ spec:
           port: 5432
         - protocol: TCP
           port: 8080
-    # test_infra: Qdrant, Nebula
+    # path-graph infra: Qdrant, Nebula
     - to:
         - namespaceSelector:
             matchLabels:

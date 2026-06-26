@@ -51,7 +51,7 @@ graph TD
 | 컴포넌트 | 저장소 |
 |---|---|
 | Agent invoke, Garage, runtime PG | [agents-runtime](../agents-runtime) |
-| Qdrant, NebulaGraph | [test_infra](../test_infra) |
+| Qdrant, NebulaGraph | path-graph [`deploy/k8s/infra/`](deploy/k8s/infra/) |
 | HWP 파서 | [rhwp_batch](../rhwp_batch) |
 
 ## Quickstart (로컬)
@@ -59,7 +59,7 @@ graph TD
 ```bash
 # k8s dev 클러스터에 path-graph 의존 infra가 떠 있어야 함
 #   ../agents-runtime — make k8s-apply-dev
-#   ../test_infra     — ./scripts/deploy.sh
+#   path-graph        — make deploy-qdrant-nebula (Qdrant + NebulaGraph)
 
 make install
 ./scripts/wire-dev.sh up          # port-forward → 127.0.0.1

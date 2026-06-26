@@ -1,0 +1,18 @@
+# Fragment — merge into shared ingress-nginx values (e.g. test_infra helm/values/ingress-nginx.yaml).
+# Qdrant REST :6333 and Nebula Studio :7001 use HTTP Ingress via socat → nginx :80.
+# Qdrant gRPC :6334 uses TCP stream passthrough.
+
+tcp:
+  6334: "qdrant/qdrant:6334"
+
+# Under controller: add to extraHostPorts (hostPort):
+#   - name: qdrant
+#     containerPort: 6333
+#     hostPort: 6333
+#   - name: nebula-studio
+#     containerPort: 7001
+#     hostPort: 7001
+#
+# Under controller.extraContainers[0].command, append:
+#   socat TCP-LISTEN:6333,fork,reuseaddr TCP:127.0.0.1:80 &
+#   socat TCP-LISTEN:7001,fork,reuseaddr TCP:127.0.0.1:80 &

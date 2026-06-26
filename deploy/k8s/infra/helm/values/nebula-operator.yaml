@@ -1,0 +1,5 @@
+# NebulaGraph Operator — test cluster (k3s, single node)
+# Chart: nebula-operator/nebula-operator 1.8.0
+
+admissionWebhook:
+  create: false

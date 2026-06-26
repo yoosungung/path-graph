@@ -1,7 +1,7 @@
 .PHONY: venv test install wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
 	ensure-namespace ensure-registry-secret k8s-apply-dev build-images build-pipeline-image \
-	e2e-ingest-rag e2e-downstream
+	e2e-ingest-rag e2e-downstream test-infra-config deploy-qdrant-nebula verify-qdrant-nebula teardown-qdrant-nebula
 
 VENV := .venv
 PY := $(VENV)/bin/python3
@@ -108,3 +108,23 @@ e2e-ingest-rag: install
 
 e2e-downstream: install
 	./scripts/submit-downstream-e2e.sh
+
+test-infra-config:
+	chmod +x scripts/test-qdrant-config.sh scripts/test-nebula-config.sh scripts/test-nebula-studio-config.sh
+	./scripts/test-qdrant-config.sh
+	./scripts/test-nebula-config.sh
+	./scripts/test-nebula-studio-config.sh
+
+deploy-qdrant-nebula:
+	chmod +x scripts/deploy-qdrant-nebula.sh
+	./scripts/deploy-qdrant-nebula.sh --force
+
+verify-qdrant-nebula:
+	chmod +x scripts/verify-qdrant.sh scripts/verify-nebula.sh scripts/verify-nebula-studio.sh
+	./scripts/verify-qdrant.sh
+	./scripts/verify-nebula.sh
+	./scripts/verify-nebula-studio.sh
+
+teardown-qdrant-nebula:
+	chmod +x scripts/teardown-qdrant-nebula.sh
+	./scripts/teardown-qdrant-nebula.sh --force

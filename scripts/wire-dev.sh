@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wire local path-graph debug to k8s infra (agents-runtime + test_infra).
+# Wire local path-graph debug to k8s infra (agents-runtime + path-graph Qdrant/Nebula).
 #
 # Usage:
 #   ./scripts/wire-dev.sh up [--profile core|s3|runtime|test-infra]
@@ -14,7 +14,7 @@
 #
 # Prerequisites:
 #   agents-runtime dev cluster: make k8s-apply-dev (or wire-dev in ../agents-runtime)
-#   test_infra: ./scripts/deploy.sh (Qdrant + NebulaGraph)
+#   path-graph: make deploy-qdrant-nebula (Qdrant + NebulaGraph)
 #
 # See scripts/wire-dev.env.example and .vscode/launch.json for debug configs.
 
@@ -292,7 +292,7 @@ PATH_GRAPH_DSN=postgresql://runtime:runtime@127.0.0.1:5432/runtime?sslmode=disab
 PIPELINE_STORAGE_BACKEND=${storage_backend}
 PIPELINE_STORAGE_DIR=${storage_dir}${s3_block}
 
-# test_infra (wire-dev → qdrant :6333, nebula :9669)
+# path-graph deploy/k8s/infra (wire-dev → qdrant :6333, nebula :9669)
 QDRANT_URL=http://127.0.0.1:6333
 QDRANT_API_KEY=${QDRANT_API_KEY}
 

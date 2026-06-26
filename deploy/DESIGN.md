@@ -1,6 +1,6 @@
 # deploy — K8s 배포 설계
 
-path-graph 파이프라인 **워크로드만** 배포한다. Qdrant·Nebula는 [test_infra](../../test_infra) 책임.
+path-graph **파이프라인 워크로드** + **Qdrant·NebulaGraph 인프라**를 배포한다.
 
 ## 레이아웃
 
@@ -10,9 +10,36 @@ deploy/
     argo/
       values.yaml
     base/                             # WorkflowTemplate·SA·ConfigMap·Filestash
+    infra/                            # Qdrant + NebulaGraph (test_infra에서 이전)
+      helm/values/
+      manifests/
     overlays/
       dev/                            # GHCR image + :latest
 ```
+
+## Qdrant · NebulaGraph (`k8s/infra/`)
+
+k8s-test 클러스터용 벡터·그래프 DB. Helm + raw manifest. 상세 런북: [SETUP.md](SETUP.md#qdrant--nebulagraph).
+
+| 리소스 | 용도 |
+|--------|------|
+| `helm/values/qdrant.yaml` | Qdrant Helm (1 replica, `local-path` 8Gi) |
+| `helm/values/nebula-operator.yaml` | NebulaGraph Operator 1.8.0 |
+| `helm/values/nebula-cluster.yaml` | NebulaGraph v3.8.0 cluster (graphd/metad/storaged ×1) |
+| `manifests/*-namespace.yaml` | `qdrant`, `nebula`, `nebula-operator-system` |
+| `manifests/nebula-studio.yaml` | Studio v3.8.0 (Ingress `nebula-studio.k8s-test:7001`) |
+| `manifests/ingress-routes.yaml` | Ingress `qdrant.k8s-test:6333` |
+| `helm/values/ingress-nginx-qdrant-nebula.snippet.yaml` | 공유 ingress-nginx에 merge할 socat/TCP fragment |
+
+배포·검증:
+
+```bash
+make test-infra-config      # TDD gate (helm template + kubectl dry-run)
+make deploy-qdrant-nebula   # Helm + manifests
+make verify-qdrant-nebula   # post-deploy smoke
+```
+
+로컬 디버그는 `wire-dev.sh` port-forward (`:6333`, `:9669`) — Ingress 불필요.
 
 ## Filestash (Garage S3 UI, dev)
 
@@ -49,6 +76,9 @@ make k8s-apply-dev
 
 ```bash
 make test
+make test-infra-config
+make deploy-qdrant-nebula
+make verify-qdrant-nebula
 make kustomize-build
 make workflow-validate
 make argo-install
