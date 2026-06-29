@@ -48,6 +48,7 @@ class BlobStore(Protocol):
     def list_keys(self, prefix: str) -> list[str]: ...
     def delete_prefix(self, prefix: str) -> int: ...
     def uri_for(self, key: str) -> str: ...
+    def agent_artifact_uri(self, key: str, *, expires_sec: int = 3600) -> str: ...
 
 
 class LocalBlobStore:
@@ -101,6 +102,10 @@ class LocalBlobStore:
 
     def uri_for(self, key: str) -> str:
         return f"file://{self._path(key).resolve()}"
+
+    def agent_artifact_uri(self, key: str, *, expires_sec: int = 3600) -> str:
+        _ = expires_sec
+        return self.uri_for(key)
 
 
 class S3BlobStore:
@@ -158,6 +163,13 @@ class S3BlobStore:
 
     def uri_for(self, key: str) -> str:
         return f"s3://{self._bucket}/{key}"
+
+    def agent_artifact_uri(self, key: str, *, expires_sec: int = 3600) -> str:
+        return self._client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": key},
+            ExpiresIn=expires_sec,
+        )
 
 
 _s3_store_cache: dict[tuple[str, str, str, str, str], S3BlobStore] = {}

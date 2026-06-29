@@ -105,7 +105,7 @@ def run_graph_pipeline_for_project(
     semantic: dict = {}
     if not skip_agent:
         semantic = graph_extract_semantic(
-            tenant, project_id, batch_id, store.uri_for(chunks_key), session_id
+            tenant, project_id, batch_id, store.agent_artifact_uri(chunks_key), session_id
         )
 
     nebula.ensure_space(space)

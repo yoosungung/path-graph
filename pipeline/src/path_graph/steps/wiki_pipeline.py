@@ -15,6 +15,7 @@ from path_graph.storage.blob import make_blob_store
 def wiki_synthesize(
     tenant: str,
     project_id: str,
+    project_slug: str,
     community_id: str,
     community_level: int,
     graph_context_s3: str,
@@ -28,6 +29,7 @@ def wiki_synthesize(
     inp = WikiSynthesizerInput(
         tenant=tenant,
         project_id=project_id,
+        project_slug=project_slug,
         community_id=community_id,
         community_level=community_level,
         graph_context_s3=graph_context_s3,
@@ -90,10 +92,11 @@ def run_wiki_for_community(
     pg: PgMetaStore | None = None,
 ) -> dict:
     store = make_blob_store(get_settings())
-    ctx_uri = store.uri_for(record.graph_context_key)
+    ctx_uri = store.agent_artifact_uri(record.graph_context_key)
     result = wiki_synthesize(
         tenant,
         record.project_id,
+        record.project_slug,
         record.community_id,
         record.level,
         ctx_uri,

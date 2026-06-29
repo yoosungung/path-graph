@@ -8,7 +8,7 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 |------|------|
 | invoke payload 계약 | [x] `WikiSynthesizerInput` — `project_id`, `project_slug` |
 | pipeline 연동 | [x] `wiki_pipeline.py` + `test_wiki.py` (mock) |
-| LLM community report 본구현 | [ ] 프롬프트만 존재 |
+| LLM community report 본구현 | [x] `graph.py` — graph_context → markdown page |
 | agents-runtime 번들 배포 | 수동 zip |
 
 ## 입출력
@@ -25,6 +25,12 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 ## agents-runtime 번들 import
 
 `__file__`은 번들 exec 시 정의되지 않는다. 프롬프트는 `paths.read_prompt()`(`__spec__.origin`)로 읽는다. graph-extractor와 동일 제약.
+
+## LangGraph
+
+1. `load_context` — `graph_context_s3` JSON
+2. `synthesize` — `community_report.txt` + LLM → `{slug, title, markdown}` → `pages[]`
+3. `project_slug` — invoke input 필수 (`WikiSynthesizerInput`)
 
 ## Commands
 

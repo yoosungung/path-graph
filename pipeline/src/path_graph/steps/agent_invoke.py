@@ -41,7 +41,10 @@ def invoke_agent(
                     delay = min(delay * 2, 60)
                     continue
                 resp.raise_for_status()
-                return resp.json()
+                body = resp.json()
+                if isinstance(body, dict) and "output" in body:
+                    return body["output"]
+                return body
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (429, 503) and attempt < max_retries - 1:
                 time.sleep(delay)

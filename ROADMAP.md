@@ -10,7 +10,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **171 tests** (2026-06) |
+| pipeline 패키지 | v0.1.0, `make test` **184 tests** (2026-06) |
 | 로컬 ingest | CLI — web / file / SharePoint / GDrive / OneDrive → parse → **blocks** → chunk → (선택) RAG |
 | 파싱·청킹 | markitdown/VL OCR → `BLOCKS_EXTRACTOR=md_heuristic` → `content.json` → `chunk_from_blocks` (D3) |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward (`wire-dev.sh`) · Qdrant vector 검색 E2E 검증 |
@@ -146,7 +146,8 @@
 | 3.1.2 | community metadata → S3/PG | [x] | |
 | 3.1.3 | graph_context artifact | [x] | |
 | 3.1.4 | `graphrag_pipeline` / WF `pipeline-graphrag` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
-| 3.1.5 | Graph-enhanced Wiki **프롬프트** (MS GraphRAG 템플릿) | [ ] | |
+| 3.1.5 | Graph-enhanced Wiki **프롬프트** (MS GraphRAG 템플릿) | [x] | `community_report.txt` |
+| 3.1.6 | graph-extractor / wiki-synthesizer **LangGraph** 본구현 | [~] | `StateGraph` + LLM JSON; agent pool S3 read env |
 
 ### 3.2 agents-runtime 연동
 

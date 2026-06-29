@@ -34,3 +34,4 @@ pipeline/.data/
 Thumbs.db
 
 agents/**/bundle.zip
+.work/

@@ -39,6 +39,7 @@ class GraphExtractorInput(BaseModel):
 class WikiSynthesizerInput(BaseModel):
     tenant: str
     project_id: str
+    project_slug: str
     community_id: str
     community_level: int
     graph_context_s3: str

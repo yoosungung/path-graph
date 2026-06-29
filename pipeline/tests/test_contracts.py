@@ -179,6 +179,7 @@ def test_wiki_synthesizer_input():
     inp = WikiSynthesizerInput(
         tenant="dev",
         project_id=PROJECT_ID,
+        project_slug="default",
         community_id="00000000-0000-0000-0000-000000000001",
         community_level=0,
         graph_context_s3="s3://bucket/context.json",
@@ -186,3 +187,4 @@ def test_wiki_synthesizer_input():
     )
     payload = AgentInvokePayload.from_input("wiki-synthesizer", inp, "sess")
     assert payload.input["community_id"] == inp.community_id
+    assert payload.input["project_slug"] == "default"
