@@ -41,6 +41,18 @@ class ProjectStore:
             ).fetchall()
         return [row_to_project(r) for r in rows]
 
+    def list_all_projects(self) -> list[ProjectProfile]:
+        """Return all projects across tenants (backend bootstrap; table owner bypasses RLS)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT tenant, id, slug, name, created_at
+                FROM path_graph.projects
+                ORDER BY tenant, name
+                """
+            ).fetchall()
+        return [row_to_project(r) for r in rows]
+
     def get_project(self, tenant: str, project_id: str) -> ProjectProfile | None:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)

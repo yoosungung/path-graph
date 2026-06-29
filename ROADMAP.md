@@ -244,7 +244,7 @@
 | 4.4.1 | path-graph `admin.lifecycle` 도메인 API | [x] | purge/restore/reingest/cleanup/reconcile/tombstones |
 | 4.4.2 | BFF `/api/pipeline/documents/{id}/purge` 등 | [x] | agents-runtime `pipeline.py` 래핑 |
 | 4.4.3 | UI purge·tombstones·reconcile 리포트 | [x] | `/files/projects/:id/*` |
-| 4.4.4 | CronWorkflow `pipeline-reconcile-index` per project | [ ] | 일 1회 |
+| 4.4.4 | CronWorkflow `pipeline-reconcile-index` per project | [x] | 일 1회; agents-runtime BFF reconcile (PG-5) |
 
 ### 4.5 Downstream (GraphRAG) — Console
 
