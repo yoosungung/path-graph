@@ -49,7 +49,7 @@ RAG ingest 이후 Graph(Nebula)·Wiki(S3) 적재. Console MVP는 **`pipeline-gra
 
 | 항목 | 규칙 |
 |------|------|
-| **선행 조건** | ingest batch manifest 내 문서가 `ingest_state = indexed_rag` |
+| **선행 조건** | manifest 문서 `ingest_state` ∈ `indexed_rag` (최초) · `indexed_graph` (재빌드) |
 | **입력** | `tenant`, `project_id`, `project_slug`, `batch_id` — ingest와 **동일 batch_id** |
 | **chunks_key** | submit 전 `chunks/{tenant}/{project_id}/{batch_id}/chunks.jsonl`로 manifest 문서 chunks **집계** |
 | **API** | `POST /api/pipeline/projects/{project_id}/graphrag` → **202** `{batch_id, chunks_key, workflow_name, …}` |

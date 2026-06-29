@@ -11,6 +11,9 @@ from path_graph.meta.pg import PgMetaStore
 from path_graph.storage.blob import make_blob_store, read_jsonl, write_jsonl
 
 
+_GRAPH_RAG_ELIGIBLE_STATES = frozenset({"indexed_rag", "indexed_graph"})
+
+
 class DownstreamValidationError(ValueError):
     """Invalid batch or document state for downstream GraphRAG."""
 
@@ -87,9 +90,12 @@ def aggregate_batch_chunks(
         if not doc_id:
             raise DownstreamValidationError("manifest line missing document_id")
         doc = pg.get_document(tenant, doc_id)
-        if not doc or doc.get("ingest_state") != "indexed_rag":
+        state = (doc or {}).get("ingest_state")
+        if state not in _GRAPH_RAG_ELIGIBLE_STATES:
             raise DownstreamValidationError(
                 f"document {doc_id} is not indexed_rag (required for GraphRAG)"
+                if state in (None, "pending", "failed", "dead_letter")
+                else f"document {doc_id} ingest_state={state!r} is not eligible for GraphRAG"
             )
         chunks_key = s3_key_chunks(tenant, doc_id)
         if not store.exists(chunks_key):

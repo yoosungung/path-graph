@@ -94,6 +94,21 @@ def test_aggregate_rejects_project_mismatch(local_store):
         aggregate_batch_chunks("dev", PROJECT_ID, batch_id)
 
 
+def test_aggregate_allows_indexed_graph_for_rebuild(local_store):
+    batch_id = "batch-rebuild"
+    doc_id = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+    write_batch_manifest("dev", batch_id, [_manifest_item(doc_id)], get_settings())
+    store = make_blob_store(get_settings())
+    write_jsonl(s3_key_chunks("dev", doc_id), [{"chunk_id": "c1", "text": "x"}], store)
+    mock_pg = MagicMock()
+    mock_pg.get_document.return_value = {"document_id": doc_id, "ingest_state": "indexed_graph"}
+
+    with patch("path_graph.admin.downstream.PgMetaStore", return_value=mock_pg):
+        result = aggregate_batch_chunks("dev", PROJECT_ID, batch_id)
+
+    assert result.document_count == 1
+
+
 def test_aggregate_requires_indexed_rag(local_store):
     batch_id = "batch-pending"
     doc_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
