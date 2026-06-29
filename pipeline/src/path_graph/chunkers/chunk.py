@@ -108,7 +108,7 @@ def chunk_from_markdown(
     return chunks
 
 
-def chunk_from_rhwp_json(
+def chunk_from_blocks(
     doc: dict[str, Any],
     tenant: str,
     content_hash: str,

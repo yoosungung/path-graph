@@ -32,3 +32,5 @@ pipeline/.data/
 
 .DS_Store
 Thumbs.db
+
+agents/**/bundle.zip

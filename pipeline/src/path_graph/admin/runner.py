@@ -14,7 +14,7 @@ from path_graph.collectors.remote import (
 from path_graph.admin.credential_settings import merge_credential_into_settings
 from path_graph.admin.credentials import CredentialStore
 from path_graph.config import Settings, get_settings
-from path_graph.contracts.source import SourceDriver, SourceProfile
+from path_graph.contracts.source import CollectSyncMode, SourceDriver, SourceProfile, resolve_collect_sync_mode
 from path_graph.storage.blob import make_blob_store, read_jsonl
 
 
@@ -129,6 +129,7 @@ def collect_source(
     profile: SourceProfile,
     batch_id: str | None = None,
     *,
+    sync_mode: CollectSyncMode | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Collect files to raw/ and write manifest; returns manifest_key and file_count."""
@@ -137,18 +138,36 @@ def collect_source(
     cfg = profile.config
     tenant = profile.tenant
     source_id = profile.source_id
+    mode = resolve_collect_sync_mode(profile, sync_mode)
+    sync_meta: dict[str, Any] = {"sync_mode": mode.value}
 
     if profile.driver == SourceDriver.SHAREPOINT:
         collector = _sharepoint_collector(s)
-        items = collector.collect_folder(
-            tenant,
-            profile.project_id,
-            source_id,
-            site=cfg.get("site"),
-            drive_name=cfg.get("drive"),
-            folder=cfg.get("folder"),
-            recursive=cfg.get("recursive", True),
-        )
+        if mode == CollectSyncMode.DELTA:
+            delta_result = collector.collect_delta(
+                tenant,
+                profile.project_id,
+                source_id,
+                site=cfg.get("site"),
+                drive_name=cfg.get("drive"),
+                folder=cfg.get("folder"),
+                delta_link=cfg.get("delta_link"),
+            )
+            items = delta_result["items"]
+            if delta_result.get("delta_link"):
+                sync_meta["delta_link"] = delta_result["delta_link"]
+            if delta_result.get("purged_document_ids"):
+                sync_meta["purged_document_ids"] = delta_result["purged_document_ids"]
+        else:
+            items = collector.collect_folder(
+                tenant,
+                profile.project_id,
+                source_id,
+                site=cfg.get("site"),
+                drive_name=cfg.get("drive"),
+                folder=cfg.get("folder"),
+                recursive=cfg.get("recursive", True),
+            )
     elif profile.driver == SourceDriver.GDRIVE:
         collector = _gdrive_collector(s)
         items = collector.collect_folder(
@@ -183,6 +202,7 @@ def collect_source(
         "manifest_key": manifest_key,
         "manifest_uri": manifest_uri,
         "file_count": len(items),
+        **sync_meta,
     }
 
 

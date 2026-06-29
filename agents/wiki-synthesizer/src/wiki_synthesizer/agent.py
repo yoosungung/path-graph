@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-
-_PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "community_report.txt"
+from wiki_synthesizer.paths import read_prompt
 
 
 def _wiki_slug(project_slug: str, level: int, community_id: str) -> str:
@@ -21,7 +19,7 @@ def factory(cfg: dict, secrets) -> Any:
             community_id = input.get("community_id", "")
             level = int(input.get("community_level", 0))
             project_slug = input.get("project_slug", "project")
-            _ = _PROMPT_PATH.read_text(encoding="utf-8") if _PROMPT_PATH.exists() else ""
+            _ = read_prompt("community_report.txt")
             slug = (
                 _wiki_slug(project_slug, level, community_id)
                 if community_id

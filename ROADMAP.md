@@ -10,13 +10,15 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **135 tests** (2026-06) |
-| 로컬 ingest | CLI로 **web / local file / SharePoint / GDrive / OneDrive** → parse → chunk → (선택) RAG |
-| k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward 가능 (`wire-dev.sh`) |
-| Argo Workflows | `argo` NS — `make argo-install` |
-| `path-graph` NS / WorkflowTemplate | **applied** — ingest·graph·wiki·graphrag·lifecycle WF |
-| Admin Console (agents-runtime) | **RAG + GraphRAG downstream** — ingest·Graph/Wiki 빌드·Runs·파일관리 |
-| agents | graph-extractor / wiki-synthesizer — pipeline invoke + cluster E2E (`skip_agent=1` 또는 live) |
+| pipeline 패키지 | v0.1.0, `make test` **171 tests** (2026-06) |
+| 로컬 ingest | CLI — web / file / SharePoint / GDrive / OneDrive → parse → **blocks** → chunk → (선택) RAG |
+| 파싱·청킹 | markitdown/VL OCR → `BLOCKS_EXTRACTOR=md_heuristic` → `content.json` → `chunk_from_blocks` (D3) |
+| k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward (`wire-dev.sh`) · Qdrant vector 검색 E2E 검증 |
+| Argo Workflows | path-graph 소유 — `argo` NS, `make argo-install` (D1) |
+| `path-graph` NS / WorkflowTemplate | **applied** — pipeline 이미지 **git SHA 태그** + `IfNotPresent` (D2) |
+| Admin Console (agents-runtime) | ingest·GraphRAG downstream·파일관리·Sources `schedule_cron` |
+| 외부 LLM·Embedding | llm-serving TEI·sglang — path-graph는 HTTP 클라이언트만 (D4) |
+| 수집 동기화 | SharePoint 기본 **delta** · Run now `--sync-mode=full` (D5); BFF `delta_link` persist 잔여 |
 
 ---
 
@@ -32,15 +34,15 @@
 | 1.1.2 | `tenant` / `document_id` / `chunk_id` 멱등 식별자 | [x] | `ids.py`, 계약 테스트 |
 | 1.1.3 | S3 key layout (`raw|parsed|chunks|batches|…`) | [x] | `contracts/s3_keys.py` |
 | 1.1.4 | Blob store (local + S3/Garage) | [x] | `PIPELINE_STORAGE_BACKEND` |
-| 1.1.5 | parse → chunk → meta 적재 | [x] | markitdown + rhwp-batch |
+| 1.1.5 | parse → chunk → meta 적재 | [x] | markitdown + rhwp-batch; 비-HWP는 blocks 경유 (3.3.2) |
 | 1.1.6 | `CHUNK_MAX_CHARS` (기본 1000) + 긴 문단 hard-split | [x] | embed context 안전 |
 | 1.1.7 | dead-letter (parse 실패 격리) | [x] | S3 + PG `dead_letter` |
 | 1.1.8 | PG `path_graph.*` 스키마·마이그레이션 | [x] | lifecycle 테이블·RLS POLICY 포함 |
-| 1.1.9 | `pipeline_runs` / ingest_state **전 단계 기록** | [~] | 테이블 있음; **RAG·DLQ만 write**, graph/wiki 커서·run 미연동 |
+| 1.1.9 | `pipeline_runs` / ingest_state **전 단계 기록** | [x] | RAG·DLQ·graph/wiki: `mark_rag_indexed` / `record_dead_letter` / `mark_graphrag_indexed`; graphrag WF 종료 시 pipeline step + BFF reconciler |
 | 1.1.10 | RLS 정책 (`tenant = current_setting('app.tenant')`) | [x] | `meta/pg.py` `RLS_POLICY_MIGRATION_SQL` |
 | 1.1.11 | document **compensation** (재처리 시 Qdrant/Nebula 삭제) | [x] | `lifecycle/compensation.py` |
 | 1.1.12 | **purge** · tombstone · reconcile | [x] | `lifecycle/purge.py`, `reconcile.py`, Argo WF |
-| 1.1.13 | SharePoint **delta sync** | [~] | `SharePointClient.list_delta`, `collect_delta` |
+| 1.1.13 | SharePoint **delta sync** | [~] | `collect_delta` + `collect_source` 기본 delta; BFF `delta_link` persist 잔여 |
 
 ### 1.2 RAG
 
@@ -49,7 +51,7 @@
 | 1.2.1 | TEI OpenAI-compatible embed (`bge-m3`, dim 1024) | [x] | `rag/embed.py` |
 | 1.2.2 | Qdrant upsert (project Silo collection) | [x] | `path_graph_{tenant}_{project_slug}` |
 | 1.2.3 | PG `chunks` + `document_ingest_state.rag_at` | [x] | |
-| 1.2.4 | 로컬 RAG E2E (`ingest_web --rag`) | [~] | `EMBEDDING_BASE_URL` k8s 내부 주소 — 로컬은 port-forward 또는 URL override 필요 |
+| 1.2.4 | 로컬 RAG E2E (`ingest_web --rag`) | [~] | 외부 TEI — `EMBEDDING_BASE_URL` port-forward 또는 override (D4) |
 | 1.2.5 | embed 실패 재시도·배치 (`EMBEDDING_BATCH_SIZE`) | [x] | |
 
 ### 1.3 CLI · 개발 UX
@@ -70,7 +72,7 @@
 | 1.4.3 | ServiceAccount · NetworkPolicy | [x] | `serviceaccount.yaml`, `networkpolicy.yaml` |
 | 1.4.4 | ConfigMap `path-graph-limits` (semaphore) | [x] | `configmap-limits.yaml` |
 | 1.4.5 | Secret `path-graph-env` / PG·S3 참조 | [x] | `create-path-graph-secrets.sh` |
-| 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [x] | GHA `build-images.yml` + dev overlay GHCR |
+| 1.4.6 | pipeline **컨테이너 이미지** 빌드·푸시·CI | [x] | GHA `build-images` → GHCR `:<git-sha>`; `make k8s-apply-dev` pin (D2) |
 | 1.4.7 | **Argo Workflows controller** 설치 | [x] | `install-argo.sh` + `deploy/k8s/argo/values.yaml` |
 | 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [x] | `make bootstrap-k8s` + ingest/downstream E2E scripts |
 | 1.4.9 | CronWorkflow / 이벤트 트리거 | [x] | Console `schedule_cron` → `pg-cron-{tenant}-{source}` |
@@ -100,7 +102,7 @@
 | 2.1.4 | OneDrive (`/me/drive`) | [x] | `ingest_onedrive` |
 | 2.1.5 | agent-chat JSON export | [x] | `AgentChatCollector` |
 | 2.1.6 | `batches/{tenant}/{batch_id}/manifest.jsonl` writer | [x] | collect CLI가 생성 |
-| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | `list_delta` + `collect_delta`; source config `delta_link` |
+| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | pipeline: `CollectSyncMode`·`collect_source` delta 기본·`--sync-mode`; BFF `delta_link`·UI full 재수집 [ ] |
 | 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [~] | Console Cron → `pipeline-collect-ingest-rag`; **collect-only WF**(ingest 분리)는 미구현 |
 
 ### 2.2 Graph pipeline
@@ -159,7 +161,7 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 3.3.1 | **RRF hybrid** (PG BM25 + Qdrant) | [ ] | |
-| 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리 또는 Docling) | [ ] | HWP만 `content.json` |
+| 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리) | [~] | `md_heuristic` + registry; ingest `content.json`·`chunk_from_blocks`. Docling/Azure extractor [ ] |
 | 3.3.3 | ingest 검색 API / retrieval CLI | [ ] | |
 | 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; [pipeline/DESIGN.md §VL OCR](pipeline/DESIGN.md#vl-ocr-ingest--빈-parse-fallback) |
 
@@ -167,12 +169,12 @@
 
 ## 권장 실행 순서 (다음 4 sprint)
 
-아래는 **의존성·리스크** 기준. 번호는 ROADMAP # 참조. Phase 1·4 ingest MVP는 완료 — **downstream Console·runtime 소비**가 현재 병목.
+D1–D5 결정 완료. Phase 4 Console·GraphRAG downstream **MVP 완료** — 병목은 **수집 운영화(BFF)** · **검색 품질** · **runtime binding**.
 
-1. **Console downstream** — 4.5.1 BFF graph/wiki/graphrag submit → 4.5.2 chunks_key resolve → 4.5.3 UI → 4.5.4 `pipeline_runs` graph/wiki 커서
-2. **운영 마감** — 4.4.4 reconcile Cron per project → 1.1.9 ingest_state 전 단계 write → 2.1.7 SharePoint delta 운영화
-3. **runtime 소비** — 3.2.0 `path_graph_project_id` + binding resolve → 3.2.1 VFS wiki mount (agents-runtime ROADMAP 동기)
-4. **품질** — 3.3.2 blocks JSON → 3.3.1 RRF → 3.1.5 Graph-enhanced Wiki 프롬프트
+1. **수집 운영화 (D5 마감)** — 4.1.3 BFF `sync_mode` full override UI · `delta_link` persist after collect → 2.1.7 SharePoint delta Cron E2E
+2. **검색·파싱 품질** — 3.3.1 RRF hybrid · 3.3.2 blocks extractor 품질(또는 Docling PoC) · 3.1.5 Graph-enhanced Wiki 프롬프트
+3. **runtime 소비** — 3.2.0 Knowledge Binding retrieval · 3.2.1 VFS wiki mount (agents-runtime)
+4. **오케스트레이션 잔여** — 2.4.2 Argo wait→API NP · 2.4.3 tenant `max_parallel`·semaphore 연동 · 2.1.8 collect-only WF(선택)
 
 ---
 
@@ -182,9 +184,9 @@
 |---|---|---|
 | Garage, runtime PG, Envoy | agents-runtime | wire-dev / Secret |
 | Qdrant, Nebula | path-graph `deploy/k8s/infra/` | `make deploy-qdrant-nebula` |
-| Argo Workflows controller | test_infra 또는 별도 Helm | SETUP.md |
-| TEI `bge-m3` | llm-serving NS | `EMBEDDING_BASE_URL` |
-| sglang Gemma 4 12B | llm-serving NS | VL OCR ingest 계획: `OCR_LLM_*` ([pipeline/DESIGN.md](pipeline/DESIGN.md)) |
+| Argo Workflows controller | path-graph `deploy/k8s/argo/` | `make argo-install`, [SETUP.md](deploy/SETUP.md#argo-ui) |
+| TEI `bge-m3` | llm-serving NS (외부) | `EMBEDDING_*` — HTTP only (D4) |
+| sglang Gemma 4 12B | llm-serving NS (외부) | `OCR_LLM_*` · agents via Envoy (D4) |
 | rhwp-batch 이미지 | rhwp_batch | HWP parse |
 
 ---
@@ -211,7 +213,8 @@
 | 4.1.0 | **`projects` 테이블·CRUD·`resolve_binding`** | [x] | path-graph `admin/projects.py`; BFF `/api/pipeline/projects`는 agents-runtime |
 | 4.1.1 | `path_graph.sources` + **`project_id` FK** | [x] | Source 생성 시 project 필수 |
 | 4.1.2 | Sources CRUD + 연결 테스트 | [x] | SharePoint/GDrive/OneDrive dry-run (`probe_source`) |
-| 4.1.3 | Run now → collect → Argo `pipeline-ingest-rag` | [x] | BFF가 manifest jsonl → JSON 배열 submit (MVP) |
+| 4.1.3 | Run now → collect → Argo `pipeline-ingest-rag` | [~] | manifest submit [x]; `sync_mode=full`·`delta_link` persist — agents-runtime BFF [ ] |
+| 4.1.7 | Source **schedule_cron** + **sync_mode** UI | [~] | PG `schedule_cron` [x]; Console cron 입력 [x]; delta/full·delta_link UI [ ] (D5) |
 | 4.1.4 | Runs / dead-letter 조회 | [x] | `pipeline_runs`, `documents.ingest_state=dead_letter` |
 | 4.1.5 | `require_admin` 가드 전 API | [x] | agents-runtime `UserRole.ADMIN` |
 | 4.1.6 | Manual raw upload / ingest / documents API | [x] | `driver=manual`, multipart upload, pending ingest |
@@ -257,15 +260,17 @@
 
 ---
 
-## 미결정
+## 결정 사항 (D1–D5, 2026-06)
 
-| ID | 주제 | 선택지 / 메모 |
+| ID | 주제 | 결정 |
 |---|---|---|
-| D1 | Argo controller **설치 주체** | test_infra Helm vs path-graph deploy 문서만 |
-| ~~D2~~ | pipeline 이미지 **레지스트리** | **결정: GHCR** — GHA `build-images` + dev overlay |
-| D3 | PDF 구조화 | md→blocks 후처리 vs Docling vs Azure DI; **스캔 PDF**는 3.3.4 VL OCR(sglang) 우선 |
-| D4 | 로컬 embed | TEI port-forward vs 로컬 mock vs cluster-only RAG |
-| D5 | 회사규정 ingest **주기** | SharePoint cron 주기·delta vs full scan |
+| D1 | Argo controller 설치 주체 | **path-graph** — `deploy/k8s/argo/` + `make argo-install` |
+| D2 | pipeline 이미지 레지스트리·태그 | **GHCR** + **git SHA** (`:latest` 배포 안 함), `IfNotPresent` |
+| D3 | PDF 구조화 | **md→blocks 후처리** — `BLOCKS_EXTRACTOR` registry; 청킹 정본 `content.json` `blocks[]` |
+| D4 | LLM·Embedding 서빙 | **path-graph 외부** — OpenAI-compatible HTTP (`EMBEDDING_*`, `OCR_LLM_*`, Envoy); in-process 모델 없음 |
+| D5 | 수집 주기·동기화 | Console **`schedule_cron`** · 기본 **`sync_mode=delta`** · Run now **`full`** 전체 재수집 |
+
+계약 정본: [ARCHITECTURE.md](ARCHITECTURE.md) · [pipeline/DESIGN.md](pipeline/DESIGN.md) · [deploy/DESIGN.md](deploy/DESIGN.md)
 
 ---
 

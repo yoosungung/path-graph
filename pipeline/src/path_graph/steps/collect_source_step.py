@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 
+from path_graph.contracts.source import CollectSyncMode
 from path_graph.admin.runner import collect_source, resolve_settings_from_env
 from path_graph.admin.sources import SourceStore
 from path_graph.config import get_settings
@@ -30,6 +31,7 @@ def run_collect(
     tenant: str,
     source_pg_id: str,
     batch_id: str = "",
+    sync_mode: str = "",
     output_dir: str = "/tmp",
 ) -> dict[str, str | int]:
     settings = get_settings()
@@ -53,21 +55,36 @@ def run_collect(
         platform_ms_tenant_id=ms_tenant_id,
         settings=settings,
     )
-    collected = collect_source(profile, batch_id=batch_id or None, settings=pg_settings)
+    collected = collect_source(
+        profile,
+        batch_id=batch_id or None,
+        settings=pg_settings,
+        sync_mode=CollectSyncMode(sync_mode) if sync_mode else None,
+    )
     out = {
         "batch_id": collected["batch_id"],
         "manifest_key": collected["manifest_key"],
         "file_count": collected["file_count"],
+        "sync_mode": collected.get("sync_mode", ""),
     }
+    if collected.get("delta_link"):
+        out["delta_link"] = collected["delta_link"]
     os.makedirs(output_dir, exist_ok=True)
     for key, filename in (
         ("batch_id", "batch_id"),
         ("manifest_key", "manifest_key"),
         ("file_count", "file_count"),
+        ("sync_mode", "sync_mode"),
     ):
+        if key not in out:
+            continue
         path = os.path.join(output_dir, filename)
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(str(out[key]))
+    if out.get("delta_link"):
+        path = os.path.join(output_dir, "delta_link")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(str(out["delta_link"]))
     return out
 
 
@@ -76,6 +93,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--source-id", required=True, help="path_graph.sources.id (UUID)")
     parser.add_argument("--batch-id", default="", help="Optional batch id (default: UTC timestamp)")
+    parser.add_argument(
+        "--sync-mode",
+        default="",
+        choices=["", "delta", "full"],
+        help="Override source sync_mode (default: source config or delta)",
+    )
     parser.add_argument(
         "--output-dir",
         default="/tmp",
@@ -88,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
             tenant=args.tenant,
             source_pg_id=args.source_id,
             batch_id=args.batch_id,
+            sync_mode=args.sync_mode,
             output_dir=args.output_dir,
         )
     except ValueError as exc:

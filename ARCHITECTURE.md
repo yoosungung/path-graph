@@ -2,7 +2,7 @@
 
 path-graph 지식 파이프라인(RAG / Graph / Wiki)의 **컴포넌트 간 계약**. 내부 구현은 [`pipeline/DESIGN.md`](pipeline/DESIGN.md), K8s 배포는 [`deploy/DESIGN.md`](deploy/DESIGN.md).
 
-인프라 소유: **Garage·runtime PG** → agents-runtime, **Qdrant·Nebula** → path-graph [`deploy/k8s/infra/`](deploy/k8s/infra/) (설치·운영).
+인프라 소유: **Garage·runtime PG** → agents-runtime, **Argo Workflows·Qdrant·Nebula** → path-graph [`deploy/k8s/`](deploy/k8s/) (설치·운영).
 
 ### 설계 원칙 (요약)
 
@@ -139,6 +139,13 @@ RAG ingest 이후 Graph(Nebula)·Wiki(S3) 적재. Console MVP는 **`pipeline-gra
 - Qdrant/Nebula **설치 매니페스트**를 `deploy/k8s/infra/` 밖(예: pipeline 패키지)에 두지 말 것.
 - `tenant` 생략·빈 문자열·`default` 폴백으로 쓰기하지 말 것.
 - agents-runtime에 RAG/파이프라인 로직을 넣지 말 것 — invoke만 사용.
+- **LLM·Embedding 모델을 path-graph 패키지/이미지에 내장하지 말 것** — 외부 HTTP 서빙만 (`EMBEDDING_*`, `OCR_LLM_*`, Envoy agent). 교체는 env/Secret만 바꾼다 ([pipeline/DESIGN.md](pipeline/DESIGN.md#외부-llmembedding-d4)).
+
+### 수집 주기·동기화 (Admin Console)
+
+- **`schedule_cron`**: Console UI에서 source별 cron 입력 → BFF가 CronWorkflow 생성(기존).
+- **`sync_mode`**: source `config` — `delta`(기본) | `full`. Scheduled run은 **delta**; Console 「Run now」에서 **full** 전체 재수집 override 가능.
+- SharePoint **delta**: `config.delta_link` 커서 — collect 후 BFF가 source config에 persist.
 
 ---
 
@@ -160,6 +167,16 @@ s3://{bucket}/
   graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json
   wiki/{tenant}/{project_id}/{page_slug}.md
 ```
+
+**`content.json` (blocks, 청킹 정본)** — PDF/DOCX(markitdown·VL OCR)와 HWP(rhwp-batch) 공통:
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| `schema_version` | ✓ | `"1"` |
+| `extractor` | ✓ | 구현 식별자 — 예: `md_heuristic`, `rhwp_batch` |
+| `blocks` | ✓ | 배열; block마다 `type`, `heading_path`, 본문(`text` \| `markdown` \| `rows`) |
+
+**blocks 추출기 교체**: ingest는 `BLOCKS_EXTRACTOR`로 구현을 선택한다. md 생성(markitdown/VL OCR)과 blocks 추출은 분리 — Docling·Azure DI 등은 동일 `blocks[]` 계약만 맞추면 된다. 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
 
 ### 2.2 runtime PostgreSQL (`path_graph` schema)
 
@@ -187,21 +204,21 @@ RLS: `tenant` = session `app.tenant`. 마이그레이션: `path_graph.migrations
 |------|------|-----------|
 | `pending` | raw·parsed 적재 전/중 | `upsert_document` 기본값 |
 | `indexed_rag` | Qdrant upsert 완료 | `mark_rag_indexed` |
-| `indexed_graph` | Nebula graph 단계 완료 | (예정 — ROADMAP 1.1.9) |
-| `failed` | 재시도 가능 실패 | (예정) |
+| `indexed_graph` | GraphRAG(graph+wiki) 완료 | `mark_graphrag_indexed` — graphrag WF step + BFF reconciler |
+| `failed` | 재시도 가능 실패 | (미구현) |
 | `dead_letter` | parse 등 복구 불가 격리 | `record_dead_letter` |
 | `purging` | purge WF 실행 중 | `purge_document` |
 | `purged` | tombstone·인덱스 제거 완료 | `purge_document` |
 | `purge_failed` | compensation 일부 실패 | reconcile·재시도 |
 
-**`document_ingest_state` 커서**: `rag_at`, `graph_at`, `wiki_at`, `error` — graphrag WF Succeeded 시 `graph_at`·`wiki_at` write (Console reconciler).
+**`document_ingest_state` 커서**: `rag_at`, `graph_at`, `wiki_at`, `error` — RAG는 ingest step, graph/wiki는 graphrag WF 성공 시 `mark_graphrag_indexed` (pipeline step + BFF reconciler, 멱등).
 
 ### 2.3 Qdrant (path-graph infra)
 
 - Collection: `path_graph_{tenant_slug}_{project_slug}` — project당 1개 (Silo MVP). `ids.qdrant_collection_name(tenant, project_slug)`
 - Point `id`: `chunk_id` (UUID string)
 - Payload: `tenant`, **`project_id`**, `document_id`, `chunk_id`, `chunk_index`, `heading_path`, `s3_chunk_uri` — **본문 텍스트 없음**
-- Vector: dim **1024**, distance **cosine** — embedding은 cluster 외부 TEI `BAAI/bge-m3` (`EMBEDDING_BASE_URL` + `/v1/embeddings`)
+- Vector: dim **1024**, distance **cosine** — embedding은 **cluster 외부** OpenAI-compatible HTTP (`EMBEDDING_BASE_URL` + `/v1/embeddings`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`). path-graph는 TEI 등 구현체를 소유하지 않는다 (D4).
 - URL/인증: K8s Secret 또는 dev 기본값 → pipeline env `QDRANT_URL`, `QDRANT_API_KEY` ([`deploy/SETUP.md`](deploy/SETUP.md#qdrant--nebulagraph))
 - **Pool 전환 시** (ROADMAP): tenant당 collection 1 + `project_id` payload index. binding의 `filter.project_id`는 **항상** 유지.
 
@@ -257,7 +274,7 @@ Agent I/O: §2.5 및 `GraphExtractorInput`, `WikiSynthesizerInput`.
 | 저장소 | path-graph가 쓰는 것 |
 |---|---|
 | [agents-runtime](../agents-runtime) | Garage, runtime PG, `POST /v1/agents/invoke` |
-| path-graph [`deploy/k8s/infra/`](deploy/k8s/infra/) | Qdrant, NebulaGraph (설치·운영) |
+| path-graph [`deploy/k8s/`](deploy/k8s/) | Argo Workflows controller, Qdrant, NebulaGraph (설치·운영) |
 | [rhwp_batch](../rhwp_batch) | HWP/HWPX `to-json` 컨테이너 이미지 |
 
 **로컬 개발 연결**: [`scripts/wire-dev.sh`](scripts/wire-dev.sh) — PG `:5432`, Envoy `:8084`, Qdrant `:6333`, Nebula `:9669`, Garage `:3900`(profile s3). 포트 맵: [`scripts/wire-dev.env.example`](scripts/wire-dev.env.example). TEI(선택): `llm-serving/bge-m3-tei` → `:8085`. **Garage 브라우저 UI**(k8s dev): Filestash → [`deploy/SETUP.md`](deploy/SETUP.md#filestash-garage-s3-ui).

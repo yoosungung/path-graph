@@ -16,7 +16,10 @@ def test_list_pipeline_runs_orders_by_started_at_desc(mock_connect):
     store.list_pipeline_runs("dev", limit=10, offset=5)
 
     sql = conn.execute.call_args[0][0]
-    assert "ORDER BY started_at DESC NULLS LAST, id DESC" in sql
+    assert "COALESCE(" in sql
+    assert "started_at" in sql
+    assert "to_timestamp(batch_id" in sql
+    assert "DESC NULLS LAST, id DESC" in sql
     assert conn.execute.call_args[0][1] == ("dev", 10, 5)
 
 

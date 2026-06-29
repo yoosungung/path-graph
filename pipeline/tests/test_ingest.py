@@ -19,7 +19,7 @@ def local_store(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_collect_and_ingest_txt(local_store, monkeypatch):
+def test_collect_and_ingest_txt_writes_blocks_json(local_store, monkeypatch):
     monkeypatch.setattr(
         "path_graph.parsers.parse.parse_document",
         lambda data, filename, rhwp_bin="rhwp-batch": ("# Title\n\nBody text", None),
@@ -32,6 +32,12 @@ def test_collect_and_ingest_txt(local_store, monkeypatch):
     result = ingest_raw_bytes(data, "sample.txt", "dev", "local", meta)
     assert "chunks_key" in result
     assert result["chunks"]
+    doc_id = meta["document_id"]
+    blocks_path = local_store / "parsed" / "dev" / doc_id / "content.json"
+    assert blocks_path.exists()
+    blocks_doc = json.loads(blocks_path.read_text(encoding="utf-8"))
+    assert blocks_doc["extractor"] == "md_heuristic"
+    assert blocks_doc["blocks"]
 
 
 def test_ingest_parse_failure_dead_letter(local_store, monkeypatch):

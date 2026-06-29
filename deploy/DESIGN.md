@@ -1,6 +1,6 @@
 # deploy — K8s 배포 설계
 
-path-graph **파이프라인 워크로드** + **Qdrant·NebulaGraph 인프라**를 배포한다.
+path-graph **Argo Workflows** + **파이프라인 워크로드** + **Qdrant·NebulaGraph 인프라**를 배포한다.
 
 ## 레이아웃
 
@@ -17,6 +17,22 @@ deploy/
       dev/                            # GHCR image + git SHA tag (kustomize newTag)
     pipeline-image-tag                # 현재 배포 중인 pipeline 이미지 SHA (set-dev-image-tag.sh)
 ```
+
+## Argo Workflows (`k8s/argo/`)
+
+**설치·운영 주체: path-graph** (ROADMAP D1 결정). `test_infra`는 ingress-nginx 등 클러스터 공유 컴포넌트만; Argo controller·server·Ingress는 path-graph가 관리한다.
+
+| 리소스 | 용도 |
+|--------|------|
+| `argo/values.yaml` | Helm values — controller + server, Ingress `argo.k8s-test` |
+| `scripts/install-argo.sh` | `helm upgrade --install argo-workflows` (`argo` NS) |
+
+```bash
+make argo-install          # Helm upgrade + rollout wait
+make bootstrap-k8s         # argo-install + k8s-apply-dev (최초 부트스트랩)
+```
+
+상세·UI URL: [SETUP.md](SETUP.md#argo-ui).
 
 ## Qdrant · NebulaGraph (`k8s/infra/`)
 

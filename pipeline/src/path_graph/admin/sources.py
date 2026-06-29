@@ -311,6 +311,16 @@ class SourceStore:
         project_id::text, run_kind
     """
 
+    _PIPELINE_RUN_ORDER = """
+        ORDER BY COALESCE(
+            started_at,
+            CASE WHEN batch_id ~ '^\\d{8}-\\d{6}$'
+                 THEN to_timestamp(batch_id, 'YYYYMMDD-HH24MISS') AT TIME ZONE 'UTC'
+                 ELSE NULL
+            END
+        ) DESC NULLS LAST, id DESC
+    """
+
     def get_pipeline_run_by_batch(
         self, tenant: str, batch_id: str
     ) -> dict[str, Any] | None:
@@ -346,7 +356,7 @@ class SourceStore:
                     SELECT {self._PIPELINE_RUN_COLS}
                     FROM path_graph.pipeline_runs
                     WHERE tenant = %s AND project_id = %s::uuid
-                    ORDER BY started_at DESC NULLS LAST, id DESC
+                    {self._PIPELINE_RUN_ORDER}
                     LIMIT %s OFFSET %s
                     """,
                     (tenant, project_id, limit, offset),
@@ -357,7 +367,7 @@ class SourceStore:
                     SELECT {self._PIPELINE_RUN_COLS}
                     FROM path_graph.pipeline_runs
                     WHERE tenant = %s
-                    ORDER BY started_at DESC NULLS LAST, id DESC
+                    {self._PIPELINE_RUN_ORDER}
                     LIMIT %s OFFSET %s
                     """,
                     (tenant, limit, offset),

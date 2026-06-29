@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from path_graph.admin.downstream import apply_graphrag_success
 from path_graph.config import get_settings
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.meta.pg import PgMetaStore
@@ -55,6 +56,8 @@ def run_graphrag_pipeline(
         pg=pg,
         settings=settings,
     )
+    if settings.path_graph_dsn:
+        apply_graphrag_success(tenant, project_id, batch_id, settings=settings)
     return {
         "graph": graph_result,
         "communities": community_results,

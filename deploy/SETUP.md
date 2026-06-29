@@ -8,7 +8,7 @@
 |------|------|
 | agents-runtime `runtime` NS | Garage, postgres, envoy |
 | path-graph infra | Qdrant, Nebula — `make deploy-qdrant-nebula` |
-| Argo Workflows | `make argo-install` |
+| Argo Workflows | **path-graph** — `make argo-install` (`deploy/k8s/argo/`) |
 | pipeline 이미지 | **GHA** `make build-images` (로컬 docker 없음) |
 | GHCR pull | `registry-creds` in `path-graph` NS (`make ensure-registry-secret`) |
 
@@ -118,6 +118,8 @@ kubectl -n path-graph rollout restart deploy/filestash
 ```
 
 ## Argo UI
+
+**소유**: path-graph — controller·server Helm (`deploy/k8s/argo/values.yaml`), `make argo-install`. `test_infra` Argo 설치에 의존하지 않는다.
 
 | 항목 | 값 |
 |------|-----|

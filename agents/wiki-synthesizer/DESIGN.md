@@ -20,14 +20,19 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 
 ## 프롬프트
 
-- `prompts/community_report.txt` — MS GraphRAG community report 템플릿 기반
+- `src/wiki_synthesizer/prompts/community_report.txt` — MS GraphRAG community report 템플릿 기반
+
+## agents-runtime 번들 import
+
+`__file__`은 번들 exec 시 정의되지 않는다. 프롬프트는 `paths.read_prompt()`(`__spec__.origin`)로 읽는다. graph-extractor와 동일 제약.
 
 ## Commands
 
 ```bash
-cd agents/wiki-synthesizer && zip -r bundle.zip src/
-# agent 이름: wiki-synthesizer
+cd agents/wiki-synthesizer/src && zip -r ../bundle.zip wiki_synthesizer
+# agent 이름: wiki-synthesizer, entrypoint=wiki_synthesizer.agent:factory
+./scripts/register-agent-bundles.sh wiki-synthesizer v2
 
 # pipeline 쪽 검증 (repo root)
-make test   # test_wiki.py
+make test   # test_agent_bundles.py, test_wiki.py
 ```

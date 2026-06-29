@@ -15,6 +15,26 @@ class SourceDriver(StrEnum):
     MANUAL = "manual"
 
 
+class CollectSyncMode(StrEnum):
+    """Source collection strategy (ROADMAP D5)."""
+
+    DELTA = "delta"
+    FULL = "full"
+
+
+def resolve_collect_sync_mode(
+    profile: SourceProfile,
+    override: CollectSyncMode | str | None = None,
+) -> CollectSyncMode:
+    if override is not None:
+        return CollectSyncMode(str(override))
+    raw = profile.config.get("sync_mode", CollectSyncMode.DELTA.value)
+    try:
+        return CollectSyncMode(str(raw))
+    except ValueError as exc:
+        raise ValueError(f"invalid sync_mode for source {profile.id}: {raw!r}") from exc
+
+
 class SourceProfile(BaseModel):
     tenant: str
     id: str

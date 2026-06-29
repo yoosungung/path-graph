@@ -14,7 +14,7 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 | `AGENTS.md` (이 파일, 정본) ← `CLAUDE.md`, `GEMINI.md` 심볼릭 | 수행 방법 + 문서 레이아웃 + 현황                              | 루트         |
 | `ARCHITECTURE.md`                                     | **계약사항(불변 규칙)** + 컴포넌트 *간* 인터페이스 형태(스키마·레이아웃·이벤트) | 루트         |
 | `README.md`                                           | 저장소 방문자용 소개 + 로컬 quickstart                       | 루트         |
-| `ROADMAP.md`                                          | 수행 계획(마일스톤·순서·미결정 항목)                             | 루트         |
+| `ROADMAP.md`                                          | 수행 계획(마일스톤·순서·결정 사항)                             | 루트         |
 | `<comp>/DESIGN.md`                                    | 컴포넌트 *내부* 설계 + `## Commands` (빌드/실행/테스트)          | `pipeline/` |
 | `deploy/DESIGN.md`                                    | K8S 배포·스케일 설계                                     | `deploy/`  |
 | `deploy/SETUP.md`                                     | K8S apply/rollback 런북                             | `deploy/`  |
@@ -41,4 +41,4 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console ingest + GraphRAG downstream (`POST …/graphrag`, Runs UI) · GHA `build-images` → GHCR · `make test` (148 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console ingest + GraphRAG downstream · GHA `build-images` → GHCR (git SHA tag) · `make test` (171 tests).

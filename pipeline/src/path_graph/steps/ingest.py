@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from path_graph.chunkers.chunk import chunk_from_markdown, chunk_from_rhwp_json, chunks_to_jsonl_lines
+from path_graph.chunkers.chunk import chunk_from_blocks, chunks_to_jsonl_lines
 from path_graph.config import Settings, get_settings
 from path_graph.contracts.s3_keys import (
     s3_key_chunks,
@@ -14,6 +14,8 @@ from path_graph.contracts.s3_keys import (
     s3_key_parsed_ocr_page_md,
     s3_key_parsed_page_png,
 )
+from path_graph.parsers.blocks_contract import normalize_blocks_document
+from path_graph.parsers.blocks_extractors import get_blocks_extractor
 from path_graph.parsers.parse import parse_document
 from path_graph.parsers.vl_ocr import ParseBackend, vl_ocr_pdf_to_markdown
 from path_graph.storage.blob import BlobStore, make_blob_store, write_jsonl
@@ -102,6 +104,31 @@ def _run_vl_ocr(
     return parsed_text, ocr_meta
 
 
+def _blocks_from_markdown(parsed_text: str, settings: Settings) -> dict[str, Any]:
+    return get_blocks_extractor(settings.blocks_extractor).extract(parsed_text)
+
+
+def _blocks_from_rhwp(rhwp_doc: dict[str, Any]) -> dict[str, Any]:
+    return normalize_blocks_document(rhwp_doc, extractor="rhwp_batch")
+
+
+def _chunk_from_blocks_doc(
+    blocks_doc: dict[str, Any],
+    tenant: str,
+    content_hash: str,
+    project_id: str,
+    *,
+    max_chars: int,
+) -> list:
+    return chunk_from_blocks(
+        blocks_doc,
+        tenant,
+        content_hash,
+        project_id,
+        max_chars=max_chars,
+    )
+
+
 def ingest_raw_bytes(
     data: bytes,
     filename: str,
@@ -160,18 +187,23 @@ def ingest_raw_bytes(
             parsed_text = ""
 
     if rhwp_doc is not None:
+        blocks_doc = _blocks_from_rhwp(rhwp_doc)
         parsed_key = s3_key_parsed_json(tenant, doc_id)
-        store.put_bytes(parsed_key, parsed_text.encode("utf-8"))
-        chunks = chunk_from_rhwp_json(
-            rhwp_doc,
+        store.put_bytes(
+            parsed_key,
+            json.dumps(blocks_doc, ensure_ascii=False).encode("utf-8"),
+        )
+        chunks = _chunk_from_blocks_doc(
+            blocks_doc,
             tenant,
             content_hash,
             meta["project_id"],
             max_chars=settings.chunk_max_chars,
         )
     else:
-        chunks = chunk_from_markdown(
-            parsed_text,
+        blocks_doc = _blocks_from_markdown(parsed_text, settings)
+        chunks = _chunk_from_blocks_doc(
+            blocks_doc,
             tenant,
             content_hash,
             meta["project_id"],
@@ -202,8 +234,9 @@ def ingest_raw_bytes(
                 )
                 parse_backend = backend
                 ocr_attempted = True
-                chunks = chunk_from_markdown(
-                    parsed_text,
+                blocks_doc = _blocks_from_markdown(parsed_text, settings)
+                chunks = _chunk_from_blocks_doc(
+                    blocks_doc,
                     tenant,
                     content_hash,
                     meta["project_id"],
@@ -228,14 +261,20 @@ def ingest_raw_bytes(
             _record_dead_letter(store, tenant, content_hash, err)
             raise ParseError(f"no chunks after parse ({stage})")
 
-        parsed_key = s3_key_parsed_md(tenant, doc_id)
-        store.put_bytes(parsed_key, parsed_text.encode("utf-8"))
+        parsed_key = s3_key_parsed_json(tenant, doc_id)
+        store.put_bytes(
+            parsed_key,
+            json.dumps(blocks_doc, ensure_ascii=False).encode("utf-8"),
+        )
+        md_key = s3_key_parsed_md(tenant, doc_id)
+        store.put_bytes(md_key, parsed_text.encode("utf-8"))
 
     meta_payload: dict[str, Any] = {
         **meta,
         "parsed_key": parsed_key,
         "chunk_count": len(chunks),
         "parse_backend": parse_backend.value,
+        "blocks_extractor": blocks_doc.get("extractor"),
     }
     if fallback_reason:
         meta_payload["fallback_reason"] = fallback_reason

@@ -4,7 +4,7 @@ LangGraph agent skeleton. `factory(cfg, secrets)` 엔트리포인트는 agents-r
 
 ## 등록 (agents-runtime admin)
 
-1. 이 디렉터리를 zip 번들로 패키징 (`graph_extractor:factory` 엔트리포인트)
+1. `cd agents/<name>/src && zip -r ../bundle.zip <package>` (`graph_extractor.agent:factory` / `wiki_synthesizer.agent:factory`)
 2. admin `POST /api/source-meta/bundle` — `runtime_pool=agent:compiled_graph`
 3. `config` 예: `{"langgraph": {"model": "provider:openai:gpt-4o-mini"}}`
 4. pipeline `invoke_agent("graph-extractor", ...)` 호출
