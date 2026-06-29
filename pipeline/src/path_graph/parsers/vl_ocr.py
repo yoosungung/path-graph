@@ -60,7 +60,7 @@ class VlOcrClient:
                     ],
                 }
             ],
-            "max_tokens": 4096,
+            "max_tokens": settings.ocr_max_tokens,
             "temperature": 0,
         }
 
@@ -112,6 +112,10 @@ def vl_ocr_pdf_to_markdown(
     page_pngs = render_pdf_pages(data, dpi=settings.ocr_render_dpi)
     if not page_pngs:
         raise ValueError("PDF has no renderable pages")
+    if settings.ocr_max_pages > 0 and len(page_pngs) > settings.ocr_max_pages:
+        raise ValueError(
+            f"PDF has {len(page_pngs)} pages, exceeds OCR_MAX_PAGES ({settings.ocr_max_pages})"
+        )
 
     page_mds: list[str] = []
     for png in page_pngs:

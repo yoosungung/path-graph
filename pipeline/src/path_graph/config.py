@@ -63,6 +63,8 @@ class Settings(BaseSettings):
 
     rhwp_batch_bin: str = "rhwp-batch"
 
+    blocks_extractor: str = "md_heuristic"  # BLOCKS_EXTRACTOR — parsers.blocks_extractors registry key
+
     ocr_llm_base_url: str = ""  # OCR_LLM_BASE_URL — unset disables VL OCR fallback
     ocr_force: bool = False  # OCR_FORCE — PDF markitdown skip (debug)
     ocr_llm_model: str = ""  # OCR_LLM_MODEL
@@ -71,6 +73,8 @@ class Settings(BaseSettings):
     ocr_render_dpi: int = 200  # OCR_RENDER_DPI
     ocr_min_text_chars: int = 32  # OCR_MIN_TEXT_CHARS — optional early fallback
     ocr_max_retries: int = 2  # OCR_MAX_RETRIES
+    ocr_max_pages: int = 30  # OCR_MAX_PAGES — 0 = unlimited
+    ocr_max_tokens: int = 2048  # OCR_MAX_TOKENS — per-page chat/completions
     ocr_keep_page_images: bool = True  # OCR_KEEP_PAGE_IMAGES
     ocr_prompt: str = ""  # OCR_PROMPT — empty uses built-in default
 

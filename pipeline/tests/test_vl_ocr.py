@@ -71,9 +71,34 @@ def test_vl_ocr_client_sends_base64_image(monkeypatch):
     assert url.startswith("data:image/png;base64,")
     assert base64.standard_b64decode(url.split(",", 1)[1]) == b"\x89PNG\r\n\x1a\n\x00"
     assert captured["json"]["temperature"] == 0
+    assert captured["json"]["max_tokens"] == 2048
 
 
-def test_vl_ocr_client_retries_on_5xx(monkeypatch):
+def test_vl_ocr_pdf_rejects_when_page_count_exceeds_max():
+    settings = Settings(
+        ocr_llm_base_url="http://ocr.test",
+        ocr_llm_model="test-model",
+        ocr_max_pages=1,
+    )
+    with pytest.raises(ValueError, match="exceeds OCR_MAX_PAGES"):
+        vl_ocr_pdf_to_markdown(_minimal_pdf_bytes(pages=2), settings=settings)
+
+
+def test_vl_ocr_pdf_allows_unlimited_pages_when_max_pages_zero():
+    settings = Settings(
+        ocr_llm_base_url="http://ocr.test",
+        ocr_llm_model="test-model",
+        ocr_max_pages=0,
+    )
+    client = MagicMock()
+    client.ocr_page_png.side_effect = ["# One", "# Two"]
+    md, meta = vl_ocr_pdf_to_markdown(
+        _minimal_pdf_bytes(pages=2),
+        settings=settings,
+        client=client,
+    )
+    assert meta["page_count"] == 2
+    assert "# One" in md
     calls = {"n": 0}
 
     def handler(_request: httpx.Request) -> httpx.Response:
