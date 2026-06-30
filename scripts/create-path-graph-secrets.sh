@@ -4,6 +4,7 @@
 # Usage:
 #   ./scripts/create-path-graph-secrets.sh
 #   PIPELINE_AGENT_ACCESS_TOKEN=... ./scripts/create-path-graph-secrets.sh
+#   S3_REGION=garage (optional — default: runtime/s3-creds S3_REGION)
 #
 # Reads: runtime/postgres-credentials, runtime/s3-creds, qdrant/qdrant-apikey
 # Writes: path-graph/path-graph-env, path-graph/s3-creds (copy for Argo artifacts)
@@ -55,6 +56,12 @@ S3_ACCESS="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath=
 S3_SECRET="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_SECRET_ACCESS_KEY}')")"
 S3_BUCKET_RUNTIME="$(b64dec "$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_BUCKET}')")"
 S3_BUCKET="${PATH_GRAPH_S3_BUCKET:-$S3_BUCKET_RUNTIME}"
+S3_REGION_RAW="$(kubectl -n "$RUNTIME_NS" get secret s3-creds -o jsonpath='{.data.S3_REGION}' 2>/dev/null || true)"
+S3_REGION_RUNTIME=""
+if [[ -n "$S3_REGION_RAW" ]]; then
+  S3_REGION_RUNTIME="$(b64dec "$S3_REGION_RAW")"
+fi
+S3_REGION="${S3_REGION:-${S3_REGION_RUNTIME:-garage}}"
 
 QDRANT_KEY="$(b64dec "$(kubectl -n "$QDRANT_NS" get secret qdrant-apikey -o jsonpath='{.data.api-key}')")"
 if [[ -z "$QDRANT_KEY" ]]; then
@@ -71,6 +78,7 @@ kubectl -n "$TARGET_NS" create secret generic path-graph-env \
   --from-literal=S3_BUCKET="$S3_BUCKET" \
   --from-literal=S3_ACCESS_KEY="$S3_ACCESS" \
   --from-literal=S3_SECRET_KEY="$S3_SECRET" \
+  --from-literal=S3_REGION="$S3_REGION" \
   --from-literal=QDRANT_URL='http://qdrant.qdrant.svc:6333' \
   --from-literal=QDRANT_API_KEY="$QDRANT_KEY" \
   --from-literal=NEBULA_HOST='nebula-graphd-svc.nebula.svc' \

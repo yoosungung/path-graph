@@ -9,5 +9,5 @@ Given structured graph context (entities and relationships), write a markdown wi
 Graph context JSON:
 {graph_context}
 
-Return JSON:
+Return JSON (output is constrained to wiki_v1 schema by the API):
 {"slug": "p{project}-community-L{level}-{short_id}", "title": "...", "markdown": "..."}

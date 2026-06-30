@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 from graph_extractor.artifact_io import fetch_bytes, read_jsonl_bytes
-from graph_extractor.llm_json import parse_json_object
+from graph_extractor.llm_json import invoke_json_llm
+from graph_extractor.output_schema import graph_v1_response_format
 from graph_extractor.paths import read_prompt
 
 try:
@@ -47,14 +48,14 @@ async def load_chunks(state: GraphState) -> dict:
 
 
 async def extract_graph(state: GraphState, llm: Any) -> dict:
-    from langchain_core.messages import HumanMessage
-
     template = read_prompt("extract_graph.txt")
     chunks_text = state.get("chunks_text") or ""
     prompt = template.replace("{chunks}", chunks_text)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
-    content = response.content if hasattr(response, "content") else str(response)
-    data = parse_json_object(content)
+    data = await invoke_json_llm(
+        llm,
+        prompt,
+        response_format=graph_v1_response_format(),
+    )
     return {
         "entities": list(data.get("entities") or []),
         "edges": list(data.get("edges") or []),

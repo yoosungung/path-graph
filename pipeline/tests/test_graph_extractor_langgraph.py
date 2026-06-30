@@ -34,8 +34,10 @@ async def test_extract_node_parses_llm_json(graph_extractor_modules, tmp_path):
         encoding="utf-8",
     )
 
-    llm = AsyncMock()
-    llm.ainvoke.return_value = MagicMock(
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+    bound.ainvoke.return_value = MagicMock(
         content=json.dumps(
             {
                 "entities": [

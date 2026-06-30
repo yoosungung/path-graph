@@ -29,7 +29,7 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 ## LangGraph
 
 1. `load_context` — `graph_context_s3` JSON
-2. `synthesize` — `community_report.txt` + LLM → `{slug, title, markdown}` → `pages[]`
+2. `synthesize` — `community_report.txt` + LLM(`response_format` `wiki_v1` JSON schema) → `{slug, title, markdown}` → `pages[]`
 3. `project_slug` — invoke input 필수 (`WikiSynthesizerInput`)
 
 ## Commands

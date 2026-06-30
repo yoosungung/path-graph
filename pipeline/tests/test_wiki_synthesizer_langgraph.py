@@ -39,8 +39,10 @@ async def test_synthesize_node_builds_page(wiki_modules, tmp_path):
         encoding="utf-8",
     )
 
-    llm = AsyncMock()
-    llm.ainvoke.return_value = MagicMock(
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+    bound.ainvoke.return_value = MagicMock(
         content=json.dumps(
             {
                 "slug": "p6907e343-community-L0-abc12345",

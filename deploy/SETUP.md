@@ -79,7 +79,7 @@ make teardown-qdrant-nebula
 
 ## Secrets
 
-`create-path-graph-secrets.sh` — `path-graph-env`, `s3-creds` (runtime에서 복사)
+`create-path-graph-secrets.sh` — `path-graph-env`, `s3-creds` (runtime에서 복사). `S3_REGION`은 runtime `s3-creds`에서 읽는다(Garage 기본 `garage`). agent presigned URL 서명에 필요.
 
 ```bash
 PIPELINE_AGENT_ACCESS_TOKEN=... ./scripts/create-path-graph-secrets.sh
@@ -138,6 +138,7 @@ make argo-install   # Ingress 포함 Helm upgrade
 | ImagePullBackOff | `make build-images`(또는 `make build-pipeline-image PUSH=1`) 완료 후 `IMAGE_TAG`가 GHCR에 있는 SHA인지 확인 · `make ensure-registry-secret` |
 | embed connection refused | TEI Pod·`EMBEDDING_BASE_URL` 확인 |
 | agent invoke 401 | `PIPELINE_AGENT_ACCESS_TOKEN` 설정 |
+| graphrag agent 500 / Garage presigned 400 | `path-graph-env`에 `S3_REGION=garage` — `./scripts/create-path-graph-secrets.sh` 재실행 |
 | `fsnotify watcher: too many open files` | ingest map burst 시 노드 inotify 한도. `./scripts/tune-node-inotify.sh` (기본 `max_user_instances=512`). 오래된 Completed WF Pod 정리: `kubectl delete pods -n path-graph --field-selector=status.phase=Succeeded` |
 
 ## Rollback

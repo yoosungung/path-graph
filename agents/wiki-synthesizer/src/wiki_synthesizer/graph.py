@@ -6,7 +6,8 @@ import json
 from typing import Any, TypedDict
 
 from wiki_synthesizer.artifact_io import fetch_bytes, read_json_bytes
-from wiki_synthesizer.llm_json import parse_json_object
+from wiki_synthesizer.llm_json import invoke_json_llm
+from wiki_synthesizer.output_schema import wiki_v1_response_format
 from wiki_synthesizer.paths import read_prompt
 
 try:
@@ -41,14 +42,14 @@ async def load_context(state: WikiState) -> dict:
 
 
 async def synthesize_page(state: WikiState, llm: Any) -> dict:
-    from langchain_core.messages import HumanMessage
-
     template = read_prompt("community_report.txt")
     context_text = state.get("graph_context_text") or ""
     prompt = template.replace("{graph_context}", context_text)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
-    content = response.content if hasattr(response, "content") else str(response)
-    data = parse_json_object(content)
+    data = await invoke_json_llm(
+        llm,
+        prompt,
+        response_format=wiki_v1_response_format(),
+    )
 
     project_slug = state.get("project_slug") or "project"
     level = int(state.get("community_level") or 0)
