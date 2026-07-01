@@ -65,14 +65,24 @@ def test_dev_kustomize_render_uses_pinned_registry_tag():
 
 def test_pipeline_ingest_rag_parallelism_and_pod_gc():
     text = INGEST_RAG.read_text(encoding="utf-8")
-    assert "parallelism: 10" in text
+    assert 'name: max_parallel' in text
+    assert 'parallelism: "{{workflow.parameters.max_parallel}}"' in text
+    assert "key: ingest-map" in text
     assert "strategy: OnPodCompletion" in text
     assert "deleteDelayDuration: 60s" in text
     assert "secondsAfterCompletion: 600" in text
 
 
+def test_pipeline_collect_only_template_exists():
+    collect_only = WORKFLOW_DIR / "pipeline-collect.yaml"
+    assert collect_only.is_file()
+    text = collect_only.read_text(encoding="utf-8")
+    assert "collect_source_step" in text
+    assert "pipeline-ingest-rag" not in text
+
+
 def test_pipeline_collect_ingest_rag_pod_gc():
     text = COLLECT_INGEST.read_text(encoding="utf-8")
-    assert "parallelism: 10" in text
+    assert 'name: max_parallel' in text
     assert "strategy: OnPodCompletion" in text
     assert "deleteDelayDuration: 60s" in text

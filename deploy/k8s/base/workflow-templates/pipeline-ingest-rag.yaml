@@ -17,12 +17,14 @@ spec:
         value: ""
       - name: rag
         value: "true"
+      - name: max_parallel
+        value: "10"
   synchronization:
     semaphore:
       configMapKeyRef:
         name: path-graph-limits
         key: embed
-  parallelism: 10
+  parallelism: "{{workflow.parameters.max_parallel}}"
   podGC:
     strategy: OnPodCompletion
     deleteDelayDuration: 60s
@@ -67,6 +69,8 @@ spec:
           - "{{inputs.parameters.batch_manifest}}"
           - --output
           - /tmp/batch_manifest.json
+          - --max-parallel-output
+          - /tmp/max_parallel
         envFrom:
           - secretRef:
               name: path-graph-env
@@ -82,7 +86,15 @@ spec:
           - name: batch_manifest
             valueFrom:
               path: /tmp/batch_manifest.json
+          - name: max_parallel
+            valueFrom:
+              path: /tmp/max_parallel
     - name: ingest-one
+      synchronization:
+        semaphore:
+          configMapKeyRef:
+            name: path-graph-limits
+            key: ingest-map
       inputs:
         parameters:
           - name: tenant

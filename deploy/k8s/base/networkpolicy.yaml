@@ -80,3 +80,18 @@ spec:
           port: 30000
         - protocol: TCP
           port: 443
+    # Argo Workflows server (workflow status / wait hooks)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argo
+      ports:
+        - protocol: TCP
+          port: 2746
+    # Kubernetes API (ServiceAccount token / CRD watch when CNI enforces egress)
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

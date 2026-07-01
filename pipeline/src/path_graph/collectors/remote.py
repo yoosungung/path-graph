@@ -337,7 +337,12 @@ def write_batch_manifest(
     batch_id: str,
     items: list[dict[str, Any]],
     settings: Settings | None = None,
+    *,
+    max_parallel: int = 10,
 ) -> str:
+    from path_graph.contracts.schemas import BatchManifestMeta
+    from path_graph.contracts.s3_keys import s3_key_batch_meta
+
     lines = [
         {
             "tenant": item["tenant"],
@@ -352,7 +357,11 @@ def write_batch_manifest(
     ]
     key = s3_key_batch_manifest(tenant, batch_id)
     store = make_blob_store(settings or get_settings())
-    return write_jsonl(key, lines, store)
+    manifest_uri = write_jsonl(key, lines, store)
+    meta = BatchManifestMeta(max_parallel=max_parallel)
+    meta_key = s3_key_batch_meta(tenant, batch_id)
+    store.put_bytes(meta_key, meta.model_dump_json().encode("utf-8"))
+    return manifest_uri
 
 
 def _parse_extensions(raw: str) -> set[str]:

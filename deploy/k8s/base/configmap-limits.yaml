@@ -9,4 +9,5 @@ data:
   agent-invoke: "8"
   parse-hwp: "4"
   embed: "16"
+  ingest-map: "10"
   ocr-vision: "2"

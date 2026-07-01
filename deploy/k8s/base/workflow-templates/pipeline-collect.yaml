@@ -1,13 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: pipeline-collect-ingest-rag
+  name: pipeline-collect
   namespace: path-graph
 spec:
   serviceAccountName: path-graph-pipeline
   imagePullSecrets:
     - name: registry-creds
-  entrypoint: collect-ingest-rag
+  entrypoint: collect-only
   arguments:
     parameters:
       - name: tenant
@@ -15,13 +15,8 @@ spec:
       - name: batch_id
       - name: credential_secret
         value: ""
-      - name: rag
-        value: "true"
       - name: sync_mode
         value: ""
-      - name: max_parallel
-        value: "10"
-  parallelism: "{{workflow.parameters.max_parallel}}"
   podGC:
     strategy: OnPodCompletion
     deleteDelayDuration: 60s
@@ -29,7 +24,7 @@ spec:
     secondsAfterCompletion: 600
     secondsAfterFailure: 7200
   templates:
-    - name: collect-ingest-rag
+    - name: collect-only
       steps:
         - - name: collect
             template: collect
@@ -39,23 +34,6 @@ spec:
                   value: "{{workflow.parameters.credential_secret}}"
                 - name: sync_mode
                   value: "{{workflow.parameters.sync_mode}}"
-        - - name: ingest
-            templateRef:
-              name: pipeline-ingest-rag
-              template: ingest-rag
-            arguments:
-              parameters:
-                - name: tenant
-                  value: "{{workflow.parameters.tenant}}"
-                - name: batch_manifest
-                  value: ""
-                - name: batch_manifest_key
-                  value: "{{steps.collect.outputs.parameters.manifest_key}}"
-                - name: rag
-                  value: "{{workflow.parameters.rag}}"
-                - name: max_parallel
-                  value: "{{steps.collect.outputs.parameters.max_parallel}}"
-            when: "{{steps.collect.outputs.parameters.file_count}} != 0"
     - name: collect
       inputs:
         parameters:

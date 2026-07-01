@@ -87,8 +87,9 @@ def test_load_batch_manifest_cli_writes_output(tmp_path, local_store):
     f = local_store / "doc.txt"
     f.write_text("hello", encoding="utf-8")
     meta = collect_local_file(f, "dev", PROJECT_ID, "local")
-    write_batch_manifest("dev", "batch-cli", [meta], get_settings())
+    write_batch_manifest("dev", "batch-cli", [meta], get_settings(), max_parallel=6)
     out = tmp_path / "manifest.json"
+    mp = tmp_path / "max_parallel"
     rc = load_main(
         [
             "--tenant",
@@ -97,9 +98,12 @@ def test_load_batch_manifest_cli_writes_output(tmp_path, local_store):
             s3_key_batch_manifest("dev", "batch-cli"),
             "--output",
             str(out),
+            "--max-parallel-output",
+            str(mp),
         ]
     )
     assert rc == 0
     rows = json.loads(out.read_text())
     assert len(rows) == 1
     assert rows[0]["project_id"] == PROJECT_ID
+    assert mp.read_text() == "6"

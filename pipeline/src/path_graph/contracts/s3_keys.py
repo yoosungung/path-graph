@@ -55,6 +55,10 @@ def s3_key_batch_manifest(tenant: str, batch_id: str) -> str:
     return f"batches/{tenant}/{batch_id}/manifest.jsonl"
 
 
+def s3_key_batch_meta(tenant: str, batch_id: str) -> str:
+    return f"batches/{tenant}/{batch_id}/manifest.meta.json"
+
+
 def s3_key_chunks_project_batch(tenant: str, project_id: str, batch_id: str) -> str:
     return f"chunks/{tenant}/{project_id}/{batch_id}/chunks.jsonl"
 

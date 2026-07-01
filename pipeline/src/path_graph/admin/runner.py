@@ -192,7 +192,12 @@ def collect_source(
     else:
         raise ValueError(f"unsupported driver: {profile.driver}")
 
-    manifest_uri = write_batch_manifest(tenant, bid, items, s)
+    max_parallel = int(cfg.get("max_parallel", 10))
+    max_parallel = max(1, min(max_parallel, 100))
+
+    manifest_uri = write_batch_manifest(
+        tenant, bid, items, s, max_parallel=max_parallel
+    )
     store = make_blob_store(s)
     from path_graph.contracts.s3_keys import s3_key_batch_manifest
 

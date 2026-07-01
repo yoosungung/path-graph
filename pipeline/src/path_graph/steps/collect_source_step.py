@@ -8,6 +8,7 @@ from path_graph.contracts.source import CollectSyncMode
 from path_graph.admin.runner import collect_source, resolve_settings_from_env
 from path_graph.admin.sources import SourceStore
 from path_graph.config import get_settings
+from path_graph.steps.load_batch_manifest import resolve_max_parallel
 
 
 def _platform_env(driver) -> tuple[str, str, str]:
@@ -66,6 +67,7 @@ def run_collect(
         "manifest_key": collected["manifest_key"],
         "file_count": collected["file_count"],
         "sync_mode": collected.get("sync_mode", ""),
+        "max_parallel": resolve_max_parallel(manifest_key=collected["manifest_key"]),
     }
     if collected.get("delta_link"):
         out["delta_link"] = collected["delta_link"]
@@ -75,6 +77,7 @@ def run_collect(
         ("manifest_key", "manifest_key"),
         ("file_count", "file_count"),
         ("sync_mode", "sync_mode"),
+        ("max_parallel", "max_parallel"),
     ):
         if key not in out:
             continue

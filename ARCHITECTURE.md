@@ -176,7 +176,7 @@ s3://{bucket}/
 | `extractor` | ✓ | 구현 식별자 — 예: `md_heuristic`, `rhwp_batch` |
 | `blocks` | ✓ | 배열; block마다 `type`, `heading_path`, 본문(`text` \| `markdown` \| `rows`) |
 
-**blocks 추출기 교체**: ingest는 `BLOCKS_EXTRACTOR`로 구현을 선택한다. md 생성(markitdown/VL OCR)과 blocks 추출은 분리 — Docling·Azure DI 등은 동일 `blocks[]` 계약만 맞추면 된다. 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
+**blocks 추출기**: ingest는 `BLOCKS_EXTRACTOR=md_heuristic`(기본·정본). md 생성(markitdown/VL OCR)과 blocks 추출은 분리. 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
 
 ### 2.2 runtime PostgreSQL (`path_graph` schema)
 
@@ -262,6 +262,12 @@ RLS: `tenant` = session `app.tenant`. 마이그레이션: `path_graph.migrations
 | `mime` | string | 선택 |
 
 수집기가 `document_id` 등을 함께 쓸 수 있으나 ingest step 계약 필드는 위 7개.
+
+**`BatchManifestMeta`** — `batches/{tenant}/{batch_id}/manifest.meta.json`:
+
+| 필드 | 타입 | 필수 |
+|------|------|------|
+| `max_parallel` | int (1–100) | 선택 — ingest map 동시성; 미설정 시 WF 기본 10 |
 
 **`ChunkRecord`** — `chunks.jsonl` 한 줄: `chunk_id`, `document_id`, `tenant`, **`project_id`**, `chunk_index`, `text`, `text_hash`, `heading_path`, `source_block_type?`.
 

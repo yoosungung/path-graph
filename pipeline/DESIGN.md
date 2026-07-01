@@ -137,8 +137,9 @@ synchronization:
 | `agent-invoke` | 8 | cluster 전체 graph+wiki agent step 동시 실행 |
 | `parse-hwp` | 4 | rhwp-batch CPU bound |
 | `embed` | 16 | embed step (Qdrant write bound) |
+| `ingest-map` | 10 | ingest map step 동시 실행 (WF `max_parallel`과 병용) |
 
-tenant별 추가 제한: batch manifest에 `max_parallel` (기본 2). WorkflowTemplate `parallelism` + semaphore 병용.
+tenant별 추가 제한: `batches/{tenant}/{batch_id}/manifest.meta.json`의 `max_parallel`(기본 10, source `config.max_parallel`로 override). Workflow submit 시 `max_parallel` 파라미터 → `spec.parallelism`. `ingest-map` semaphore(ConfigMap)과 병용.
 
 Rate limit (429) 시 Argo `retryStrategy` + step 내 backoff. 전역 semaphore가 1차 방어선.
 
@@ -171,7 +172,7 @@ bytes → parse (markitdown | rhwp-batch | VL OCR → md)
 | 레이어 | 책임 | 교체 |
 |--------|------|------|
 | **parse** | 바이너리 → Markdown(또는 HWP JSON) | markitdown, VL OCR, (미래) Docling pre-md |
-| **blocks extractor** | Markdown → `content.json` | `md_heuristic`(기본), (미래) `docling`, `azure_di` |
+| **blocks extractor** | Markdown → `content.json` | `md_heuristic`(기본·정본) |
 | **chunk** | `blocks[]` → `chunks.jsonl` | `chunk_from_blocks` 고정 |
 
 ### Registry
@@ -187,9 +188,17 @@ bytes → parse (markitdown | rhwp-batch | VL OCR → md)
 |------|------|------|
 | `BLOCKS_EXTRACTOR` | `md_heuristic` | registry 키 |
 
-### `md_heuristic` (기본)
+### `md_heuristic` (기본·정본)
 
-markitdown md에서 `#` heading · `\|` table · paragraph를 휴리스틱 분리. `heading_path`는 heading 스택으로 계산.
+markitdown md → `content.json` `blocks[]`. 외부 파서(Docling 등)는 성능 병목 시 별도 검토.
+
+| 규칙 | 동작 |
+|------|------|
+| ATX heading | `#` … `######` — 스택 기반 `heading_path` |
+| Setext heading | 다음 줄 `===` / `---` — level 1 / 2 |
+| Bold line | 단독 `**title**` — level 2 (markitdown 관행) |
+| Table | `\|` 시작 행 연속 + separator(`\|---\|`) 인식; 2행 미만·separator 없으면 paragraph |
+| Paragraph | 빈 줄 **1개**는 같은 문단(soft break); **2개 이상**이면 문단 분리 |
 
 ### HWP
 
@@ -223,6 +232,18 @@ project **내부** PG FTS + Qdrant vector 두 채널을 RRF로 병합한다. mul
 소비: agents-runtime **Container MCP** [`deploy/examples/custom-image/path-graph-rag-mcp/`](../../../agents-runtime/deploy/examples/custom-image/path-graph-rag-mcp/) — `POST /api/admin/custom-images`, `runtime_pool=mcp:custom:{slug}`. path-graph·Qdrant·embedding 의존성은 **이미지에 포함**; mcp-base pool과 무관. invoke 시 binding scope가 `tenant`·`project_id`·`project_slug`를 MCP args에 주입.
 
 FTS: PostgreSQL `simple` config + `plainto_tsquery`. ingest `upsert_chunks` 시 `text_tsv` 동기 갱신.
+
+### Retrieval CLI · Admin search (3.3.3)
+
+로컬·E2E에서 hybrid search를 agent/MCP 없이 검증한다.
+
+| 진입점 | 용도 |
+|--------|------|
+| `python -m path_graph.steps.retrieval_search` | CLI — `--tenant` `--project-id` `--query` `--top-k` `--json` |
+| `path_graph.admin.retrieval.api_search_project` | domain API — BFF가 `asyncio.to_thread`로 호출 |
+| agents-runtime `GET /api/pipeline/projects/{id}/search` | Admin Console — `q`, `top_k` query params |
+
+응답: `{query, project_id, project_slug, results[]}` — `results`는 `hybrid_search`와 동일(`chunk_id`, `text`, `rrf_score`, 채널 score).
 
 ---
 

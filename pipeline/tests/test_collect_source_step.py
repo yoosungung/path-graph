@@ -40,15 +40,20 @@ def test_run_collect_writes_outputs(tmp_path, monkeypatch):
     with patch("path_graph.steps.collect_source_step.SourceStore", return_value=mock_store):
         with patch("path_graph.steps.collect_source_step.resolve_settings_from_env") as mock_resolve:
             with patch("path_graph.steps.collect_source_step.collect_source", return_value=collected):
-                mock_resolve.return_value = MagicMock()
-                out = run_collect(
-                    tenant="dev",
-                    source_pg_id=profile.id,
-                    batch_id="batch-1",
-                    output_dir=str(tmp_path),
-                )
+                with patch(
+                    "path_graph.steps.collect_source_step.resolve_max_parallel",
+                    return_value=3,
+                ):
+                    mock_resolve.return_value = MagicMock()
+                    out = run_collect(
+                        tenant="dev",
+                        source_pg_id=profile.id,
+                        batch_id="batch-1",
+                        output_dir=str(tmp_path),
+                    )
 
     assert out["file_count"] == 2
+    assert out["max_parallel"] == 3
     assert (tmp_path / "manifest_key").read_text() == collected["manifest_key"]
     mock_store.get_source.assert_called_once_with("dev", profile.id)
 

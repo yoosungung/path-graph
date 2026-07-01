@@ -27,6 +27,10 @@ class BatchManifestLine(BaseModel):
     mime: str | None = None
 
 
+class BatchManifestMeta(BaseModel):
+    max_parallel: int = Field(default=10, ge=1, le=100)
+
+
 class GraphExtractorInput(BaseModel):
     tenant: str
     project_id: str

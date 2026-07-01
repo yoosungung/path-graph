@@ -103,7 +103,7 @@
 | 2.1.5 | agent-chat JSON export | [x] | `AgentChatCollector` |
 | 2.1.6 | `batches/{tenant}/{batch_id}/manifest.jsonl` writer | [x] | collect CLI가 생성 |
 | 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | pipeline + BFF persist [x]; Cron delta E2E — **관리자 일괄 검증으로 연기** (아래 §관리자 클러스터 검증) |
-| 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [~] | Console Cron → `pipeline-collect-ingest-rag`; **collect-only WF**(ingest 분리)는 미구현 |
+| 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [x] | `pipeline-collect` WF · `submit_collect_only` |
 
 ### 2.2 Graph pipeline
 
@@ -128,8 +128,8 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 2.4.1 | manifest 한 줄 스키마 ↔ ingest step 입력 정합 | [x] | `ingest_manifest.py` + WF `MANIFEST_LINE` |
-| 2.4.2 | 단일 Workflow + `withParam` map (batch 100) | [~] | ingest E2E OK (`submit-ingest-rag-e2e.sh`); Argo wait→API NP 잔여 |
-| 2.4.3 | tenant별 `parallelism` + semaphore | [~] | ingest-rag WF `parallelism:10`·`podGC`·`ttlStrategy`; tenant `max_parallel`·ConfigMap 연동 잔여 |
+| 2.4.2 | 단일 Workflow + `withParam` map (batch 100) | [x] | ingest E2E OK; pipeline NP egress K8s API·argo |
+| 2.4.3 | tenant별 `parallelism` + semaphore | [x] | `manifest.meta.json` `max_parallel` · WF param · `ingest-map` semaphore |
 | 2.4.4 | parse 실패 `continueOn` 배치 격리 | [x] | ingest-rag WF |
 
 ---
@@ -162,8 +162,8 @@
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | 3.3.1 | **RRF hybrid** (PG BM25 + Qdrant) | [x] | `path_graph.rag.hybrid_search` · Container MCP `path-graph-rag-mcp` |
-| 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리) | [~] | `md_heuristic` + registry; ingest `content.json`·`chunk_from_blocks`. Docling/Azure extractor [ ] |
-| 3.3.3 | ingest 검색 API / retrieval CLI | [ ] | |
+| 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리) | [x] | `md_heuristic` 규칙 보강(표·heading·문단 병합); 외부 extractor는 성능 이슈 시 검토 |
+| 3.3.3 | ingest 검색 API / retrieval CLI | [x] | `retrieval_search` CLI · `api_search_project` · BFF `GET …/search` |
 | 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; [pipeline/DESIGN.md §VL OCR](pipeline/DESIGN.md#vl-ocr-ingest--빈-parse-fallback) |
 
 ---
@@ -172,7 +172,7 @@
 
 D1–D5 결정 완료. Phase 4 Console·GraphRAG downstream **MVP 완료** — 병목은 **수집 운영화(BFF)** · **검색 품질** · **runtime binding**.
 
-1. **검색·파싱 품질** — 3.3.1 RRF hybrid · 3.3.2 blocks extractor 품질(또는 Docling PoC)
+1. **검색·파싱 품질** — 3.3.1 RRF hybrid · 3.3.2 `md_heuristic` [x]
 2. **오케스트레이션 잔여** — 2.4.2 Argo wait→API NP · 2.4.3 tenant `max_parallel`·semaphore 연동 · 2.1.8 collect-only WF(선택)
 3. **관리자 클러스터 검증 (일괄)** — 아래 §관리자 클러스터 검증 체크리스트 (SharePoint delta 등)
 

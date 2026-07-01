@@ -18,6 +18,7 @@ resources:
   - filestash-networkpolicy.yaml
   - workflow-templates/pipeline-ingest-rag.yaml
   - workflow-templates/pipeline-collect-ingest-rag.yaml
+  - workflow-templates/pipeline-collect.yaml
   - workflow-templates/pipeline-graph.yaml
   - workflow-templates/pipeline-wiki.yaml
   - workflow-templates/pipeline-graphrag.yaml

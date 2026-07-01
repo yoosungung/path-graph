@@ -61,3 +61,75 @@ def test_register_custom_extractor():
     doc = get_blocks_extractor("echo_test").extract("hi")
     assert doc["extractor"] == "echo_test"
     assert doc["blocks"][0]["text"] == "hi"
+
+
+def test_md_heuristic_merges_paragraph_on_single_blank_line():
+    md = """# Title
+
+First line.
+
+Second line after one blank.
+
+
+New paragraph after two blanks.
+"""
+    doc = MdHeuristicBlocksExtractor().extract(md)
+    paras = [b for b in doc["blocks"] if b["type"] == "paragraph"]
+    assert len(paras) == 2
+    assert "First line." in paras[0]["text"]
+    assert "Second line" in paras[0]["text"]
+    assert paras[0]["heading_path"] == ["Title"]
+    assert paras[1]["text"] == "New paragraph after two blanks."
+
+
+def test_md_heuristic_setext_and_bold_headings():
+    md = """Document Title
+==============
+
+**Bold Section**
+
+Body text.
+"""
+    doc = MdHeuristicBlocksExtractor().extract(md)
+    headings = [b for b in doc["blocks"] if b["type"] == "heading"]
+    assert [h["text"] for h in headings] == ["Document Title", "Bold Section"]
+    assert headings[0]["level"] == 1
+    assert headings[1]["level"] == 2
+    body = [b for b in doc["blocks"] if b["type"] == "paragraph"][0]
+    assert body["heading_path"] == ["Document Title", "Bold Section"]
+
+
+def test_md_heuristic_table_boundary_and_false_positive():
+    md = """| only one pipe row |
+
+Real paragraph.
+
+| h1 | h2 |
+| --- | --- |
+| a | b |
+
+After table.
+"""
+    doc = MdHeuristicBlocksExtractor().extract(md)
+    types = [b["type"] for b in doc["blocks"]]
+    assert types.count("table") == 1
+    assert types.count("paragraph") >= 2
+    table = next(b for b in doc["blocks"] if b["type"] == "table")
+    assert "| h1 | h2 |" in table["markdown"]
+    assert "| a | b |" in table["markdown"]
+
+
+def test_md_heuristic_heading_stack_resets_on_sibling():
+    md = """# A
+
+## B1
+text b1
+
+## B2
+text b2
+"""
+    doc = MdHeuristicBlocksExtractor().extract(md)
+    b2_para = [b for b in doc["blocks"] if b["type"] == "paragraph" and "text b2" in b["text"]][0]
+    assert b2_para["heading_path"] == ["A", "B2"]
+    b1_para = [b for b in doc["blocks"] if b["type"] == "paragraph" and "text b1" in b["text"]][0]
+    assert b1_para["heading_path"] == ["A", "B1"]

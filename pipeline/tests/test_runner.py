@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from path_graph.admin.runner import collect_source, probe_source, read_manifest_lines
-from path_graph.contracts.source import SourceDriver, SourceProfile
+from path_graph.contracts.source import CollectSyncMode, SourceDriver, SourceProfile
 from path_graph.storage.blob import LocalBlobStore, write_jsonl
 
 
@@ -65,7 +65,9 @@ def test_collect_and_read_manifest(local_store, monkeypatch):
         "path_graph.admin.runner._sharepoint_collector",
         lambda settings=None: mock_collector,
     )
-    out = collect_source(_profile(), batch_id="batch-test")
+    out = collect_source(
+        _profile(), batch_id="batch-test", sync_mode=CollectSyncMode.FULL
+    )
     assert out["file_count"] == 1
     assert out["manifest_key"] == "batches/dev/batch-test/manifest.jsonl"
     lines = read_manifest_lines(out["manifest_key"])
