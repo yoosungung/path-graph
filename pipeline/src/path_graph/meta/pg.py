@@ -332,6 +332,18 @@ BEGIN
 END $$;
 """
 
+CHUNKS_FTS_MIGRATION_SQL = """
+ALTER TABLE path_graph.chunks
+    ADD COLUMN IF NOT EXISTS text_tsv tsvector;
+
+UPDATE path_graph.chunks
+SET text_tsv = to_tsvector('simple', coalesce(text, ''))
+WHERE text_tsv IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_text_tsv
+    ON path_graph.chunks USING GIN (text_tsv);
+"""
+
 
 def iter_migration_sql() -> list[str]:
     return [
@@ -345,6 +357,7 @@ def iter_migration_sql() -> list[str]:
         PIPELINE_RUNS_PERSIST_MIGRATION_SQL,
         PIPELINE_RUNS_KIND_MIGRATION_SQL,
         RLS_POLICY_MIGRATION_SQL,
+        CHUNKS_FTS_MIGRATION_SQL,
     ]
 
 
@@ -414,10 +427,11 @@ class PgMetaStore:
                 conn.execute(
                     """
                     INSERT INTO path_graph.chunks
-                        (tenant, id, document_id, project_id, chunk_index, text, text_hash, s3_uri, qdrant_point_id)
-                    VALUES (%s, %s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s, %s)
+                        (tenant, id, document_id, project_id, chunk_index, text, text_hash, s3_uri, qdrant_point_id, text_tsv)
+                    VALUES (%s, %s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s, %s, to_tsvector('simple', %s))
                     ON CONFLICT (tenant, id) DO UPDATE SET
                         text = EXCLUDED.text,
+                        text_tsv = to_tsvector('simple', EXCLUDED.text),
                         s3_uri = EXCLUDED.s3_uri,
                         qdrant_point_id = EXCLUDED.qdrant_point_id,
                         project_id = EXCLUDED.project_id
@@ -432,9 +446,52 @@ class PgMetaStore:
                         c.text_hash,
                         s3_uri,
                         c.chunk_id,
+                        c.text,
                     ),
                 )
             conn.commit()
+
+    def search_fts(
+        self,
+        tenant: str,
+        project_id: str,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        q = query.strip()
+        if not q:
+            return []
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT
+                    c.id::text AS chunk_id,
+                    c.document_id::text AS document_id,
+                    c.project_id::text AS project_id,
+                    c.text,
+                    ts_rank(c.text_tsv, q) AS rank
+                FROM path_graph.chunks c,
+                     plainto_tsquery('simple', %s) q
+                WHERE c.tenant = %s
+                  AND c.project_id = %s::uuid
+                  AND c.text_tsv @@ q
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (q, tenant, project_id, limit),
+            ).fetchall()
+        return [
+            {
+                "chunk_id": row[0],
+                "document_id": row[1],
+                "project_id": row[2],
+                "text": row[3],
+                "score": float(row[4]),
+            }
+            for row in rows
+        ]
 
     def mark_rag_indexed(self, tenant: str, document_id: str) -> None:
         with self._conn() as conn:

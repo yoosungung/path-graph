@@ -161,7 +161,7 @@
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
-| 3.3.1 | **RRF hybrid** (PG BM25 + Qdrant) | [ ] | |
+| 3.3.1 | **RRF hybrid** (PG BM25 + Qdrant) | [x] | `path_graph.rag.hybrid_search` · Container MCP `path-graph-rag-mcp` |
 | 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리) | [~] | `md_heuristic` + registry; ingest `content.json`·`chunk_from_blocks`. Docling/Azure extractor [ ] |
 | 3.3.3 | ingest 검색 API / retrieval CLI | [ ] | |
 | 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; [pipeline/DESIGN.md §VL OCR](pipeline/DESIGN.md#vl-ocr-ingest--빈-parse-fallback) |

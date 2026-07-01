@@ -48,6 +48,32 @@ def test_qdrant_upsert_single_collection_per_project():
     assert client.upsert.call_args.kwargs["collection_name"] == "path_graph_dev_default"
 
 
+def test_qdrant_search_returns_payload_fields():
+    client = MagicMock()
+    client.collection_exists.return_value = True
+    point = MagicMock()
+    point.id = "pt-1"
+    point.score = 0.88
+    point.payload = {
+        "chunk_id": "chunk-1",
+        "document_id": "doc-1",
+        "project_id": PROJECT_ID,
+        "text": "hello",
+    }
+    client.search.return_value = [point]
+    store = QdrantStore(client, Settings(embedding_dim=4))
+    rows = store.search(
+        "dev",
+        "default",
+        [0.1, 0.2, 0.3, 0.4],
+        project_id=PROJECT_ID,
+        limit=5,
+    )
+    assert rows[0]["chunk_id"] == "chunk-1"
+    assert rows[0]["text"] == "hello"
+    client.search.assert_called_once()
+
+
 @patch("path_graph.steps.rag_index.embed_chunks")
 @patch("path_graph.steps.rag_index.make_qdrant_store")
 def test_index_rag_skips_qdrant(mock_qdrant, mock_embed, tmp_path, monkeypatch):

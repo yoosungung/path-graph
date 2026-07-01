@@ -124,6 +124,51 @@ class QdrantStore:
                 break
         return pairs
 
+    def search(
+        self,
+        tenant: str,
+        project_slug: str,
+        query_vector: Sequence[float],
+        *,
+        project_id: str | None = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        name = qdrant_collection_name(tenant, project_slug)
+        if not self._client.collection_exists(name):
+            return []
+        qfilter = None
+        if project_id:
+            qfilter = Filter(
+                must=[
+                    FieldCondition(
+                        key="project_id", match=MatchValue(value=project_id)
+                    )
+                ]
+            )
+        hits = self._client.search(
+            collection_name=name,
+            query_vector=list(query_vector),
+            limit=limit,
+            query_filter=qfilter,
+            with_payload=True,
+        )
+        results: list[dict] = []
+        for hit in hits:
+            payload = hit.payload or {}
+            chunk_id = str(payload.get("chunk_id") or hit.id)
+            results.append(
+                {
+                    "chunk_id": chunk_id,
+                    "document_id": str(payload.get("document_id") or ""),
+                    "project_id": str(payload.get("project_id") or project_id or ""),
+                    "text": str(payload.get("text") or ""),
+                    "score": float(hit.score or 0.0),
+                }
+            )
+        return results
+
     def delete_collection(self, collection_name: str) -> bool:
         if self._client.collection_exists(collection_name):
             self._client.delete_collection(collection_name)
