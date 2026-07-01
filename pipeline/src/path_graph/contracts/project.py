@@ -92,7 +92,10 @@ def resolve_knowledge_binding(tenant: str, project_id: str, project_slug: str) -
             filter={"project_id": project_id},
         ),
         graph=KnowledgeBindingGraph(nebula_space=space),
-        wiki=KnowledgeBindingWiki(s3_prefix=s3_key_wiki_prefix(tenant, project_id)),
+    wiki=KnowledgeBindingWiki(
+        s3_prefix=s3_key_wiki_prefix(tenant, project_id),
+        vfs_mount=f"/wiki/{slug}/",
+    ),
     )
 
 

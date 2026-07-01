@@ -81,6 +81,7 @@ def test_knowledge_binding_resolve():
     assert binding.graph.nebula_space == "path_graph_acme_product-docs"
     assert binding.rag.filter["project_id"] == PROJECT_ID
     assert binding.wiki.s3_prefix == s3_key_wiki_prefix("acme", PROJECT_ID)
+    assert binding.wiki.vfs_mount == "/wiki/product-docs/"
 
 
 def test_agent_invoke_payload_requires_tenant():

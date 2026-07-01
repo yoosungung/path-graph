@@ -138,7 +138,7 @@ synchronization:
 | `parse-hwp` | 4 | rhwp-batch CPU bound |
 | `embed` | 16 | embed step (Qdrant write bound) |
 
-tenant별 추가 제한: batch manifest에 `max_parallel` (기본 2). Hera에서 `parallelism` + semaphore 병용.
+tenant별 추가 제한: batch manifest에 `max_parallel` (기본 2). WorkflowTemplate `parallelism` + semaphore 병용.
 
 Rate limit (429) 시 Argo `retryStrategy` + step 내 backoff. 전역 semaphore가 1차 방어선.
 
@@ -581,8 +581,9 @@ src/path_graph/
     graphrag_pipeline.py, wiki_pipeline.py
     agent_invoke.py
   migrations/
-workflows/
 ```
+
+Argo `WorkflowTemplate` YAML: [`deploy/k8s/base/workflow-templates/`](../deploy/k8s/base/workflow-templates/) (Kustomize base).
 
 ## Commands
 

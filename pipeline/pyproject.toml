@@ -22,7 +22,6 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
-    "hera>=5.25",
     "langchain-core>=0.3",
     "langgraph>=0.2",
 ]

@@ -1,6 +1,6 @@
 # path-graph
 
-**RAG · Graph · Wiki** 지식 파이프라인. 문서를 수집·파싱·청킹한 뒤 벡터 인덱스(Qdrant), 지식 그래프(Nebula), 커뮤니티 위키(S3)로 적재한다. 오케스트레이션은 **Argo Workflows + Hera**, 불변 계약은 [ARCHITECTURE.md](ARCHITECTURE.md).
+**RAG · Graph · Wiki** 지식 파이프라인. 문서를 수집·파싱·청킹한 뒤 벡터 인덱스(Qdrant), 지식 그래프(Nebula), 커뮤니티 위키(S3)로 적재한다. 오케스트레이션은 **Argo Workflows** (`deploy/k8s/base/workflow-templates/`), 불변 계약은 [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 무엇을 하는가
 

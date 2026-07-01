@@ -102,7 +102,7 @@
 | 2.1.4 | OneDrive (`/me/drive`) | [x] | `ingest_onedrive` |
 | 2.1.5 | agent-chat JSON export | [x] | `AgentChatCollector` |
 | 2.1.6 | `batches/{tenant}/{batch_id}/manifest.jsonl` writer | [x] | collect CLI가 생성 |
-| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | pipeline + BFF persist [x]; **Cron delta E2E** (2회 연속 delta, `delta_link` 갱신) 검증 잔여 |
+| 2.1.7 | SharePoint **delta sync** / 변경 감지 | [~] | pipeline + BFF persist [x]; Cron delta E2E — **관리자 일괄 검증으로 연기** (아래 §관리자 클러스터 검증) |
 | 2.1.8 | collect 전용 Argo step (Cron → manifest → submit) | [~] | Console Cron → `pipeline-collect-ingest-rag`; **collect-only WF**(ingest 분리)는 미구현 |
 
 ### 2.2 Graph pipeline
@@ -153,8 +153,8 @@
 
 | # | 작업 | 상태 | 비고 |
 |---|---|---|---|
-| 3.2.0 | **Agent `path_graph_project_id` + Knowledge Binding resolve** | [~] | path-graph `resolve_knowledge_binding`; runtime 저장·retrieval/VFS는 [ ] |
-| 3.2.1 | VFS wiki mount | [ ] | agents-runtime 측 — binding `wiki.s3_prefix` |
+| 3.2.0 | **Agent `knowledge_project_ids[]` + Knowledge Binding resolve** | [x] | runtime `config.general` 저장 · invoke마다 `api_get_binding` · MCP args scope · multi-project `search` RRF |
+| 3.2.1 | VFS wiki mount | [~] | `wiki.vfs_mount` + S3 read-only backend 코드 [x]; 클러스터 `WIKI_S3_BUCKET` E2E는 §관리자 검증 |
 | 3.2.2 | async job API + Argo **suspend/resume** | [ ] | Phase 1은 extended sync poll |
 
 ### 3.3 검색 · 파싱 고도화
@@ -172,10 +172,39 @@
 
 D1–D5 결정 완료. Phase 4 Console·GraphRAG downstream **MVP 완료** — 병목은 **수집 운영화(BFF)** · **검색 품질** · **runtime binding**.
 
-1. **수집 운영화 (D5 마감)** — [x] BFF `sync_mode` UI · reconciler `delta_link` persist · WF collect 출력 → [ ] **2.1.7 Cron delta E2E** (SharePoint source, 2회 연속 delta)
-2. **runtime 소비** — 3.2.0 Knowledge Binding retrieval · 3.2.1 VFS wiki mount (agents-runtime PG-2→PG-4)
-3. **검색·파싱 품질** — 3.3.1 RRF hybrid · 3.3.2 blocks extractor 품질(또는 Docling PoC)
-4. **오케스트레이션 잔여** — 2.4.2 Argo wait→API NP · 2.4.3 tenant `max_parallel`·semaphore 연동 · 2.1.8 collect-only WF(선택)
+1. **runtime 소비 마감** — 3.2.1 wiki VFS 클러스터 E2E · agents-runtime PG-3
+2. **검색·파싱 품질** — 3.3.1 RRF hybrid · 3.3.2 blocks extractor 품질(또는 Docling PoC)
+3. **오케스트레이션 잔여** — 2.4.2 Argo wait→API NP · 2.4.3 tenant `max_parallel`·semaphore 연동 · 2.1.8 collect-only WF(선택)
+4. **관리자 클러스터 검증 (일괄)** — 아래 §관리자 클러스터 검증 체크리스트
+
+**D5 수집 동기화** — 코드·단위테스트 [x]. 클러스터 E2E만 §4로 연기.
+
+### 관리자 클러스터 검증 체크리스트 (일괄 요청용)
+
+운영 클러스터에서 한 번에 검증 요청할 항목. path-graph `deploy/SETUP.md`·agents-runtime `deploy/SETUP.md` 런북 전제.
+
+**SharePoint delta sync (2.1.7)**
+
+- [ ] SharePoint credential·source 연결 테스트 성공
+- [ ] source `config.sync_mode=delta`, `schedule_cron` 설정 (예: `0 */6 * * *`)
+- [ ] 1차 Cron WF Succeeded → source `config.delta_link` 비어 있지 않음
+- [ ] SharePoint에 파일 1건 추가(또는 수정)
+- [ ] 2차 Cron(delta) Succeeded → manifest에 변경분만 포함
+- [ ] Console Run now `sync_mode=full` → 성공 후 `delta_link` 제거(또는 재수집 확인)
+
+**Knowledge Binding · General agent (3.2.0)**
+
+- [ ] Pipeline project ingest(RAG) 완료 문서 ≥1
+- [ ] MCP 서버 `config.knowledge.requires_project=true` 등록
+- [ ] General agent 생성 — `knowledge_project_ids`에 project 선택
+- [ ] Chat invoke 1회 — agent-pool 로그에 `knowledge_binding_resolve` 성공(또는 MCP `collection`이 project binding과 일치)
+- [ ] project 2개 연결 시 `search` tool — 양쪽 collection 병렬 호출 + RRF 병합 응답
+
+**Wiki VFS (3.2.1)**
+
+- [ ] GraphRAG downstream 완료 → S3 `wiki/{tenant}/{project_id}/` 객체 존재
+- [ ] agent-pool `WIKI_S3_BUCKET`·S3 credential 설정
+- [ ] General agent invoke 후 `/wiki/{project_slug}/` 경로 VFS read 성공
 
 ---
 
