@@ -10,7 +10,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **191 tests** (2026-07) |
+| pipeline 패키지 | v0.1.0, `make test` **208 tests** (2026-07) |
 | 로컬 ingest | CLI — web / file / SharePoint / GDrive / OneDrive → parse → **blocks** → chunk → (선택) RAG |
 | 파싱·청킹 | markitdown/VL OCR → `BLOCKS_EXTRACTOR=md_heuristic` → `content.json` → `chunk_from_blocks` (D3) |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward (`wire-dev.sh`) · Qdrant vector 검색 E2E 검증 |
