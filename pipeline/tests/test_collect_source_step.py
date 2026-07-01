@@ -53,6 +53,37 @@ def test_run_collect_writes_outputs(tmp_path, monkeypatch):
     mock_store.get_source.assert_called_once_with("dev", profile.id)
 
 
+def test_run_collect_writes_delta_link_output(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH_GRAPH_DSN", "postgresql://localhost/test")
+    profile = _profile()
+    mock_store = MagicMock()
+    mock_store.get_source.return_value = profile
+
+    collected = {
+        "batch_id": "batch-1",
+        "manifest_key": "batches/dev/batch-1/manifest.jsonl",
+        "file_count": 2,
+        "sync_mode": "delta",
+        "delta_link": "https://graph/delta/new",
+    }
+
+    with patch("path_graph.steps.collect_source_step.SourceStore", return_value=mock_store):
+        with patch("path_graph.steps.collect_source_step.resolve_settings_from_env") as mock_resolve:
+            with patch("path_graph.steps.collect_source_step.collect_source", return_value=collected):
+                mock_resolve.return_value = MagicMock()
+                out = run_collect(
+                    tenant="dev",
+                    source_pg_id=profile.id,
+                    batch_id="batch-1",
+                    sync_mode="delta",
+                    output_dir=str(tmp_path),
+                )
+
+    assert out["delta_link"] == "https://graph/delta/new"
+    assert (tmp_path / "delta_link").read_text() == "https://graph/delta/new"
+    assert (tmp_path / "sync_mode").read_text() == "delta"
+
+
 def test_run_collect_source_not_found(monkeypatch):
     monkeypatch.setenv("PATH_GRAPH_DSN", "postgresql://localhost/test")
     mock_store = MagicMock()

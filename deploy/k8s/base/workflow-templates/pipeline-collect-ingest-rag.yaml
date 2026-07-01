@@ -17,6 +17,8 @@ spec:
         value: ""
       - name: rag
         value: "true"
+      - name: sync_mode
+        value: ""
   parallelism: 10
   podGC:
     strategy: OnPodCompletion
@@ -33,6 +35,8 @@ spec:
               parameters:
                 - name: credential_secret
                   value: "{{workflow.parameters.credential_secret}}"
+                - name: sync_mode
+                  value: "{{workflow.parameters.sync_mode}}"
         - - name: ingest
             templateRef:
               name: pipeline-ingest-rag
@@ -52,6 +56,7 @@ spec:
       inputs:
         parameters:
           - name: credential_secret
+          - name: sync_mode
       container:
         image: path-graph/pipeline:0.0.0
         imagePullPolicy: IfNotPresent
@@ -63,6 +68,8 @@ spec:
           - "{{workflow.parameters.source_id}}"
           - --batch-id
           - "{{workflow.parameters.batch_id}}"
+          - --sync-mode
+          - "{{inputs.parameters.sync_mode}}"
           - --output-dir
           - /tmp/collect-out
         envFrom:
@@ -90,3 +97,11 @@ spec:
           - name: file_count
             valueFrom:
               path: /tmp/collect-out/file_count
+          - name: sync_mode
+            valueFrom:
+              path: /tmp/collect-out/sync_mode
+              optional: true
+          - name: delta_link
+            valueFrom:
+              path: /tmp/collect-out/delta_link
+              optional: true

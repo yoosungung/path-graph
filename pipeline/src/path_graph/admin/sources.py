@@ -168,6 +168,38 @@ class SourceStore:
             conn.commit()
         return row_to_profile(row) if row else None
 
+    def get_source_by_last_batch(self, tenant: str, batch_id: str) -> SourceProfile | None:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            row = conn.execute(
+                f"""
+                SELECT {self._SELECT_COLS}
+                FROM path_graph.sources
+                WHERE tenant = %s AND last_batch_id = %s
+                LIMIT 1
+                """,
+                (tenant, batch_id),
+            ).fetchone()
+        return row_to_profile(row) if row else None
+
+    def patch_source_config(
+        self,
+        tenant: str,
+        source_uuid: str,
+        *,
+        set_fields: dict[str, Any] | None = None,
+        unset_fields: tuple[str, ...] = (),
+    ) -> SourceProfile | None:
+        existing = self.get_source(tenant, source_uuid)
+        if existing is None:
+            return None
+        config = dict(existing.config)
+        for key in unset_fields:
+            config.pop(key, None)
+        if set_fields:
+            config.update(set_fields)
+        return self.update_source(tenant, source_uuid, SourceUpdate(config=config))
+
     def delete_source(self, tenant: str, source_uuid: str) -> bool:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
