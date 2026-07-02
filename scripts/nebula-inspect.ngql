@@ -1,0 +1,79 @@
+-- path-graph NebulaGraph 조회 스크립트
+-- Space: path_graph_{tenant_slug}_{project_slug}  (Qdrant collection과 동일)
+-- Vertex: Entity(name, description) — vid = "entity:{name}"
+--          chunk vid = chunk_id (UUID, 태그 없음 — MENTIONS src)
+-- Edge: EXTRACTED|INFERRED(confidence), MENTIONS()
+--
+-- 실행 예:
+--   nebula-console -addr 127.0.0.1 -port 9669 -u root -p nebula -f scripts/nebula-inspect.ngql
+--   ./scripts/run-nebula-inspect.sh path_graph_acme_docs
+--
+-- Studio: Console 탭에 섹션별로 붙여넣어 실행
+
+-- ── 0. 클러스터 ─────────────────────────────────────────────
+SHOW HOSTS;
+SHOW SPACES;
+
+-- ── 1. Space 선택 (아래 USE 한 줄의 space 이름을 바꾸세요) ──
+-- 예: path_graph_acme_docs
+USE path_graph_acme_docs;
+
+-- ── 2. 스키마 ───────────────────────────────────────────────
+SHOW TAGS;
+SHOW EDGES;
+DESCRIBE TAG Entity;
+DESCRIBE EDGE EXTRACTED;
+DESCRIBE EDGE INFERRED;
+DESCRIBE EDGE MENTIONS;
+
+-- ── 3. 요약 통계 ────────────────────────────────────────────
+MATCH (v:Entity) RETURN count(v) AS entity_count;
+MATCH ()-[e:EXTRACTED]->() RETURN count(e) AS extracted_edges;
+MATCH ()-[e:INFERRED]->() RETURN count(e) AS inferred_edges;
+MATCH ()-[e:MENTIONS]->() RETURN count(e) AS mention_edges;
+
+-- ── 4. Entity 목록 (상위 30) ────────────────────────────────
+MATCH (v:Entity)
+RETURN id(v) AS vid, v.Entity.name AS name, v.Entity.description AS description
+ORDER BY name
+LIMIT 30;
+
+-- ── 5. Entity 간 관계 (EXTRACTED / INFERRED) ────────────────
+MATCH (a:Entity)-[e:EXTRACTED|INFERRED]->(b:Entity)
+RETURN
+  id(a) AS src_vid,
+  a.Entity.name AS src_name,
+  type(e) AS edge_type,
+  e.confidence AS confidence,
+  id(b) AS tgt_vid,
+  b.Entity.name AS tgt_name
+LIMIT 50;
+
+-- ── 6. Chunk → Entity (wikilink MENTIONS) ───────────────────
+MATCH (c)-[:MENTIONS]->(e:Entity)
+RETURN id(c) AS chunk_id, e.Entity.name AS entity_name
+LIMIT 30;
+
+-- ── 7. 특정 Entity 1-hop 이웃 (vid 수정) ─────────────────────
+-- vid 예: entity:SomePage
+MATCH (a:Entity)-[e:EXTRACTED|INFERRED]-(b:Entity)
+WHERE id(a) == "entity:SomePage" OR id(b) == "entity:SomePage"
+RETURN
+  id(a) AS a_vid,
+  a.Entity.name AS a_name,
+  type(e) AS edge_type,
+  e.confidence AS confidence,
+  id(b) AS b_vid,
+  b.Entity.name AS b_name
+LIMIT 50;
+
+-- ── 8. 이름으로 Entity 검색 (검색어 수정) ─────────────────────
+MATCH (v:Entity)
+WHERE v.Entity.name CONTAINS "Example"
+RETURN id(v) AS vid, v.Entity.name AS name
+LIMIT 20;
+
+-- ── 9. 특정 chunk가 언급한 Entity (chunk_id UUID 수정) ───────
+MATCH (c)-[:MENTIONS]->(e:Entity)
+WHERE id(c) == "00000000-0000-4000-8000-000000000000"
+RETURN e.Entity.name AS entity_name;
