@@ -65,6 +65,16 @@ def is_length_limit_error(exc: BaseException) -> bool:
     return "length limit" in message or "lengthfinishreason" in message
 
 
+def is_empty_json_error(exc: BaseException) -> bool:
+    import json
+
+    return isinstance(exc, json.JSONDecodeError) and "expecting value" in str(exc).lower()
+
+
+def is_splittable_extraction_error(exc: BaseException) -> bool:
+    return is_length_limit_error(exc) or is_empty_json_error(exc)
+
+
 def split_text_half(text: str) -> tuple[str, str]:
     stripped = text.strip()
     if not stripped:

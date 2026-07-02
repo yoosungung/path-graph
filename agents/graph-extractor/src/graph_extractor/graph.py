@@ -11,6 +11,7 @@ from graph_extractor.batching import (
     DEFAULT_MAX_COMPLETION_TOKENS,
     DEFAULT_MIN_SPLIT_CHARS,
     is_length_limit_error,
+    is_splittable_extraction_error,
     merge_graph_parts,
     resolve_graph_extractor_budgets,
     split_chunk_batches,
@@ -76,8 +77,10 @@ async def _extract_chunks_text(
             max_tokens=max_completion_tokens,
         )
     except Exception as exc:
-        if not is_length_limit_error(exc) or len(chunks_text) <= min_split_chars:
+        if not is_splittable_extraction_error(exc):
             raise
+        if len(chunks_text) <= min_split_chars:
+            return {"entities": [], "edges": []}
         left, right = split_text_half(chunks_text)
         if not left or not right:
             raise

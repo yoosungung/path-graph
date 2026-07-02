@@ -114,6 +114,65 @@ def test_split_text_half_prefers_paragraph_boundary(batching_mod):
 
 
 @pytest.mark.asyncio
+async def test_extract_graph_splits_batch_on_empty_llm_response():
+    sys.path.insert(0, str(GRAPH_SRC))
+    try:
+        import graph_extractor.graph as graph_mod
+    finally:
+        sys.path.remove(str(GRAPH_SRC))
+
+    from unittest.mock import AsyncMock, MagicMock
+
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+    calls = {"n": 0}
+
+    async def _ainvoke(_messages):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            return MagicMock(content="")
+        return MagicMock(content=json.dumps({"entities": [], "edges": []}))
+
+    bound.ainvoke.side_effect = _ainvoke
+
+    big = "word " * 800
+    out = await graph_mod.extract_graph(
+        {"chunk_batches": [big]},
+        llm,
+        max_completion_tokens=8192,
+        min_split_chars=400,
+    )
+    assert out["entities"] == []
+    assert bound.ainvoke.await_count >= 3
+
+
+@pytest.mark.asyncio
+async def test_extract_graph_returns_empty_for_tiny_batch_on_empty_llm():
+    sys.path.insert(0, str(GRAPH_SRC))
+    try:
+        import graph_extractor.graph as graph_mod
+    finally:
+        sys.path.remove(str(GRAPH_SRC))
+
+    from unittest.mock import AsyncMock, MagicMock
+
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+    bound.ainvoke.return_value = MagicMock(content="")
+
+    out = await graph_mod.extract_graph(
+        {"chunk_batches": ["short text"]},
+        llm,
+        max_completion_tokens=8192,
+        min_split_chars=400,
+    )
+    assert out == {"entities": [], "edges": []}
+    assert bound.ainvoke.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_extract_graph_splits_batch_on_length_limit():
     sys.path.insert(0, str(GRAPH_SRC))
     try:
