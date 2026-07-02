@@ -30,4 +30,6 @@ def make_nebula_store(settings: Settings | None = None) -> NebulaGraphStore:
         s.nebula_port,
         s.nebula_user,
         s.nebula_password,
+        schema_wait_sec=s.nebula_schema_wait_sec,
+        schema_poll_interval_sec=s.nebula_schema_poll_interval_sec,
     )

@@ -87,6 +87,7 @@ collect / ingest_web
 | `CHUNK_MAX_CHARS` | `1000` | 청크 hard-split |
 | `ENVOY_URL` / `PIPELINE_AGENT_ACCESS_TOKEN` | — | agent invoke |
 | `NEBULA_HOST` / `NEBULA_PORT` / `NEBULA_USER` / `NEBULA_PASSWORD` | — | Graph upsert |
+| `NEBULA_SCHEMA_WAIT_SEC` / `NEBULA_SCHEMA_POLL_INTERVAL_SEC` | 20 / 1 | Nebula DDL 전파 폴링 |
 
 ---
 
@@ -472,6 +473,8 @@ MS GraphRAG 사상을 **Knowledge Project** 경계와 정합되게 구현한다.
 
 1. `copy_chunks_to_project_batch` — batch chunks → `chunks/{tenant}/{project_id}/{batch_id}/chunks.jsonl`
 2. `run_graph_pipeline` — project별 graph-extractor + Nebula upsert (`graph/nebula_store.py`)
+   - **Nebula space bootstrap** (`NebulaGraphStore.ensure_space`): `CREATE SPACE` → heartbeat 대기 → `USE` → `CREATE TAG`/`CREATE EDGE` DDL → schema 전파 대기. 태그 `Entity`, `Chunk`; 엣지 `EXTRACTED`, `INFERRED`, `MENTIONS`. DDL은 비동기 반영이므로 `SHOW TAGS`/`SHOW EDGES` 폴링(`NEBULA_SCHEMA_WAIT_SEC`, 기본 20s).
+   - upsert 실패 시 `RuntimeError` — silent ignore 금지.
 3. `run_community_pipeline` — project별 hierarchical Leiden
 4. `build_graph_context` — `graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json`
 5. `run_wiki_pipeline` — project·community별 wiki-synthesizer

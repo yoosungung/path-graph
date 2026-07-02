@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     nebula_port: int = 9669
     nebula_user: str = "root"
     nebula_password: str = "nebula"
+    nebula_schema_wait_sec: float = 20.0  # NEBULA_SCHEMA_WAIT_SEC — DDL heartbeat wait
+    nebula_schema_poll_interval_sec: float = 1.0  # NEBULA_SCHEMA_POLL_INTERVAL_SEC
 
     envoy_url: str = "http://127.0.0.1:8084"
     pipeline_agent_access_token: str = ""  # PIPELINE_AGENT_ACCESS_TOKEN

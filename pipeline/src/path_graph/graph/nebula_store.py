@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,6 +18,31 @@ class _MemorySpace:
     entities: dict[str, dict[str, Any]] = field(default_factory=dict)
     edges: list[dict[str, Any]] = field(default_factory=list)
     mentions: list[tuple[str, str]] = field(default_factory=list)
+    chunks: set[str] = field(default_factory=set)
+
+
+_SCHEMA_TAG_DDL = (
+    "CREATE TAG IF NOT EXISTS Entity(name string, description string);",
+    "CREATE TAG IF NOT EXISTS Chunk();",
+)
+_SCHEMA_EDGE_DDL = (
+    "CREATE EDGE IF NOT EXISTS EXTRACTED(confidence double);",
+    "CREATE EDGE IF NOT EXISTS INFERRED(confidence double);",
+    "CREATE EDGE IF NOT EXISTS MENTIONS();",
+)
+
+
+def _schema_tag_names() -> set[str]:
+    return {"Entity", "Chunk"}
+
+
+def _schema_edge_types() -> set[str]:
+    return {"EXTRACTED", "INFERRED", "MENTIONS"}
+
+
+def _ngql_string(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 class NebulaGraphStore:
@@ -30,6 +56,8 @@ class NebulaGraphStore:
         password: str,
         *,
         memory: dict[str, _MemorySpace] | None = None,
+        schema_wait_sec: float = 20.0,
+        schema_poll_interval_sec: float = 1.0,
     ) -> None:
         self._host = host
         self._port = port
@@ -37,6 +65,9 @@ class NebulaGraphStore:
         self._password = password
         self._pool = None
         self._memory = memory
+        self._schema_wait_sec = schema_wait_sec
+        self._schema_poll_interval_sec = schema_poll_interval_sec
+        self._prepared_spaces: set[str] = set()
 
     def _mem(self, space: str) -> _MemorySpace:
         if self._memory is None:
@@ -44,8 +75,8 @@ class NebulaGraphStore:
         return self._memory.setdefault(space, _MemorySpace())
 
     def _session(self):
-        from nebula3.gclient.net import ConnectionPool
         from nebula3.Config import Config
+        from nebula3.gclient.net import ConnectionPool
 
         if self._pool is None:
             cfg = Config()
@@ -55,14 +86,64 @@ class NebulaGraphStore:
                 raise RuntimeError("nebula connection pool init failed")
         return self._pool.get_session(self._user, self._password)
 
+    def _execute(self, sess: Any, nql: str) -> Any:
+        result = sess.execute(nql)
+        if not result.is_succeeded():
+            raise RuntimeError(result.error_msg() or f"nebula query failed: {nql}")
+        return result
+
+    def _wait_until(self, sess: Any, *, ready: Any, label: str) -> None:
+        deadline = time.monotonic() + self._schema_wait_sec
+        while time.monotonic() < deadline:
+            if ready(sess):
+                return
+            time.sleep(self._schema_poll_interval_sec)
+        raise RuntimeError(f"nebula {label} not ready within {self._schema_wait_sec}s")
+
+    def _space_visible(self, sess: Any, space: str) -> bool:
+        result = sess.execute("SHOW SPACES;")
+        if not result.is_succeeded():
+            return False
+        for row in result.rows():
+            if _decode_value(row.values[0]) == space:
+                return True
+        return False
+
+    def _schema_ready(self, sess: Any) -> bool:
+        tags = sess.execute("SHOW TAGS;")
+        if not tags.is_succeeded():
+            return False
+        tag_names = {_decode_value(row.values[0]) for row in tags.rows()}
+        if not _schema_tag_names() <= tag_names:
+            return False
+        edges = sess.execute("SHOW EDGES;")
+        if not edges.is_succeeded():
+            return False
+        edge_names = {_decode_value(row.values[0]) for row in edges.rows()}
+        return _schema_edge_types() <= edge_names
+
+    def _ensure_live_schema(self, sess: Any, space: str) -> None:
+        if space in self._prepared_spaces:
+            return
+        self._execute(sess, f"CREATE SPACE IF NOT EXISTS {space}(vid_type=FIXED_STRING(64));")
+        self._wait_until(
+            sess,
+            ready=lambda s: self._space_visible(s, space),
+            label=f"space {space}",
+        )
+        self._execute(sess, f"USE {space};")
+        for ddl in (*_SCHEMA_TAG_DDL, *_SCHEMA_EDGE_DDL):
+            self._execute(sess, ddl)
+        self._wait_until(sess, ready=self._schema_ready, label=f"schema in {space}")
+        self._prepared_spaces.add(space)
+
     def ensure_space(self, space: str) -> None:
         if self._memory is not None:
             self._mem(space)
             return
         sess = self._session()
         try:
-            sess.execute(f"CREATE SPACE IF NOT EXISTS {space}(vid_type=FIXED_STRING(64));")
-            sess.execute(f"USE {space};")
+            self._ensure_live_schema(sess, space)
         finally:
             sess.release()
 
@@ -73,16 +154,20 @@ class NebulaGraphStore:
                 eid = ent.get("id") or f"entity:{ent['name']}"
                 mem.entities[eid] = ent
             return
+        if not entities:
+            return
         sess = self._session()
         try:
-            sess.execute(f"USE {space};")
+            self._ensure_live_schema(sess, space)
+            self._execute(sess, f"USE {space};")
             for ent in entities:
                 eid = ent.get("id") or f"entity:{ent['name']}"
                 name = ent.get("name", "")
                 desc = ent.get("description", "")
-                sess.execute(
-                    f'INSERT VERTEX IF NOT EXISTS Entity(name, description) '
-                    f'VALUES "{eid}":("{name}", "{desc}");'
+                self._execute(
+                    sess,
+                    "INSERT VERTEX IF NOT EXISTS Entity(name, description) "
+                    f"VALUES {_ngql_string(eid)}:({_ngql_string(name)}, {_ngql_string(desc)});",
                 )
         finally:
             sess.release()
@@ -92,17 +177,21 @@ class NebulaGraphStore:
             mem = self._mem(space)
             mem.edges.extend(edges)
             return
+        if not edges:
+            return
         sess = self._session()
         try:
-            sess.execute(f"USE {space};")
+            self._ensure_live_schema(sess, space)
+            self._execute(sess, f"USE {space};")
             for edge in edges:
                 etype = edge.get("type", "EXTRACTED")
                 src = edge["source"]
                 tgt = edge["target"]
                 conf = edge.get("confidence", 1.0)
-                sess.execute(
-                    f'INSERT EDGE IF NOT EXISTS {etype} (confidence) '
-                    f'VALUES "{src}"->"{tgt}":({conf});'
+                self._execute(
+                    sess,
+                    f"INSERT EDGE IF NOT EXISTS {etype} (confidence) "
+                    f"VALUES {_ngql_string(src)}->{_ngql_string(tgt)}:({conf});",
                 )
         finally:
             sess.release()
@@ -110,21 +199,33 @@ class NebulaGraphStore:
     def upsert_mentions(self, space: str, chunk_id: str, entities: list[str]) -> None:
         if self._memory is not None:
             mem = self._mem(space)
+            mem.chunks.add(chunk_id)
             for ent in entities:
                 eid = f"entity:{ent}"
                 mem.entities.setdefault(eid, {"id": eid, "name": ent})
                 mem.mentions.append((chunk_id, eid))
             return
+        if not entities:
+            return
         sess = self._session()
         try:
-            sess.execute(f"USE {space};")
+            self._ensure_live_schema(sess, space)
+            self._execute(sess, f"USE {space};")
+            self._execute(
+                sess,
+                f"INSERT VERTEX IF NOT EXISTS Chunk() VALUES {_ngql_string(chunk_id)}:();",
+            )
             for ent in entities:
                 eid = f"entity:{ent}"
-                sess.execute(
-                    f'INSERT VERTEX IF NOT EXISTS Entity(name) VALUES "{eid}":("{ent}");'
+                self._execute(
+                    sess,
+                    "INSERT VERTEX IF NOT EXISTS Entity(name) "
+                    f"VALUES {_ngql_string(eid)}:({_ngql_string(ent)});",
                 )
-                sess.execute(
-                    f'INSERT EDGE IF NOT EXISTS MENTIONS () VALUES "{chunk_id}"->"{eid}":();'
+                self._execute(
+                    sess,
+                    "INSERT EDGE IF NOT EXISTS MENTIONS () "
+                    f"VALUES {_ngql_string(chunk_id)}->{_ngql_string(eid)}:();",
                 )
         finally:
             sess.release()
@@ -138,10 +239,9 @@ class NebulaGraphStore:
         """Export entity-entity edges within a single Nebula space."""
         if self._memory is not None:
             return self._export_from_memory(space, batch_chunk_ids)
-        # Live Nebula: query EXTRACTED/INFERRED edges in space
         sess = self._session()
         try:
-            sess.execute(f"USE {space};")
+            self._execute(sess, f"USE {space};")
             result = sess.execute(
                 "MATCH (a:Entity)-[e:EXTRACTED|INFERRED]->(b:Entity) "
                 "RETURN id(a) AS src, id(b) AS tgt, type(e) AS etype;"
@@ -199,7 +299,22 @@ class NebulaGraphStore:
         if self._memory is not None:
             mem = self._memory.get(space, _MemorySpace())
             return {eid for cid, eid in mem.mentions if cid in chunk_ids}
-        return set()
+        if not chunk_ids:
+            return set()
+        sess = self._session()
+        try:
+            self._execute(sess, f"USE {space};")
+            ids_literal = ", ".join(_ngql_string(cid) for cid in sorted(chunk_ids))
+            result = sess.execute(
+                "MATCH (c)-[:MENTIONS]->(e:Entity) "
+                f"WHERE id(c) IN [{ids_literal}] "
+                "RETURN DISTINCT id(e) AS eid;"
+            )
+            if not result.is_succeeded():
+                return set()
+            return {_decode_value(row.values[0]) for row in result.rows() if row.values}
+        finally:
+            sess.release()
 
     def get_entities(self, space: str, entity_ids: list[str]) -> list[dict[str, Any]]:
         if self._memory is not None:
@@ -221,7 +336,6 @@ class NebulaGraphStore:
             return rels
         return []
 
-
     def delete_chunks(self, space: str, chunk_ids: list[str]) -> int:
         if not chunk_ids:
             return 0
@@ -231,6 +345,7 @@ class NebulaGraphStore:
             mem.mentions = [
                 (cid, eid) for cid, eid in mem.mentions if cid not in chunk_set
             ]
+            mem.chunks -= chunk_set
             for cid in chunk_ids:
                 mem.entities.pop(f"chunk:{cid}", None)
                 mem.entities.pop(cid, None)
@@ -238,9 +353,9 @@ class NebulaGraphStore:
         sess = self._session()
         deleted = 0
         try:
-            sess.execute(f"USE {space};")
+            self._execute(sess, f"USE {space};")
             for cid in chunk_ids:
-                sess.execute(f'DELETE VERTEX "{cid}";')
+                self._execute(sess, f"DELETE VERTEX {_ngql_string(cid)};")
                 deleted += 1
         finally:
             sess.release()
@@ -267,7 +382,8 @@ class NebulaGraphStore:
             return False
         sess = self._session()
         try:
-            sess.execute(f"DROP SPACE IF EXISTS {space};")
+            self._execute(sess, f"DROP SPACE IF EXISTS {space};")
+            self._prepared_spaces.discard(space)
             return True
         finally:
             sess.release()
@@ -275,7 +391,7 @@ class NebulaGraphStore:
     def list_chunk_vertices(self, space: str) -> list[str]:
         if self._memory is not None:
             mem = self._memory.get(space, _MemorySpace())
-            return sorted({cid for cid, _ in mem.mentions})
+            return sorted(mem.chunks or {cid for cid, _ in mem.mentions})
         return []
 
 
