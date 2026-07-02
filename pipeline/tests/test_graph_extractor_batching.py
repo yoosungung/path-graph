@@ -62,6 +62,22 @@ def test_resolve_graph_extractor_budgets_fallback_without_preset(batching_mod, m
     assert completion == batching_mod.DEFAULT_MAX_COMPLETION_TOKENS
 
 
+def test_split_chunk_line_groups_splits_by_chunk_count(batching_mod):
+    lines = [{"text": f"c{i}"} for i in range(250)]
+    groups = batching_mod.split_chunk_line_groups(lines, max_chunks_per_group=100)
+    assert len(groups) == 3
+    assert len(groups[0]) == 100
+    assert len(groups[1]) == 100
+    assert len(groups[2]) == 50
+
+
+def test_split_chunk_line_groups_skips_empty_text(batching_mod):
+    lines = [{"text": ""}, {"text": "a"}, {"text": "  "}, {"text": "b"}]
+    groups = batching_mod.split_chunk_line_groups(lines, max_chunks_per_group=100)
+    assert len(groups) == 1
+    assert len(groups[0]) == 2
+
+
 def test_merge_graph_parts_dedupes_entities_and_edges(batching_mod):
     merged = batching_mod.merge_graph_parts(
         [
@@ -201,6 +217,79 @@ async def test_extract_graph_splits_batch_on_length_limit():
     state = {"chunk_batches": [big]}
     await graph_mod.extract_graph(state, llm, max_completion_tokens=8192)
     assert bound.ainvoke.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_load_chunks_builds_chunk_groups():
+    sys.path.insert(0, str(GRAPH_SRC))
+    try:
+        import graph_extractor.graph as graph_mod
+    finally:
+        sys.path.remove(str(GRAPH_SRC))
+
+    from unittest.mock import patch
+
+    lines = [{"text": f"chunk-{i}"} for i in range(150)]
+    raw = "\n".join(json.dumps(line) for line in lines).encode()
+
+    with patch("graph_extractor.graph.fetch_bytes", return_value=raw):
+        out = await graph_mod.load_chunks(
+            {"chunks_s3": "file:///tmp/chunks.jsonl"},
+            max_batch_chars=10_000,
+            chunks_per_group=100,
+        )
+
+    assert len(out["chunk_groups"]) == 2
+    assert len(out["chunk_groups"][0]) >= 1
+    assert "chunk-0" in out["chunk_groups"][0][0]
+    assert "chunk-149" in out["chunk_groups"][1][-1]
+
+
+@pytest.mark.asyncio
+async def test_extract_graph_limits_concurrent_workers_within_group():
+    sys.path.insert(0, str(GRAPH_SRC))
+    try:
+        import graph_extractor.graph as graph_mod
+    finally:
+        sys.path.remove(str(GRAPH_SRC))
+
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+
+    active = 0
+    max_active = 0
+    lock = asyncio.Lock()
+
+    async def _ainvoke(_messages):
+        nonlocal active, max_active
+        async with lock:
+            active += 1
+            max_active = max(max_active, active)
+        await asyncio.sleep(0.02)
+        async with lock:
+            active -= 1
+        return MagicMock(content=json.dumps({"entities": [], "edges": []}))
+
+    bound.ainvoke.side_effect = _ainvoke
+
+    state = {
+        "chunk_groups": [
+            ["batch-1", "batch-2", "batch-3"],
+            ["batch-4"],
+        ]
+    }
+    await graph_mod.extract_graph(
+        state,
+        llm,
+        max_completion_tokens=8192,
+        max_concurrent_workers=2,
+    )
+    assert max_active <= 2
+    assert bound.ainvoke.await_count == 4
 
 
 @pytest.mark.asyncio

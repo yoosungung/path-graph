@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     pipeline_agent_access_token: str = ""  # PIPELINE_AGENT_ACCESS_TOKEN
     pipeline_agent_invoke_mode: str = "async_poll"  # sync | async_poll | async_suspend
     pipeline_agent_job_poll_interval_s: float = 5.0  # PIPELINE_AGENT_JOB_POLL_INTERVAL_S
-    pipeline_agent_job_max_wait_s: float = 1800.0  # PIPELINE_AGENT_JOB_MAX_WAIT_S
+    pipeline_agent_job_max_wait_s: float = 7200.0  # PIPELINE_AGENT_JOB_MAX_WAIT_S (2h)
     argo_workflow_namespace: str = ""  # ARGO_WORKFLOW_NAMESPACE — auto from Argo env
     argo_workflow_name: str = ""  # ARGO_WORKFLOW_NAME
 

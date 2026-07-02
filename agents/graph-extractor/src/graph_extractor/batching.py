@@ -7,6 +7,8 @@ import os
 DEFAULT_MAX_BATCH_CHARS = 4_000
 DEFAULT_MAX_COMPLETION_TOKENS = 4_096
 DEFAULT_MIN_SPLIT_CHARS = 400
+DEFAULT_CHUNKS_PER_GROUP = 100
+DEFAULT_MAX_CONCURRENT_WORKERS = 2
 PROMPT_OVERHEAD_TOKENS = 3_500
 CHARS_PER_TOKEN = 3.5
 
@@ -88,6 +90,27 @@ def split_text_half(text: str) -> tuple[str, str]:
     left = stripped[:split_at].strip()
     right = stripped[split_at:].strip()
     return left, right
+
+
+def split_chunk_line_groups(
+    lines: list[dict],
+    *,
+    max_chunks_per_group: int,
+) -> list[list[dict]]:
+    """Split non-empty chunk lines into fixed-size groups for sequential processing."""
+    groups: list[list[dict]] = []
+    current: list[dict] = []
+    for line in lines:
+        text = (line.get("text") or "").strip()
+        if not text:
+            continue
+        current.append(line)
+        if len(current) >= max_chunks_per_group:
+            groups.append(current)
+            current = []
+    if current:
+        groups.append(current)
+    return groups
 
 
 def split_chunk_batches(lines: list[dict], *, max_batch_chars: int) -> list[str]:

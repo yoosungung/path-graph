@@ -62,7 +62,7 @@ register_one() {
     graph-extractor)
       package="graph_extractor"
       entrypoint="graph_extractor.agent:factory"
-      config_json='{"langgraph":{"model":"preset:GEMMA412B"},"graph_extractor":{"max_batch_chars":2500,"max_completion_tokens":8192}}'
+      config_json='{"langgraph":{"model":"preset:GEMMA412B"},"graph_extractor":{"max_batch_chars":2500,"max_completion_tokens":8192,"chunks_per_group":100,"max_concurrent_workers":2}}'
       ;;
     wiki-synthesizer)
       package="wiki_synthesizer"

@@ -100,7 +100,7 @@ collect / ingest_web
 ### 패턴 (Phase 2 — 기본)
 
 1. **Submit**: `POST {ENVOY}/v1/agents/jobs` — 동기 `/v1/agents/invoke` 대신 `job_id` 즉시 수신. `session_id = f"{workflow_uid}:{step}:{batch_idx}"` (멱등·추적).
-2. **Poll**: `GET {ENVOY}/v1/agents/jobs/{job_id}?agent=…` — 5s 간격, max 1800s. Argo worker는 agent pool HTTP 연결을 홀딩하지 않는다.
+2. **Poll**: `GET {ENVOY}/v1/agents/jobs/{job_id}?agent=…` — 5s 간격, max **7200s (2h)**. Argo worker는 agent pool HTTP 연결을 홀딩하지 않는다.
 3. **Argo `suspend` + resume** (`PIPELINE_AGENT_INVOKE_MODE=async_suspend`): submit body `callback.argo`에 WF name/namespace/`node_field_selector` 전달 → job 완료 시 agents-runtime이 Argo `PUT …/resume`(또는 실패 시 `…/stop`) 호출. WF 템플릿에 `suspend: {}` step이 선행해야 한다.
 
 동기 `/v1/agents/invoke`는 `PIPELINE_AGENT_INVOKE_MODE=sync`로만 유지(디버그·로컬).
@@ -124,8 +124,8 @@ steps:
 | 계층 | 값 | 비고 |
 |---|---|---|
 | Job poll interval | 5s | `PIPELINE_AGENT_JOB_POLL_INTERVAL_S` |
-| Job max wait | 1800s | `PIPELINE_AGENT_JOB_MAX_WAIT_S` — 초과 시 `failed` + DLQ, retryable |
-| Argo step `activeDeadlineSeconds` | 1800s | poll 루프 + S3 I/O 여유 (graphrag) |
+| Job max wait | 7200s (2h) | `PIPELINE_AGENT_JOB_MAX_WAIT_S` — 초과 시 `failed`, retryable |
+| Argo step `activeDeadlineSeconds` | 7200s | graphrag step (poll + graph-extractor job) |
 | Sync invoke (legacy) | 600s | `PIPELINE_AGENT_INVOKE_MODE=sync` only |
 
 ### 재시도

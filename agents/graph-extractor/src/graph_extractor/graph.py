@@ -7,14 +7,17 @@ from typing import Any, TypedDict
 
 from graph_extractor.artifact_io import fetch_bytes, read_jsonl_bytes
 from graph_extractor.batching import (
+    DEFAULT_CHUNKS_PER_GROUP,
     DEFAULT_MAX_BATCH_CHARS,
     DEFAULT_MAX_COMPLETION_TOKENS,
+    DEFAULT_MAX_CONCURRENT_WORKERS,
     DEFAULT_MIN_SPLIT_CHARS,
     is_length_limit_error,
     is_splittable_extraction_error,
     merge_graph_parts,
     resolve_graph_extractor_budgets,
     split_chunk_batches,
+    split_chunk_line_groups,
     split_text_half,
 )
 from graph_extractor.llm_json import invoke_json_llm
@@ -34,6 +37,7 @@ class GraphState(TypedDict, total=False):
     project_id: str
     batch_id: str
     chunks_s3: str
+    chunk_groups: list[list[str]]
     chunk_batches: list[str]
     chunks_text: str
     entities: list[dict]
@@ -48,12 +52,22 @@ async def load_chunks(
     state: GraphState,
     *,
     max_batch_chars: int = DEFAULT_MAX_BATCH_CHARS,
+    chunks_per_group: int = DEFAULT_CHUNKS_PER_GROUP,
 ) -> dict:
     uri = state.get("chunks_s3") or ""
     raw = fetch_bytes(uri)
     lines = read_jsonl_bytes(raw)
-    batches = split_chunk_batches(lines, max_batch_chars=max_batch_chars)
+    line_groups = split_chunk_line_groups(
+        lines,
+        max_chunks_per_group=chunks_per_group,
+    )
+    chunk_groups = [
+        split_chunk_batches(group_lines, max_batch_chars=max_batch_chars)
+        for group_lines in line_groups
+    ]
+    batches = [batch for group in chunk_groups for batch in group]
     return {
+        "chunk_groups": chunk_groups,
         "chunk_batches": batches,
         "chunks_text": "\n\n".join(batches),
     }
@@ -111,28 +125,38 @@ async def extract_graph(
     *,
     max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
     min_split_chars: int = DEFAULT_MIN_SPLIT_CHARS,
+    max_concurrent_workers: int = DEFAULT_MAX_CONCURRENT_WORKERS,
 ) -> dict:
     template = read_prompt("extract_graph.txt")
-    batches = list(state.get("chunk_batches") or [])
-    if not batches:
-        text = (state.get("chunks_text") or "").strip()
-        if text:
-            batches = [text]
+    chunk_groups = list(state.get("chunk_groups") or [])
+    if not chunk_groups:
+        batches = list(state.get("chunk_batches") or [])
+        if not batches:
+            text = (state.get("chunks_text") or "").strip()
+            batches = [text] if text else []
+        if batches:
+            chunk_groups = [batches]
 
     response_format = graph_v1_response_format()
+    sem = asyncio.Semaphore(max(1, max_concurrent_workers))
     parts: list[dict] = []
-    for chunks_text in batches:
-        if not chunks_text.strip():
-            continue
-        data = await _extract_chunks_text(
-            chunks_text,
-            llm=llm,
-            template=template,
-            response_format=response_format,
-            max_completion_tokens=max_completion_tokens,
-            min_split_chars=min_split_chars,
-        )
-        parts.append(data)
+
+    async def run_batch(chunks_text: str) -> dict:
+        async with sem:
+            return await _extract_chunks_text(
+                chunks_text,
+                llm=llm,
+                template=template,
+                response_format=response_format,
+                max_completion_tokens=max_completion_tokens,
+                min_split_chars=min_split_chars,
+            )
+
+    for group_batches in chunk_groups:
+        tasks = [run_batch(batch) for batch in group_batches if batch.strip()]
+        if tasks:
+            group_parts = await asyncio.gather(*tasks)
+            parts.extend(group_parts)
 
     merged = merge_graph_parts(parts)
     return {
@@ -153,9 +177,17 @@ def build_graph(cfg: dict, secrets: Any) -> Any:
         graph_cfg.get("max_completion_tokens", preset_completion)
     )
     min_split_chars = int(graph_cfg.get("min_split_chars", DEFAULT_MIN_SPLIT_CHARS))
+    chunks_per_group = int(graph_cfg.get("chunks_per_group", DEFAULT_CHUNKS_PER_GROUP))
+    max_concurrent_workers = int(
+        graph_cfg.get("max_concurrent_workers", DEFAULT_MAX_CONCURRENT_WORKERS)
+    )
 
     async def load_node(state: GraphState) -> dict:
-        return await load_chunks(state, max_batch_chars=max_batch_chars)
+        return await load_chunks(
+            state,
+            max_batch_chars=max_batch_chars,
+            chunks_per_group=chunks_per_group,
+        )
 
     async def extract_node(state: GraphState) -> dict:
         return await extract_graph(
@@ -163,6 +195,7 @@ def build_graph(cfg: dict, secrets: Any) -> Any:
             llm,
             max_completion_tokens=max_completion_tokens,
             min_split_chars=min_split_chars,
+            max_concurrent_workers=max_concurrent_workers,
         )
 
     builder = StateGraph(GraphState)
