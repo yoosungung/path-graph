@@ -1,4 +1,4 @@
-.PHONY: venv test install wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
+.PHONY: venv test install build-wheel publish-wheel wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
 	ensure-namespace ensure-registry-secret k8s-apply-dev set-dev-image-tag deploy-dev build-images build-pipeline-image \
 	e2e-ingest-rag e2e-downstream test-infra-config deploy-qdrant-nebula verify-qdrant-nebula teardown-qdrant-nebula tune-node-inotify
@@ -21,6 +21,15 @@ install: venv
 
 test: install
 	cd pipeline && ../$(PY) -m pytest -q
+
+build-wheel:
+	cd pipeline && $(UV) build
+
+publish-wheel: build-wheel
+	@test -n "$(UV_PUBLISH_TOKEN)" \
+		|| { echo "error: UV_PUBLISH_TOKEN required (e.g. gh auth token)" >&2; exit 1; }
+	@version=$$($(PY) -c "import tomllib; print(tomllib.load(open('pipeline/pyproject.toml','rb'))['project']['version'])"); \
+	GH_TOKEN=$(UV_PUBLISH_TOKEN) gh release upload "v$$version" pipeline/dist/*.whl --clobber
 
 wire-dev-up:
 	./scripts/wire-dev.sh up

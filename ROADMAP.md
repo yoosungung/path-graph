@@ -77,6 +77,7 @@
 | 1.4.8 | `kubectl apply -k deploy/k8s/base` 검증 | [x] | `make bootstrap-k8s` + ingest/downstream E2E scripts |
 | 1.4.9 | CronWorkflow / 이벤트 트리거 | [x] | Console `schedule_cron` → `pg-cron-{tenant}-{source}` |
 | 1.4.10 | Filestash (Garage S3 dev UI) | [x] | `deploy/k8s/base/filestash*.yaml`, `bootstrap-filestash.sh` |
+| 1.4.11 | **Python wheel** → GitHub Release | [x] | GHA `publish-package.yml`; `make build-wheel`; release tag ↔ `pyproject.toml` version |
 
 ### 1.5 Agents (MVP 스켈레ton)
 

@@ -678,7 +678,16 @@ python -m path_graph.steps.ingest_onedrive --tenant dev --folder Documents --dry
 
 # 컨테이너 이미지 — GitHub Actions → GHCR (로컬 docker 빌드 없음)
 #   git push && make build-images
+
+# Python wheel — GitHub Release asset (agents-runtime 등 소비자용)
+make build-wheel                    # pipeline/dist/*.whl
+# Release published 또는 workflow_dispatch → GHA publish-package.yml
+#   gh release upload vX.Y.Z dist/*.whl
+# 소비: path-graph==X.Y.Z + releases/download/vX.Y.Z/*.whl URL (GitHub Packages PyPI 미지원)
+# 버전: release tag vX.Y.Z ↔ pipeline/pyproject.toml version (불일치 시 publish fail)
 ```
+
+**Wheel publish 계약**: 패키지명 `path-graph`, hatch `only-packages` wheel. agents-runtime은 editable path 복사 대신 release wheel URL pin. 로컬 sibling 개발은 agents-runtime `uv.override.toml`로 editable override.
 
 Local env: [`scripts/wire-dev.sh`](../scripts/wire-dev.sh) `env` 또는 [`.env.dev.local.example`](../.env.dev.local.example)
 

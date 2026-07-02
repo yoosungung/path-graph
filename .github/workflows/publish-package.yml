@@ -1,0 +1,55 @@
+name: Publish Python package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Verify release tag matches pyproject version
+        if: github.event_name == 'release'
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          expected="${tag#v}"
+          actual=$(python3 -c "import tomllib; print(tomllib.load(open('pipeline/pyproject.toml','rb'))['project']['version'])")
+          if [ "$expected" != "$actual" ]; then
+            echo "tag $tag expects version $expected but pyproject.toml has $actual" >&2
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build wheel
+        run: uv build
+        working-directory: pipeline
+
+      - name: Ensure GitHub Release exists
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(python3 -c "import tomllib; print(tomllib.load(open('pipeline/pyproject.toml','rb'))['project']['version'])")"
+          gh release view "$tag" 2>/dev/null || gh release create "$tag" --title "$tag" --notes "Python wheel for agents-runtime"
+
+      - name: Upload wheel to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          if [ -z "$tag" ]; then
+            tag="v$(python3 -c "import tomllib; print(tomllib.load(open('pipeline/pyproject.toml','rb'))['project']['version'])")"
+          fi
+          gh release upload "$tag" pipeline/dist/*.whl --clobber
