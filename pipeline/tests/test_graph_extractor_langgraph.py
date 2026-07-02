@@ -78,3 +78,53 @@ def test_factory_returns_compiled_graph(graph_extractor_modules):
         graph = agent_mod.factory({"langgraph": {"model": "openai:gpt-4o-mini"}}, MagicMock())
 
     assert hasattr(graph, "ainvoke")
+
+
+@pytest.mark.asyncio
+async def test_compiled_graph_ainvoke_end_to_end(graph_extractor_modules, tmp_path):
+    agent_mod, _ = graph_extractor_modules
+    pytest.importorskip("langgraph")
+
+    chunks_uri = tmp_path / "chunks.jsonl"
+    chunks_uri.write_text(
+        json.dumps({"chunk_id": "c1", "text": "Alpha relates to Beta."}) + "\n",
+        encoding="utf-8",
+    )
+
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+    bound.ainvoke.return_value = MagicMock(
+        content=json.dumps(
+            {
+                "entities": [
+                    {"id": "entity:Alpha", "name": "Alpha"},
+                    {"id": "entity:Beta", "name": "Beta"},
+                ],
+                "edges": [
+                    {
+                        "type": "EXTRACTED",
+                        "source": "entity:Alpha",
+                        "target": "entity:Beta",
+                        "confidence": 0.9,
+                    }
+                ],
+            }
+        )
+    )
+
+    with patch("graph_extractor.graph.prepare_langgraph_llm", return_value=llm):
+        graph = agent_mod.factory({"langgraph": {"model": "openai:gpt-4o-mini"}}, MagicMock())
+
+    result = await graph.ainvoke(
+        {
+            "tenant": "dev",
+            "project_id": "00000000-0000-0000-0000-000000000001",
+            "batch_id": "b1",
+            "chunks_s3": chunks_uri.as_uri(),
+        }
+    )
+
+    assert "Alpha" in result["chunks_text"]
+    assert len(result["entities"]) == 2
+    assert result["edges"][0]["target"] == "entity:Beta"

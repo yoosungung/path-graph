@@ -98,6 +98,18 @@ PIPELINE_AGENT_ACCESS_TOKEN=... ./scripts/create-path-graph-secrets.sh
 TEMPLATE=pipeline-graph ./scripts/submit-downstream-e2e.sh
 ```
 
+## LangGraph agent bundles
+
+graph-extractor·wiki-synthesizer는 agents-runtime `agent:compiled_graph` 풀에 zip 번들로 등록한다. pipeline은 artifact를 **presigned URL**로 전달 — agent pool에 Garage/S3 credential을 두지 않는다.
+
+```bash
+# agents-runtime admin 로그인 + bundle POST (AGENTS_HOST, ADMIN_PASSWORD)
+./scripts/register-agent-bundles.sh all v2
+
+# live agent downstream (LLM port-forward + 번들 등록 후)
+SKIP_AGENT=0 ./scripts/submit-downstream-e2e.sh
+```
+
 ## Filestash (Garage S3 UI)
 
 dev 클러스터에서 Garage 객체를 브라우저로 확인할 때 사용한다. `make k8s-apply-dev`에 bootstrap이 포함된다.

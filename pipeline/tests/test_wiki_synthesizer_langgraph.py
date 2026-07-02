@@ -77,3 +77,51 @@ def test_factory_returns_compiled_graph(wiki_modules):
         graph = agent_mod.factory({"langgraph": {"model": "openai:gpt-4o-mini"}}, MagicMock())
 
     assert hasattr(graph, "ainvoke")
+
+
+@pytest.mark.asyncio
+async def test_compiled_graph_ainvoke_end_to_end(wiki_modules, tmp_path):
+    agent_mod, _ = wiki_modules
+    pytest.importorskip("langgraph")
+
+    ctx_path = tmp_path / "ctx.json"
+    ctx_path.write_text(
+        json.dumps(
+            {
+                "entities": [{"name": "Alpha"}, {"name": "Beta"}],
+                "edges": [{"source": "entity:Alpha", "target": "entity:Beta"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    llm = MagicMock()
+    bound = AsyncMock()
+    llm.bind.return_value = bound
+    bound.ainvoke.return_value = MagicMock(
+        content=json.dumps(
+            {
+                "slug": "p6907e343-community-L0-abc12345",
+                "title": "Community Alpha-Beta",
+                "markdown": "# Report\n\nSummary here.",
+            }
+        )
+    )
+
+    with patch("wiki_synthesizer.graph.prepare_langgraph_llm", return_value=llm):
+        graph = agent_mod.factory({"langgraph": {"model": "openai:gpt-4o-mini"}}, MagicMock())
+
+    result = await graph.ainvoke(
+        {
+            "tenant": "didim",
+            "project_id": "7ba730bd-4a8a-40a2-8779-7c1f83069dd8",
+            "project_slug": "p_6907e343",
+            "community_id": "abc12345-0000-0000-0000-000000000099",
+            "community_level": 0,
+            "graph_context_s3": ctx_path.as_uri(),
+        }
+    )
+
+    assert "Alpha" in result["graph_context_text"]
+    assert result["pages"][0]["title"] == "Community Alpha-Beta"
+    assert result["pages"][0]["markdown"].startswith("# Report")

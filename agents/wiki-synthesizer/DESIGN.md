@@ -2,14 +2,14 @@
 
 MS GraphRAG community report 프롬프트 사상으로 project·community 단위 위키를 합성한다.
 
-## 현재 상태 (스켈레ton)
+## 현재 상태
 
 | 항목 | 상태 |
 |------|------|
 | invoke payload 계약 | [x] `WikiSynthesizerInput` — `project_id`, `project_slug` |
-| pipeline 연동 | [x] `wiki_pipeline.py` + `test_wiki.py` (mock) |
-| LLM community report 본구현 | [x] `graph.py` — graph_context → markdown page |
-| agents-runtime 번들 배포 | 수동 zip |
+| pipeline 연동 | [x] `wiki_pipeline.py` + `test_wiki.py` (agent mock) |
+| LangGraph 본구현 | [x] `graph.py` — graph_context → LLM JSON → markdown page |
+| agents-runtime 번들 배포 | [x] `./scripts/register-agent-bundles.sh` — `agent:compiled_graph` |
 
 ## 입출력
 

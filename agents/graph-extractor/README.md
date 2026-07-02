@@ -1,6 +1,6 @@
 # graph-extractor agent bundle (agents-runtime 등록용)
 
-LangGraph agent skeleton. `factory(cfg, secrets)` 엔트리포인트는 agents-runtime 번들 규약을 따른다.
+LangGraph agent bundle. `factory(cfg, secrets)` 엔트리포인트는 agents-runtime 번들 규약을 따른다.
 
 ## 등록 (agents-runtime admin)
 

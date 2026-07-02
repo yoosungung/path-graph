@@ -2,14 +2,14 @@
 
 MS GraphRAG entity/relationship extraction 프롬프트 사상을 LangGraph로 이식한다. 컴포넌트 간 계약은 [ARCHITECTURE.md](../../ARCHITECTURE.md) §2.5.
 
-## 현재 상태 (스켈레ton)
+## 현재 상태
 
 | 항목 | 상태 |
 |------|------|
 | invoke payload 계약 | [x] `GraphExtractorInput` — `project_id` (UUID) |
-| pipeline 연동 테스트 | [x] mock 위주 — `pipeline/tests/test_graph.py` |
+| pipeline 연동 | [x] `graph_pipeline.py` + `test_graph.py` (agent mock) |
 | LangGraph 본구현 | [x] `graph.py` — load chunks → LLM extract → entities/edges |
-| agents-runtime 번들 배포 | 수동 zip + admin API |
+| agents-runtime 번들 배포 | [x] `./scripts/register-agent-bundles.sh` — `agent:compiled_graph` |
 
 ## 입출력
 
