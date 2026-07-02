@@ -78,6 +78,7 @@
 | 1.4.9 | CronWorkflow / 이벤트 트리거 | [x] | Console `schedule_cron` → `pg-cron-{tenant}-{source}` |
 | 1.4.10 | Filestash (Garage S3 dev UI) | [x] | `deploy/k8s/base/filestash*.yaml`, `bootstrap-filestash.sh` |
 | 1.4.11 | **Python wheel** → GitHub Release | [x] | GHA `publish-package.yml`; `make build-wheel`; release tag ↔ `pyproject.toml` version |
+| 1.4.12 | **`path_graph.console` 공개 API** | [x] | 외부 소비자 stable facade; `admin`은 내부·Argo 전용 |
 
 ### 1.5 Agents (MVP 스켈레ton)
 

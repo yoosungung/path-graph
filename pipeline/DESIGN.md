@@ -689,6 +689,8 @@ make build-wheel                    # pipeline/dist/*.whl
 
 **Wheel publish 계약**: 패키지명 `path-graph`, hatch `only-packages` wheel. agents-runtime은 editable path 복사 대신 release wheel URL pin. 로컬 sibling 개발은 agents-runtime `uv.override.toml`로 editable override.
 
+**Console API**: 외부 import는 `path_graph.console`만 (`ProjectStore`, `api_get_binding`, `hybrid_search` 등). `path_graph.admin`은 Argo step·내부 구현.
+
 Local env: [`scripts/wire-dev.sh`](../scripts/wire-dev.sh) `env` 또는 [`.env.dev.local.example`](../.env.dev.local.example)
 
 VS Code: [`.vscode/launch.json`](../.vscode/launch.json) — `Wire: dev cluster` → `Debug: ingest_web` / `Debug: pytest`.
