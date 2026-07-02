@@ -39,6 +39,29 @@ def test_split_chunk_batches_processes_all_lines(batching_mod):
         assert f"chunk-{i}" in joined
 
 
+def test_compute_graph_extractor_budgets_for_16k(batching_mod):
+    batch_chars, completion = batching_mod.compute_graph_extractor_budgets(16384, 8192)
+    assert completion == 8192
+    assert batch_chars > 4000
+
+
+def test_resolve_graph_extractor_budgets_uses_preset_env(batching_mod, monkeypatch):
+    monkeypatch.setenv("LLM_PRESET_SGLANG_GEMMA4_CONTEXT_WINDOW", "16384")
+    monkeypatch.setenv("LLM_PRESET_SGLANG_GEMMA4_MAX_OUTPUT_TOKENS", "8192")
+    cfg = {"langgraph": {"model": "preset:SGLANG_GEMMA4"}}
+    batch_chars, completion = batching_mod.resolve_graph_extractor_budgets(cfg)
+    assert completion == 8192
+    assert batch_chars > 4000
+
+
+def test_resolve_graph_extractor_budgets_fallback_without_preset(batching_mod, monkeypatch):
+    monkeypatch.delenv("LLM_PRESET_MISSING_CONTEXT_WINDOW", raising=False)
+    cfg = {"langgraph": {"model": "preset:MISSING"}}
+    batch_chars, completion = batching_mod.resolve_graph_extractor_budgets(cfg)
+    assert batch_chars == batching_mod.DEFAULT_MAX_BATCH_CHARS
+    assert completion == batching_mod.DEFAULT_MAX_COMPLETION_TOKENS
+
+
 def test_merge_graph_parts_dedupes_entities_and_edges(batching_mod):
     merged = batching_mod.merge_graph_parts(
         [

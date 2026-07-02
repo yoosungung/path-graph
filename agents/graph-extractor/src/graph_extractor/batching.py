@@ -2,42 +2,81 @@
 
 from __future__ import annotations
 
-DEFAULT_MAX_BATCH_CHARS = 2_500
-DEFAULT_MAX_COMPLETION_TOKENS = 8_192
-DEFAULT_MIN_SPLIT_CHARS = 400
+import os
 
-_LENGTH_LIMIT_MARKERS = (
-    "length limit was reached",
-    "lengthfinishreasonerror",
-)
+DEFAULT_MAX_BATCH_CHARS = 4_000
+DEFAULT_MAX_COMPLETION_TOKENS = 4_096
+DEFAULT_MIN_SPLIT_CHARS = 400
+PROMPT_OVERHEAD_TOKENS = 3_500
+CHARS_PER_TOKEN = 3.5
+
+
+def compute_graph_extractor_budgets(
+    context_window_tokens: int,
+    max_output_tokens: int | None = None,
+) -> tuple[int, int]:
+    """Derive batch/completion ceilings from a preset context window."""
+    completion = max_output_tokens or min(8_192, context_window_tokens // 2)
+    completion = min(completion, context_window_tokens - PROMPT_OVERHEAD_TOKENS - 256)
+    input_tokens = max(256, context_window_tokens - completion - PROMPT_OVERHEAD_TOKENS)
+    max_batch_chars = max(500, int(input_tokens * CHARS_PER_TOKEN))
+    return max_batch_chars, max(completion, 256)
+
+
+def _read_preset_limits(preset_name: str) -> tuple[int | None, int | None]:
+    try:
+        from runtime_common.providers.langgraph import read_llm_preset_limits
+
+        return read_llm_preset_limits(preset_name)
+    except ImportError:
+        prefix = f"LLM_PRESET_{preset_name}"
+        ctx_raw = os.environ.get(f"{prefix}_CONTEXT_WINDOW", "").strip()
+        out_raw = os.environ.get(f"{prefix}_MAX_OUTPUT_TOKENS", "").strip()
+        context = int(ctx_raw) if ctx_raw else None
+        max_output = int(out_raw) if out_raw else None
+        return context, max_output
+
+
+def _extract_preset_name(model_spec: str | None) -> str | None:
+    try:
+        from runtime_common.providers.langgraph import extract_preset_name
+
+        return extract_preset_name(model_spec)
+    except ImportError:
+        if model_spec and model_spec.startswith("preset:"):
+            name = model_spec[len("preset:") :].strip()
+            return name or None
+        return None
+
+
+def resolve_graph_extractor_budgets(cfg: dict) -> tuple[int, int]:
+    """Resolve default batch/completion budgets from preset env or conservative fallback."""
+    model_spec = (cfg.get("langgraph") or {}).get("model")
+    preset = _extract_preset_name(model_spec)
+    if preset:
+        context_window, max_output = _read_preset_limits(preset)
+        if context_window:
+            return compute_graph_extractor_budgets(context_window, max_output)
+    return DEFAULT_MAX_BATCH_CHARS, DEFAULT_MAX_COMPLETION_TOKENS
 
 
 def is_length_limit_error(exc: BaseException) -> bool:
-    msg = str(exc).lower()
-    return any(marker in msg for marker in _LENGTH_LIMIT_MARKERS)
+    message = str(exc).lower()
+    return "length limit" in message or "lengthfinishreason" in message
 
 
 def split_text_half(text: str) -> tuple[str, str]:
-    """Split chunk text near the middle, preferring paragraph boundaries."""
     stripped = text.strip()
     if not stripped:
         return "", ""
-    if len(stripped) < 2:
-        return stripped, ""
-
-    mid = len(stripped) // 2
-    window_start = max(0, mid - 200)
-    window = stripped[window_start : min(len(stripped), mid + 200)]
-    para_idx = window.find("\n\n")
-    if para_idx >= 0:
-        split_at = window_start + para_idx + 2
-        left = stripped[:split_at].strip()
-        right = stripped[split_at:].strip()
-        if left and right:
-            return left, right
-
-    left = stripped[:mid].strip()
-    right = stripped[mid:].strip()
+    midpoint = len(stripped) // 2
+    breaks = [i for i in range(len(stripped)) if stripped.startswith("\n\n", i)]
+    if breaks:
+        split_at = min(breaks, key=lambda index: abs(index - midpoint))
+    else:
+        split_at = midpoint
+    left = stripped[:split_at].strip()
+    right = stripped[split_at:].strip()
     return left, right
 
 

@@ -12,6 +12,7 @@ from graph_extractor.batching import (
     DEFAULT_MIN_SPLIT_CHARS,
     is_length_limit_error,
     merge_graph_parts,
+    resolve_graph_extractor_budgets,
     split_chunk_batches,
     split_text_half,
 )
@@ -143,9 +144,10 @@ def build_graph(cfg: dict, secrets: Any) -> Any:
     _ = secrets
     llm = prepare_langgraph_llm(cfg)
     graph_cfg = _graph_extractor_cfg(cfg)
-    max_batch_chars = int(graph_cfg.get("max_batch_chars", DEFAULT_MAX_BATCH_CHARS))
+    preset_batch, preset_completion = resolve_graph_extractor_budgets(cfg)
+    max_batch_chars = int(graph_cfg.get("max_batch_chars", preset_batch))
     max_completion_tokens = int(
-        graph_cfg.get("max_completion_tokens", DEFAULT_MAX_COMPLETION_TOKENS)
+        graph_cfg.get("max_completion_tokens", preset_completion)
     )
     min_split_chars = int(graph_cfg.get("min_split_chars", DEFAULT_MIN_SPLIT_CHARS))
 
