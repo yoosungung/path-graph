@@ -20,10 +20,19 @@ def parse_json_object(text: str) -> dict:
     return data
 
 
-async def invoke_json_llm(llm: Any, prompt: str, *, response_format: dict) -> dict:
+async def invoke_json_llm(
+    llm: Any,
+    prompt: str,
+    *,
+    response_format: dict,
+    max_tokens: int | None = None,
+) -> dict:
     from langchain_core.messages import HumanMessage
 
-    bound = llm.bind(response_format=response_format)
+    bind_kwargs: dict[str, Any] = {"response_format": response_format}
+    if max_tokens is not None:
+        bind_kwargs["max_tokens"] = max_tokens
+    bound = llm.bind(**bind_kwargs)
     response = await bound.ainvoke([HumanMessage(content=prompt)])
     content = response.content if hasattr(response, "content") else str(response)
     return parse_json_object(content)

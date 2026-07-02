@@ -9,7 +9,8 @@ Return JSON only (output is constrained to graph_v1 schema by the API):
 Rules:
 - Use entity ids prefixed with entity:
 - Prefer EXTRACTED for explicit mentions; INFERRED only when strongly implied
-- Keep descriptions concise
+- Keep descriptions concise (one short sentence)
+- Extract only from the chunks below (one batch); omit entities with no support in this batch
 
 Chunks:
 {chunks}

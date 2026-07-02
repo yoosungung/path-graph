@@ -58,5 +58,8 @@ async def test_extract_graph_binds_json_schema(graph_extractor_modules):
     )
 
     out = await graph_mod.extract_graph({"chunks_text": "Alpha relates to Beta."}, llm)
-    llm.bind.assert_called_once_with(response_format=schema_mod.graph_v1_response_format())
+    llm.bind.assert_called_once_with(
+        response_format=schema_mod.graph_v1_response_format(),
+        max_tokens=graph_mod.DEFAULT_MAX_COMPLETION_TOKENS,
+    )
     assert out["entities"][0]["name"] == "Alpha"
