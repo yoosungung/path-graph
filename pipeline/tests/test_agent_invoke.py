@@ -8,6 +8,7 @@ from path_graph.steps.agent_invoke import AgentInvokeError, invoke_agent
 
 def test_invoke_agent_unwraps_output_envelope(monkeypatch):
     monkeypatch.setenv("PIPELINE_AGENT_ACCESS_TOKEN", "tok")
+    monkeypatch.setenv("PIPELINE_AGENT_INVOKE_MODE", "sync")
     from path_graph.config import get_settings
 
     get_settings.cache_clear()
@@ -40,6 +41,7 @@ def test_invoke_agent_unwraps_output_envelope(monkeypatch):
 
 def test_invoke_agent_raises_without_token(monkeypatch):
     monkeypatch.delenv("PIPELINE_AGENT_ACCESS_TOKEN", raising=False)
+    monkeypatch.setenv("PIPELINE_AGENT_INVOKE_MODE", "sync")
     from path_graph.config import get_settings
 
     get_settings.cache_clear()

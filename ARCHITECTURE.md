@@ -230,20 +230,36 @@ RLS: `tenant` = session `app.tenant`. 마이그레이션: `path_graph.migrations
 
 ### 2.5 Agent invoke (요약)
 
-- **Graph Extractor**:
-  ```json
-  POST {ENVOY}/v1/agents/invoke
-  { "agent": "graph-extractor", "input": { "tenant", "project_id", "batch_id", "chunks_s3" }, "session_id" }
-  ```
-- **Wiki Synthesizer (GraphRAG Community 기반)**:
-  ```json
-  POST {ENVOY}/v1/agents/invoke
-  { "agent": "wiki-synthesizer", "input": { "tenant", "project_id", "project_slug", "community_id", "community_level", "graph_context_s3" }, "session_id" }
-  ```
+**Async job (기본)** — pool HTTP 홀딩 없음:
+
+```json
+POST {ENVOY}/v1/agents/jobs
+{
+  "agent": "graph-extractor | wiki-synthesizer",
+  "input": { … },
+  "session_id": "…",
+  "callback": {
+    "argo": {
+      "namespace": "path-graph",
+      "workflow": "{workflow.name}",
+      "node_field_selector": "inputs.parameters.job-id.value={job_id}"
+    }
+  }
+}
+→ { "job_id", "status": "pending", "session_id" }
+
+GET {ENVOY}/v1/agents/jobs/{job_id}?agent={agent}
+→ { "job_id", "status": "pending|running|succeeded|failed", "output"?, "error"? }
+```
+
+성공 시 `output`은 동기 invoke와 동일 envelope. pipeline은 `jobs/{tenant}/{job_id}/manifest.json`(S3)에도 결과를 기록할 수 있다.
+
+**Graph Extractor input**: `{ "tenant", "project_id", "batch_id", "chunks_s3" }`  
+**Wiki Synthesizer input**: `{ "tenant", "project_id", "project_slug", "community_id", "community_level", "graph_context_s3" }`
 
 정본 스키마: `pipeline/src/path_graph/contracts/schemas.py`, Knowledge Binding: `contracts/project.py`.
 
-비동기·poll·semaphore 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md).
+비동기·poll·Argo suspend 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md).
 
 ### 2.6 공통 JSON 스키마
 

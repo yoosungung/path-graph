@@ -10,7 +10,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| pipeline 패키지 | v0.1.0, `make test` **208 tests** (2026-07) |
+| pipeline 패키지 | v0.1.0, `make test` **218 tests** (2026-07) |
 | 로컬 ingest | CLI — web / file / SharePoint / GDrive / OneDrive → parse → **blocks** → chunk → (선택) RAG |
 | 파싱·청킹 | markitdown/VL OCR → `BLOCKS_EXTRACTOR=md_heuristic` → `content.json` → `chunk_from_blocks` (D3) |
 | k8s dev 클러스터 | `runtime`·`qdrant`·`nebula` port-forward (`wire-dev.sh`) · Qdrant vector 검색 E2E 검증 |
@@ -147,7 +147,7 @@
 | 3.1.3 | graph_context artifact | [x] | |
 | 3.1.4 | `graphrag_pipeline` / WF `pipeline-graphrag` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
 | 3.1.5 | Graph-enhanced Wiki **프롬프트** (MS GraphRAG 템플릿) | [x] | `community_report.txt` |
-| 3.1.6 | graph-extractor / wiki-synthesizer **LangGraph** 본구현 | [~] | `StateGraph` + LLM JSON; agent pool S3 read env |
+| 3.1.6 | graph-extractor / wiki-synthesizer **LangGraph** 본구현 | [x] | `StateGraph` load→LLM JSON schema; artifact는 presigned HTTP(`agent_artifact_uri`) — agent pool S3 credential 불필요 |
 
 ### 3.2 agents-runtime 연동
 
@@ -155,7 +155,7 @@
 |---|---|---|---|
 | 3.2.0 | **Agent `knowledge_project_ids[]` + Knowledge Binding resolve** | [x] | runtime `config.general` 저장 · invoke마다 `api_get_binding` · MCP args scope · multi-project `search` RRF |
 | 3.2.1 | VFS wiki mount | [x] | `wiki.vfs_mount` + S3 read-only backend; agents-runtime PG-3 E2E [`test_wiki_vfs.sh`](../agents-runtime/deploy/examples/tests/e2e/test_wiki_vfs.sh) |
-| 3.2.2 | async job API + Argo **suspend/resume** | [ ] | Phase 1은 extended sync poll |
+| 3.2.2 | async job API + Argo **suspend/resume** | [x] | `POST/GET /v1/agents/jobs` · pool `/jobs` · `async_poll` 기본 · `callback.argo` resume |
 
 ### 3.3 검색 · 파싱 고도화
 

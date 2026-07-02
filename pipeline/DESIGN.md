@@ -96,26 +96,58 @@ collect / ingest_web
 
 동기 `POST /v1/agents/invoke`를 수 분간 홀딩하면 Argo worker가 타임아웃·OOM·LLM rate limit에 취약하다.
 
-### 패턴 (Phase 1)
+### 패턴 (Phase 2 — 기본)
 
-1. **Submit**: `invoke` 1회 — `session_id = f"{workflow_uid}:{step}:{batch_idx}"` (멱등·추적).
-2. **Poll**: agents-runtime이 동기 SSE/JSON 응답을 끝까지 반환하는 동안, **별도 lightweight poll loop**가 아니라 **단일 invoke with extended client timeout** + **Argo `activeDeadlineSeconds`** (기본 900s, graph/wiki step).
-3. **Argo `suspend`**: Phase 2 — agents-runtime에 async job API가 생기면 `suspend` + callback resume으로 전환. ARCHITECTURE §1 계약은 유지.
+1. **Submit**: `POST {ENVOY}/v1/agents/jobs` — 동기 `/v1/agents/invoke` 대신 `job_id` 즉시 수신. `session_id = f"{workflow_uid}:{step}:{batch_idx}"` (멱등·추적).
+2. **Poll**: `GET {ENVOY}/v1/agents/jobs/{job_id}?agent=…` — 5s 간격, max 1800s. Argo worker는 agent pool HTTP 연결을 홀딩하지 않는다.
+3. **Argo `suspend` + resume** (`PIPELINE_AGENT_INVOKE_MODE=async_suspend`): submit body `callback.argo`에 WF name/namespace/`node_field_selector` 전달 → job 완료 시 agents-runtime이 Argo `PUT …/resume`(또는 실패 시 `…/stop`) 호출. WF 템플릿에 `suspend: {}` step이 선행해야 한다.
+
+동기 `/v1/agents/invoke`는 `PIPELINE_AGENT_INVOKE_MODE=sync`로만 유지(디버그·로컬).
+
+**Argo suspend 템플릿 (split step)** — graphrag 단일 container 대신:
+
+```yaml
+steps:
+  - - name: submit-agent
+      template: pipeline-submit-agent-job   # POST /v1/agents/jobs + callback.argo
+  - - name: wait-agent
+      template: suspend                     # agents-runtime job 완료 시 PUT …/resume
+  - - name: fetch-agent
+      template: pipeline-poll-agent-job     # GET /v1/agents/jobs/{id}
+```
+
+`suspend` 노드는 `inputs.parameters.job-id`를 `node_field_selector`로 resume 타깃에 넘긴다. monolithic `pipeline-graphrag` step은 **`async_poll`**(기본)을 사용한다.
 
 ### 타임아웃 (기본값)
 
 | 계층 | 값 | 비고 |
 |---|---|---|
-| HTTP client read | 600s | graph-extractor / wiki-synthesizer |
-| Argo step `activeDeadlineSeconds` | 900s | client + S3 I/O 여유 |
-| Poll interval (Phase 2) | 5s | async job 도입 시 |
-| Max wait | 1800s | 초과 시 `failed` + DLQ, retryable |
+| Job poll interval | 5s | `PIPELINE_AGENT_JOB_POLL_INTERVAL_S` |
+| Job max wait | 1800s | `PIPELINE_AGENT_JOB_MAX_WAIT_S` — 초과 시 `failed` + DLQ, retryable |
+| Argo step `activeDeadlineSeconds` | 1800s | poll 루프 + S3 I/O 여유 (graphrag) |
+| Sync invoke (legacy) | 600s | `PIPELINE_AGENT_INVOKE_MODE=sync` only |
 
 ### 재시도
 
 - **429 / 503**: exponential backoff, max 5회, jitter.
 - **4xx (입력 오류)**: retry 금지 → `dead_letter`.
 - invoke payload에 항상 `tenant`, `document_id` 또는 `batch_id`, `idempotency_key` (= content_hash 또는 batch manifest hash).
+
+### LangGraph agents (3.1.6)
+
+`agents/graph-extractor`, `agents/wiki-synthesizer` — `StateGraph` 2-node workflow, `agent:compiled_graph` 풀.
+
+| agent | nodes | structured output |
+|---|---|---|
+| graph-extractor | `load` → `extract` | `graph_v1` JSON schema (`entities[]`, `edges[]`) |
+| wiki-synthesizer | `load` → `synthesize` | `wiki_v1` JSON schema (`slug`, `title`, `markdown`) |
+
+- **artifact I/O**: pipeline이 `BlobStore.agent_artifact_uri(key)`로 **presigned HTTPS**(S3) 또는 `file://`(local) URI를 invoke input에 넣는다. agent pool은 `httpx` GET만 사용 — **S3 credential env 불필요**.
+- **LLM**: `runtime_common.providers.langgraph.prepare_langgraph_llm(cfg)` + `llm.bind(response_format=...)`.
+- **번들 등록**: `./scripts/register-agent-bundles.sh {graph-extractor|wiki-synthesizer|all} v2` — [deploy/SETUP.md](../deploy/SETUP.md#langgraph-agent-bundles).
+- **테스트**: `test_graph_extractor_langgraph.py`, `test_wiki_synthesizer_langgraph.py`, `test_agent_artifact_io.py`, `test_agent_bundles.py`.
+
+클러스터 downstream E2E는 LLM·번들 등록 전제 — `submit-downstream-e2e.sh` 기본 `skip_agent=1`; live agent 검증은 번들 등록 후 `skip_agent=0`.
 
 ---
 
