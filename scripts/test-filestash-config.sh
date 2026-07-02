@@ -70,5 +70,8 @@ grep -q 'APPLICATION_URL="filestash.k8s-test"' "${BOOTSTRAP}" \
 
 grep -q 'APPLICATION_URL="http://' "${BOOTSTRAP}" \
   && fail "bootstrap-filestash.sh must not prefix APPLICATION_URL with http:// (Filestash redirect bug)"
+grep -q 'EXISTING_ADMIN_HASH_RAW' "${BOOTSTRAP}" \
+  || fail "bootstrap-filestash.sh must preserve existing filestash-env ADMIN_PASSWORD when FILESTASH_ADMIN_PASSWORD unset"
 
 ok "bootstrap-filestash.sh sets APPLICATION_URL to bare hostname"
+ok "bootstrap-filestash.sh preserves filestash-env ADMIN_PASSWORD on re-apply"

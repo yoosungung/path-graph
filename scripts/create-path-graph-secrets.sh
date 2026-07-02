@@ -4,7 +4,8 @@
 # Usage:
 #   ./scripts/create-path-graph-secrets.sh
 #   PIPELINE_AGENT_ACCESS_TOKEN=... ./scripts/create-path-graph-secrets.sh
-#   S3_REGION=garage (optional — default: runtime/s3-creds S3_REGION)
+#   (unset) ./scripts/create-path-graph-secrets.sh  # preserves existing path-graph-env token + S3_REGION
+#   S3_REGION=garage (optional — override; else existing path-graph-env, then runtime/s3-creds, then garage)
 #
 # Reads: runtime/postgres-credentials, runtime/s3-creds, qdrant/qdrant-apikey
 # Writes: path-graph/path-graph-env, path-graph/s3-creds (copy for Argo artifacts)
@@ -61,7 +62,17 @@ S3_REGION_RUNTIME=""
 if [[ -n "$S3_REGION_RAW" ]]; then
   S3_REGION_RUNTIME="$(b64dec "$S3_REGION_RAW")"
 fi
-S3_REGION="${S3_REGION:-${S3_REGION_RUNTIME:-garage}}"
+S3_REGION_FROM_ENV="${S3_REGION:-}"
+S3_REGION="${S3_REGION:-}"
+if [[ -z "$S3_REGION" ]]; then
+  EXISTING_REGION_RAW="$(kubectl -n "$TARGET_NS" get secret path-graph-env \
+    -o jsonpath='{.data.S3_REGION}' 2>/dev/null || true)"
+  if [[ -n "$EXISTING_REGION_RAW" ]]; then
+    S3_REGION="$(b64dec "$EXISTING_REGION_RAW")"
+  else
+    S3_REGION="${S3_REGION_RUNTIME:-garage}"
+  fi
+fi
 
 QDRANT_KEY="$(b64dec "$(kubectl -n "$QDRANT_NS" get secret qdrant-apikey -o jsonpath='{.data.api-key}')")"
 if [[ -z "$QDRANT_KEY" ]]; then
@@ -70,6 +81,13 @@ if [[ -z "$QDRANT_KEY" ]]; then
 fi
 
 AGENT_TOKEN="${PIPELINE_AGENT_ACCESS_TOKEN:-}"
+if [[ -z "$AGENT_TOKEN" ]]; then
+  EXISTING_TOKEN_RAW="$(kubectl -n "$TARGET_NS" get secret path-graph-env \
+    -o jsonpath='{.data.PIPELINE_AGENT_ACCESS_TOKEN}' 2>/dev/null || true)"
+  if [[ -n "$EXISTING_TOKEN_RAW" ]]; then
+    AGENT_TOKEN="$(b64dec "$EXISTING_TOKEN_RAW")"
+  fi
+fi
 
 kubectl -n "$TARGET_NS" create secret generic path-graph-env \
   --from-literal=PATH_GRAPH_DSN="$PG_DSN" \
@@ -96,4 +114,9 @@ kubectl -n "$TARGET_NS" create secret generic path-graph-env \
 echo "Secrets applied in namespace ${TARGET_NS}: path-graph-env, s3-creds"
 if [[ -z "$AGENT_TOKEN" ]]; then
   echo "note: PIPELINE_AGENT_ACCESS_TOKEN empty — graph/wiki steps need token (wire-dev.sh env)"
+elif [[ -z "${PIPELINE_AGENT_ACCESS_TOKEN:-}" ]]; then
+  echo "note: preserved existing PIPELINE_AGENT_ACCESS_TOKEN from path-graph-env"
+fi
+if [[ -z "$S3_REGION_FROM_ENV" && -n "${EXISTING_REGION_RAW:-}" ]]; then
+  echo "note: preserved existing S3_REGION from path-graph-env"
 fi

@@ -24,5 +24,15 @@ grep -q 'from-literal=S3_REGION=' "${SCRIPT}" \
   || fail "create-path-graph-secrets.sh must pass --from-literal=S3_REGION"
 grep -q 'S3_REGION=garage' "${SETUP}" \
   || fail "SETUP.md must document S3_REGION=garage troubleshooting"
+grep -q 'path-graph-env.*PIPELINE_AGENT_ACCESS_TOKEN\|PIPELINE_AGENT_ACCESS_TOKEN.*path-graph-env\|기존.*path-graph-env\|preserv' "${SETUP}" \
+  || fail "SETUP.md must document PIPELINE_AGENT_ACCESS_TOKEN preservation on re-apply"
+grep -q 'path-graph-env' "${SCRIPT}" \
+  && grep -q 'PIPELINE_AGENT_ACCESS_TOKEN' "${SCRIPT}" \
+  && grep -qE 'get secret path-graph-env|jsonpath=.*PIPELINE_AGENT_ACCESS_TOKEN' "${SCRIPT}" \
+  || fail "create-path-graph-secrets.sh must preserve existing PIPELINE_AGENT_ACCESS_TOKEN from path-graph-env"
+grep -q 'EXISTING_REGION_RAW' "${SCRIPT}" \
+  || fail "create-path-graph-secrets.sh must preserve existing S3_REGION from path-graph-env"
 
 ok "create-path-graph-secrets.sh includes S3_REGION for agent presigned URLs"
+ok "create-path-graph-secrets.sh preserves PIPELINE_AGENT_ACCESS_TOKEN on re-apply"
+ok "create-path-graph-secrets.sh preserves S3_REGION on re-apply"
