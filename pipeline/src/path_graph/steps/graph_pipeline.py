@@ -5,6 +5,7 @@ from collections import defaultdict
 from path_graph.config import get_settings
 from path_graph.contracts.schemas import GraphExtractorInput, unwrap_agent_graph_output
 from path_graph.graph.chunk_partition import make_nebula_store
+from path_graph.graph.entity_vid import normalize_semantic_graph
 from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.ids import nebula_space_name
 from path_graph.steps.agent_invoke import extract_wikilinks, invoke_agent
@@ -48,17 +49,10 @@ def graph_extract_semantic(
     return unwrap_agent_graph_output(invoke_agent("graph-extractor", inp, session_id))
 
 
-def _entity_id(name: str) -> str:
-    return f"entity:{name}"
-
-
 def semantic_batch_entity_ids(semantic: dict) -> set[str] | None:
     """Entity ids from graph-extractor output; None when empty (wikilink fallback)."""
-    ids = {
-        str(ent["id"])
-        for ent in (semantic.get("entities") or [])
-        if ent.get("id")
-    }
+    normalized = normalize_semantic_graph(unwrap_agent_graph_output(semantic))
+    ids = {str(ent["id"]) for ent in normalized.get("entities") or []}
     return ids if ids else None
 
 
@@ -67,31 +61,12 @@ def _upsert_semantic_edges(
     space: str,
     semantic: dict,
 ) -> None:
-    semantic = unwrap_agent_graph_output(semantic)
-    entities = semantic.get("entities") or []
+    normalized = normalize_semantic_graph(unwrap_agent_graph_output(semantic))
+    entities = normalized.get("entities") or []
     if entities:
         nebula.upsert_entities(space, entities)
 
-    edges = semantic.get("edges") or []
-    entity_edges: list[dict] = []
-    for edge in edges:
-        src = edge.get("source")
-        tgt = edge.get("target")
-        if not src or not tgt:
-            continue
-        if not str(src).startswith("entity:"):
-            src = _entity_id(str(src))
-        if not str(tgt).startswith("entity:"):
-            tgt = _entity_id(str(tgt))
-        entity_edges.append(
-            {
-                "type": edge.get("type", "EXTRACTED"),
-                "source": src,
-                "target": tgt,
-                "confidence": edge.get("confidence", 1.0),
-                "description": edge.get("description", ""),
-            }
-        )
+    entity_edges = normalized.get("edges") or []
     if entity_edges:
         nebula.upsert_edges(space, entity_edges)
 

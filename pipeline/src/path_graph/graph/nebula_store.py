@@ -4,6 +4,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from path_graph.graph.entity_vid import (
+    entity_vid,
+    normalize_entity_record,
+    resolve_entity_vid,
+)
+
 
 @dataclass
 class HierarchicalCluster:
@@ -151,8 +157,8 @@ class NebulaGraphStore:
         if self._memory is not None:
             mem = self._mem(space)
             for ent in entities:
-                eid = ent.get("id") or f"entity:{ent['name']}"
-                mem.entities[eid] = ent
+                norm = normalize_entity_record(ent)
+                mem.entities[norm["id"]] = norm
             return
         if not entities:
             return
@@ -161,9 +167,10 @@ class NebulaGraphStore:
             self._ensure_live_schema(sess, space)
             self._execute(sess, f"USE {space};")
             for ent in entities:
-                eid = ent.get("id") or f"entity:{ent['name']}"
-                name = ent.get("name", "")
-                desc = ent.get("description", "")
+                norm = normalize_entity_record(ent)
+                eid = norm["id"]
+                name = norm["name"]
+                desc = norm["description"]
                 self._execute(
                     sess,
                     "INSERT VERTEX IF NOT EXISTS Entity(name, description) "
@@ -175,7 +182,14 @@ class NebulaGraphStore:
     def upsert_edges(self, space: str, edges: list[dict[str, Any]]) -> None:
         if self._memory is not None:
             mem = self._mem(space)
-            mem.edges.extend(edges)
+            for edge in edges:
+                mem.edges.append(
+                    {
+                        **edge,
+                        "source": resolve_entity_vid(str(edge["source"])),
+                        "target": resolve_entity_vid(str(edge["target"])),
+                    }
+                )
             return
         if not edges:
             return
@@ -185,8 +199,8 @@ class NebulaGraphStore:
             self._execute(sess, f"USE {space};")
             for edge in edges:
                 etype = edge.get("type", "EXTRACTED")
-                src = edge["source"]
-                tgt = edge["target"]
+                src = resolve_entity_vid(str(edge["source"]))
+                tgt = resolve_entity_vid(str(edge["target"]))
                 conf = edge.get("confidence", 1.0)
                 self._execute(
                     sess,
@@ -201,7 +215,7 @@ class NebulaGraphStore:
             mem = self._mem(space)
             mem.chunks.add(chunk_id)
             for ent in entities:
-                eid = f"entity:{ent}"
+                eid = entity_vid(ent)
                 mem.entities.setdefault(eid, {"id": eid, "name": ent})
                 mem.mentions.append((chunk_id, eid))
             return
@@ -216,7 +230,7 @@ class NebulaGraphStore:
                 f"INSERT VERTEX IF NOT EXISTS Chunk() VALUES {_ngql_string(chunk_id)}:();",
             )
             for ent in entities:
-                eid = f"entity:{ent}"
+                eid = entity_vid(ent)
                 self._execute(
                     sess,
                     "INSERT VERTEX IF NOT EXISTS Entity(name) "
@@ -344,7 +358,33 @@ class NebulaGraphStore:
         if self._memory is not None:
             mem = self._memory.get(space, _MemorySpace())
             return [mem.entities[eid] for eid in entity_ids if eid in mem.entities]
-        return [{"id": eid, "name": eid.removeprefix("entity:")} for eid in entity_ids]
+        if not entity_ids:
+            return []
+        sess = self._session()
+        try:
+            self._execute(sess, f"USE {space};")
+            ids_literal = ", ".join(_ngql_string(eid) for eid in entity_ids)
+            result = sess.execute(
+                "MATCH (v:Entity) "
+                f"WHERE id(v) IN [{ids_literal}] "
+                "RETURN id(v) AS id, v.Entity.name AS name, v.Entity.description AS description;"
+            )
+            if not result.is_succeeded():
+                return [
+                    {"id": eid, "name": "", "description": ""} for eid in entity_ids
+                ]
+            by_id: dict[str, dict[str, Any]] = {}
+            for row in result.rows():
+                values = row.values
+                eid = _decode_value(values[0])
+                by_id[eid] = {
+                    "id": eid,
+                    "name": _decode_value(values[1]) if len(values) > 1 else "",
+                    "description": _decode_value(values[2]) if len(values) > 2 else "",
+                }
+            return [by_id.get(eid, {"id": eid, "name": "", "description": ""}) for eid in entity_ids]
+        finally:
+            sess.release()
 
     def get_relationships(
         self, space: str, entity_ids: set[str]

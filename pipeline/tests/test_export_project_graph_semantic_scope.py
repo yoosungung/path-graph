@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from path_graph.graph.entity_vid import entity_vid
 from path_graph.graph.nebula_store import NebulaGraphStore
 
 
@@ -10,6 +11,8 @@ def test_export_semantic_only_with_batch_entity_ids() -> None:
     memory: dict = {}
     nebula = NebulaGraphStore("h", 1, "u", "p", memory=memory)
     space = "path_graph_dev_default"
+    pm_vid = entity_vid("PM")
+    project_vid = entity_vid("프로젝트")
     nebula.ensure_space(space)
     nebula.upsert_entities(
         space,
@@ -33,10 +36,10 @@ def test_export_semantic_only_with_batch_entity_ids() -> None:
     scoped = nebula.export_project_graph(
         space,
         batch_chunk_ids={"chunk-no-wikilink"},
-        batch_entity_ids={"entity:PM", "entity:프로젝트"},
+        batch_entity_ids={pm_vid, project_vid},
     )
     assert len(scoped) == 1
-    assert scoped[0][:2] == ("entity:PM", "entity:프로젝트")
+    assert scoped[0][:2] == (pm_vid, project_vid)
 
 
 def test_export_mentions_only_without_batch_entity_ids() -> None:
@@ -53,7 +56,7 @@ def test_export_mentions_only_without_batch_entity_ids() -> None:
     )
     assert len(scoped) >= 1
     endpoints = {scoped[0][0], scoped[0][1]}
-    assert endpoints <= {"entity:Alpha", "entity:Beta"}
+    assert endpoints <= {entity_vid("Alpha"), entity_vid("Beta")}
 
 
 def test_export_semantic_batch_entity_ids_ignores_empty_mentions_scope() -> None:
@@ -61,6 +64,8 @@ def test_export_semantic_batch_entity_ids_ignores_empty_mentions_scope() -> None
     memory: dict = {}
     nebula = NebulaGraphStore("h", 1, "u", "p", memory=memory)
     space = "path_graph_dev_default"
+    a_vid = entity_vid("A")
+    b_vid = entity_vid("B")
     nebula.ensure_space(space)
     nebula.upsert_edges(
         space,
@@ -83,6 +88,6 @@ def test_export_semantic_batch_entity_ids_ignores_empty_mentions_scope() -> None
     with_semantic_scope = nebula.export_project_graph(
         space,
         batch_chunk_ids={"plain-chunk"},
-        batch_entity_ids={"entity:A", "entity:B"},
+        batch_entity_ids={a_vid, b_vid},
     )
     assert len(with_semantic_scope) == 1

@@ -1,6 +1,6 @@
 [project]
 name = "path-graph"
-version = "0.1.1"
+version = "0.1.2"
 description = "RAG / Graph / Wiki knowledge pipeline"
 requires-python = ">=3.12,<3.13"
 dependencies = [

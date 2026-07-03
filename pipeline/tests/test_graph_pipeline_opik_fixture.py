@@ -10,6 +10,7 @@ import pytest
 
 from path_graph.config import Settings
 from path_graph.contracts.schemas import unwrap_agent_graph_output
+from path_graph.graph.entity_vid import entity_vid
 from path_graph.graph.nebula_store import NebulaGraphStore, _ngql_string
 from path_graph.steps.graph_pipeline import run_graph_pipeline
 from constants import PROJECT_ID
@@ -89,9 +90,10 @@ def test_graph_pipeline_upserts_opik_fixture_to_nebula(
     space = memory["path_graph_didim_default"]
     assert len(space.entities) == 7
     assert len(space.edges) == 5
-    assert "entity:현장대리인(PM)" in space.entities
+    assert entity_vid("현장대리인(PM)") in space.entities
     assert any(
-        edge["source"] == "entity:프로젝트" and edge["target"] == "entity:프로젝트 지원비"
+        edge["source"] == entity_vid("프로젝트")
+        and edge["target"] == entity_vid("프로젝트 지원비")
         for edge in space.edges
     )
 
@@ -110,6 +112,6 @@ def test_upsert_opik_fixture_entities_generates_korean_ngql() -> None:
 
     joined = "\n".join(call.args[0] for call in session.execute.call_args_list)
     ent = graph_v1["entities"][2]
-    eid = _ngql_string(ent["id"])
+    eid = _ngql_string(entity_vid(ent["name"]))
     assert f'VALUES {eid}:(' in joined
     assert "현장대리인(PM)" in joined
