@@ -15,7 +15,7 @@ fail() { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
 
 MANIFEST="${INFRA_DIR}/manifests/nebula-studio.yaml"
 INGRESS="${INFRA_DIR}/manifests/ingress-routes.yaml"
-INGRESS_SNIPPET="${INFRA_DIR}/helm/values/ingress-nginx-qdrant-nebula.snippet.yaml"
+INGRESS_SNIPPET="${INFRA_DIR}/helm/values/ingress-nginx-nebula.snippet.yaml"
 
 [[ -f "${MANIFEST}" ]] || fail "Missing ${MANIFEST}"
 

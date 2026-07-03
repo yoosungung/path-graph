@@ -4,7 +4,6 @@ from path_graph.graph.nebula_store import NebulaGraphStore, _MemorySpace
 from path_graph.lifecycle.compensation import compensate_document_index
 from path_graph.lifecycle.purge import delete_project, purge_project
 from path_graph.meta.pg import iter_migration_sql
-from path_graph.rag.qdrant_store import QdrantStore
 from path_graph.storage.blob import LocalBlobStore
 from constants import PROJECT_ID
 
@@ -16,6 +15,7 @@ def test_rls_migration_includes_policies():
     assert "reconcile_reports" in sql
     assert "pipeline_runs" in sql
     assert "started_at TIMESTAMPTZ" in sql
+    assert "embedding vector(1024)" in sql
 
 
 def test_local_blob_delete_prefix(tmp_path):
@@ -24,15 +24,6 @@ def test_local_blob_delete_prefix(tmp_path):
     store.put_bytes("raw/t/p/s/h/f2", b"y")
     assert store.delete_prefix("raw/t/") == 2
     assert store.list_keys("raw/") == []
-
-
-def test_qdrant_delete_by_document_id():
-    client = MagicMock()
-    client.collection_exists.return_value = True
-    store = QdrantStore(client, __import__("path_graph.config", fromlist=["Settings"]).Settings(embedding_dim=4))
-    n = store.delete_by_document_id("dev", "default", "doc-1", project_id=PROJECT_ID)
-    assert n >= 1
-    client.delete.assert_called_once()
 
 
 def test_nebula_memory_delete_chunks():
@@ -45,10 +36,9 @@ def test_nebula_memory_delete_chunks():
     assert store.list_chunk_vertices(space) == []
 
 
-@patch("path_graph.lifecycle.compensation.make_qdrant_store")
 @patch("path_graph.lifecycle.compensation.make_nebula_store")
 @patch("path_graph.lifecycle.compensation.ProjectStore")
-def test_compensate_document_index(mock_proj, mock_nebula, mock_qdrant):
+def test_compensate_document_index(mock_proj, mock_nebula):
     pg = MagicMock()
     pg.get_document.return_value = {
         "document_id": "d1",
@@ -56,14 +46,14 @@ def test_compensate_document_index(mock_proj, mock_nebula, mock_qdrant):
         "content_hash": "h",
     }
     pg.list_chunk_ids_for_document.return_value = ["c1"]
+    pg.clear_embeddings_for_document.return_value = 1
     mock_proj.return_value.get_project.return_value = MagicMock(slug="default")
-    mock_qdrant.return_value.delete_by_document_id.return_value = 1
     mock_nebula.return_value.delete_chunks.return_value = 1
 
     result = compensate_document_index(
-        "dev", PROJECT_ID, "d1", settings=MagicMock(path_graph_dsn="x", qdrant_url="http://q"), pg=pg
+        "dev", PROJECT_ID, "d1", settings=MagicMock(path_graph_dsn="x"), pg=pg
     )
-    assert result["qdrant_deleted"] == 1
+    assert result["embeddings_cleared"] == 1
     assert result["nebula_deleted"] == 1
 
 
@@ -80,7 +70,6 @@ def test_lifecycle_step_modules_import_without_cycle():
 
 
 @patch("path_graph.lifecycle.purge.make_nebula_store")
-@patch("path_graph.lifecycle.purge.make_qdrant_store")
 @patch("path_graph.lifecycle.purge.make_blob_store")
 @patch("path_graph.lifecycle.purge.PgMetaStore")
 @patch("path_graph.lifecycle.purge.ProjectStore")
@@ -88,7 +77,6 @@ def test_purge_project_deletes_raw_prefix_for_already_purged_docs(
     mock_proj_store_cls,
     mock_pg_cls,
     mock_blob_factory,
-    mock_qdrant_factory,
     mock_nebula_factory,
     tmp_path,
 ):
@@ -108,13 +96,14 @@ def test_purge_project_deletes_raw_prefix_for_already_purged_docs(
 
     mock_nebula_factory.return_value.drop_space.return_value = None
 
-    settings = MagicMock(path_graph_dsn="postgresql://x", qdrant_url=None)
+    settings = MagicMock(path_graph_dsn="postgresql://x")
     result = purge_project(tenant, PROJECT_ID, settings=settings)
 
     assert result["status"] == "purged"
     assert result["raw_prefix_deleted"] == 1
     assert blob.list_keys(f"raw/{tenant}/{PROJECT_ID}/") == []
     assert result["purged_documents"] == 0
+    pg.clear_embeddings_for_project.assert_called_once_with(tenant, PROJECT_ID)
 
 
 @patch("path_graph.lifecycle.purge.purge_project")
@@ -145,7 +134,7 @@ def test_delete_project_purges_then_hard_deletes_pg(
         "purged_documents": 1,
     }
 
-    settings = MagicMock(path_graph_dsn="postgresql://x", qdrant_url=None)
+    settings = MagicMock(path_graph_dsn="postgresql://x")
     result = delete_project(tenant, PROJECT_ID, settings=settings)
 
     assert result["status"] == "deleted"

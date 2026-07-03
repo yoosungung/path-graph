@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wire local path-graph debug to k8s infra (agents-runtime + path-graph Qdrant/Nebula).
+# Wire local path-graph debug to k8s infra (agents-runtime + path-graph Nebula).
 #
 # Usage:
 #   ./scripts/wire-dev.sh up [--profile core|s3|runtime|test-infra]
@@ -9,12 +9,12 @@
 #
 # Local port map (cluster Service → Mac):
 #   runtime/postgres:5432, runtime/envoy:8084, runtime/auth:8081,
-#   qdrant/qdrant:6333, nebula/nebula-graphd-svc:9669,
+#   nebula/nebula-graphd-svc:9669,
 #   runtime/garage-s3:3900 (profile s3)
 #
 # Prerequisites:
 #   agents-runtime dev cluster: make k8s-apply-dev (or wire-dev in ../agents-runtime)
-#   path-graph: make deploy-qdrant-nebula (Qdrant + NebulaGraph)
+#   path-graph: make deploy-nebula (NebulaGraph)
 #
 # See scripts/wire-dev.env.example and .vscode/launch.json for debug configs.
 
@@ -22,7 +22,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_NS="${RUNTIME_NS:-runtime}"
-QDRANT_NS="${QDRANT_NS:-qdrant}"
 NEBULA_NS="${NEBULA_NS:-nebula}"
 STATE_DIR="${WIRE_DEV_STATE_DIR:-$ROOT/.wire-dev}"
 PID_DIR="$STATE_DIR/pids"
@@ -33,16 +32,14 @@ STORAGE_BACKEND="${WIRE_DEV_STORAGE:-local}"
 GARAGE_ACCESS_KEY="${GARAGE_ACCESS_KEY:-GKdev000000000000000001}"
 GARAGE_SECRET_KEY="${GARAGE_SECRET_KEY:-devsecret000000000000000000000000000000000000000000000000000000}"
 GARAGE_BUCKET="${GARAGE_BUCKET:-runtime-bundles}"
-QDRANT_API_KEY="${QDRANT_API_KEY:-test-qdrant-api-key}"
-
 usage() {
   sed -n '2,10p' "$0" | sed 's/^# \?//'
   echo
   echo "Profiles:"
-  echo "  core        postgres, envoy, auth, qdrant, nebula (default)"
+  echo "  core        postgres, envoy, auth, nebula (default)"
   echo "  s3          core + garage-s3 (PIPELINE_STORAGE_BACKEND=s3)"
   echo "  runtime     agents-runtime only (postgres, envoy, auth)"
-  echo "  test-infra  qdrant + nebula only"
+  echo "  test-infra  nebula only"
   echo
   echo "env:"
   echo "  --storage local|s3   blob backend in generated .env.dev.local (default: local)"
@@ -134,7 +131,6 @@ wire_runtime() {
 }
 
 wire_test_infra() {
-  start_pf qdrant 6333 6333 qdrant "$QDRANT_NS"
   start_pf nebula 9669 9669 nebula-graphd-svc "$NEBULA_NS"
 }
 
@@ -292,9 +288,7 @@ PATH_GRAPH_DSN=postgresql://runtime:runtime@127.0.0.1:5432/runtime?sslmode=disab
 PIPELINE_STORAGE_BACKEND=${storage_backend}
 PIPELINE_STORAGE_DIR=${storage_dir}${s3_block}
 
-# path-graph deploy/k8s/infra (wire-dev → qdrant :6333, nebula :9669)
-QDRANT_URL=http://127.0.0.1:6333
-QDRANT_API_KEY=${QDRANT_API_KEY}
+# path-graph deploy/k8s/infra (wire-dev → nebula :9669)
 
 NEBULA_HOST=127.0.0.1
 NEBULA_PORT=9669

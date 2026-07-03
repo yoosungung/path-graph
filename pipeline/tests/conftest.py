@@ -12,7 +12,10 @@ def local_store(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _clear_settings_cache():
+def _clear_settings_cache(monkeypatch):
+    """Unit tests must not require live PG/envoy from .env.dev.local."""
+    monkeypatch.setenv("PATH_GRAPH_DSN", "")
+    monkeypatch.setenv("PIPELINE_AGENT_ACCESS_TOKEN", "")
     from path_graph.config import get_settings
 
     get_settings.cache_clear()

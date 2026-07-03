@@ -26,9 +26,7 @@ def test_nebula_url_parsed(monkeypatch):
 
 def test_env_file_fields(monkeypatch):
     monkeypatch.setenv("PATH_GRAPH_TENANT", "acme")
-    monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
     get_settings.cache_clear()
     s = Settings()
     assert s.path_graph_tenant == "acme"
-    assert s.qdrant_url == "http://localhost:6333"
     get_settings.cache_clear()

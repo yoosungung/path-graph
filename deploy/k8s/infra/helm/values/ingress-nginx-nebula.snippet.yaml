@@ -1,0 +1,10 @@
+# Fragment — documents hostPorts for path-graph Nebula Studio on shared ingress-nginx (test_infra helm/values/ingress-nginx.yaml).
+# Nebula Studio :7001 uses HTTP Ingress via socat → nginx :80.
+
+# Under controller: add to extraHostPorts (hostPort):
+#   - name: nebula-studio
+#     containerPort: 7001
+#     hostPort: 7001
+#
+# Under controller.extraContainers[0].command, append:
+#   socat TCP-LISTEN:7001,fork,reuseaddr TCP:127.0.0.1:80 &

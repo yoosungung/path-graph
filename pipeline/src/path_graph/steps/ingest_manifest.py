@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
         "--manifest-line",
         help="JSON object (BatchManifestLine). Falls back to MANIFEST_LINE env (Argo WF).",
     )
-    parser.add_argument("--rag", action="store_true", help="Run embed + Qdrant index")
+    parser.add_argument("--rag", action="store_true", help="Run embed + pgvector index")
     args = parser.parse_args(argv)
 
     raw = args.manifest_line or os.environ.get("MANIFEST_LINE", "").strip()

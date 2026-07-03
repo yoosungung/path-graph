@@ -7,14 +7,13 @@
 #   (unset) ./scripts/create-path-graph-secrets.sh  # preserves existing path-graph-env token + S3_REGION
 #   S3_REGION=garage (optional — override; else existing path-graph-env, then runtime/s3-creds, then garage)
 #
-# Reads: runtime/postgres-credentials, runtime/s3-creds, qdrant/qdrant-apikey
+# Reads: runtime/postgres-credentials, runtime/s3-creds
 # Writes: path-graph/path-graph-env, path-graph/s3-creds (copy for Argo artifacts)
 
 set -euo pipefail
 
 TARGET_NS="${PATH_GRAPH_NS:-path-graph}"
 RUNTIME_NS="${RUNTIME_NS:-runtime}"
-QDRANT_NS="${QDRANT_NS:-qdrant}"
 
 require_kubectl() {
   command -v kubectl >/dev/null 2>&1 || {
@@ -29,12 +28,10 @@ b64dec() {
 
 require_kubectl
 
-for ns in "$RUNTIME_NS" "$QDRANT_NS"; do
-  kubectl get namespace "$ns" >/dev/null 2>&1 || {
-    echo "error: namespace $ns not found" >&2
-    exit 1
-  }
-done
+kubectl get namespace "$RUNTIME_NS" >/dev/null 2>&1 || {
+  echo "error: namespace $RUNTIME_NS not found" >&2
+  exit 1
+}
 
 kubectl create namespace "$TARGET_NS" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -74,12 +71,6 @@ if [[ -z "$S3_REGION" ]]; then
   fi
 fi
 
-QDRANT_KEY="$(b64dec "$(kubectl -n "$QDRANT_NS" get secret qdrant-apikey -o jsonpath='{.data.api-key}')")"
-if [[ -z "$QDRANT_KEY" ]]; then
-  echo "error: qdrant/qdrant-apikey secret missing or empty — run make deploy-qdrant-nebula" >&2
-  exit 1
-fi
-
 AGENT_TOKEN="${PIPELINE_AGENT_ACCESS_TOKEN:-}"
 if [[ -z "$AGENT_TOKEN" ]]; then
   EXISTING_TOKEN_RAW="$(kubectl -n "$TARGET_NS" get secret path-graph-env \
@@ -97,8 +88,6 @@ kubectl -n "$TARGET_NS" create secret generic path-graph-env \
   --from-literal=S3_ACCESS_KEY="$S3_ACCESS" \
   --from-literal=S3_SECRET_KEY="$S3_SECRET" \
   --from-literal=S3_REGION="$S3_REGION" \
-  --from-literal=QDRANT_URL='http://qdrant.qdrant.svc:6333' \
-  --from-literal=QDRANT_API_KEY="$QDRANT_KEY" \
   --from-literal=NEBULA_HOST='nebula-graphd-svc.nebula.svc' \
   --from-literal=NEBULA_PORT='9669' \
   --from-literal=NEBULA_USER='root' \

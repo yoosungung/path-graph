@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import Any, Sequence
 
 import psycopg
 
@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS path_graph.chunks (
     text TEXT NOT NULL,
     text_hash TEXT NOT NULL,
     s3_uri TEXT,
-    qdrant_point_id TEXT,
     PRIMARY KEY (tenant, id)
 );
 
@@ -344,6 +343,26 @@ CREATE INDEX IF NOT EXISTS idx_chunks_text_tsv
     ON path_graph.chunks USING GIN (text_tsv);
 """
 
+PGVECTOR_MIGRATION_SQL = """
+CREATE EXTENSION IF NOT EXISTS vector;
+
+ALTER TABLE path_graph.chunks
+    ADD COLUMN IF NOT EXISTS embedding vector(1024);
+
+ALTER TABLE path_graph.chunks DROP COLUMN IF EXISTS qdrant_point_id;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw
+    ON path_graph.chunks USING hnsw (embedding vector_cosine_ops)
+    WHERE embedding IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_tenant_project
+    ON path_graph.chunks (tenant, project_id)
+    WHERE embedding IS NOT NULL;
+
+ALTER TABLE path_graph.reconcile_reports
+    RENAME COLUMN qdrant_orphans_deleted TO vector_orphans_cleared;
+"""
+
 
 def iter_migration_sql() -> list[str]:
     return [
@@ -358,6 +377,7 @@ def iter_migration_sql() -> list[str]:
         PIPELINE_RUNS_KIND_MIGRATION_SQL,
         RLS_POLICY_MIGRATION_SQL,
         CHUNKS_FTS_MIGRATION_SQL,
+        PGVECTOR_MIGRATION_SQL,
     ]
 
 
@@ -367,6 +387,17 @@ class PgMetaStore:
 
     def _conn(self):
         return psycopg.connect(self._dsn)
+
+    def _vector_conn(self):
+        conn = psycopg.connect(self._dsn)
+        self._register_vector(conn)
+        return conn
+
+    @staticmethod
+    def _register_vector(conn) -> None:
+        from pgvector.psycopg import register_vector
+
+        register_vector(conn)
 
     @staticmethod
     def _set_tenant(conn: psycopg.Connection, tenant: str) -> None:
@@ -420,35 +451,163 @@ class PgMetaStore:
             )
             conn.commit()
 
-    def upsert_chunks(self, tenant: str, chunks: list[ChunkRecord], s3_uri: str) -> None:
+    def upsert_chunks(
+        self,
+        tenant: str,
+        chunks: list[ChunkRecord],
+        s3_uri: str,
+        *,
+        embeddings: Sequence[Sequence[float]] | None = None,
+    ) -> None:
+        if embeddings is not None and len(embeddings) != len(chunks):
+            raise ValueError("embeddings length must match chunks")
+        with self._vector_conn() as conn:
+            self._set_tenant(conn, tenant)
+            for idx, c in enumerate(chunks):
+                if embeddings is not None:
+                    conn.execute(
+                        """
+                        INSERT INTO path_graph.chunks
+                            (tenant, id, document_id, project_id, chunk_index,
+                             text, text_hash, s3_uri, text_tsv, embedding)
+                        VALUES (%s, %s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s,
+                                to_tsvector('simple', %s), %s)
+                        ON CONFLICT (tenant, id) DO UPDATE SET
+                            text = EXCLUDED.text,
+                            text_tsv = to_tsvector('simple', EXCLUDED.text),
+                            s3_uri = EXCLUDED.s3_uri,
+                            project_id = EXCLUDED.project_id,
+                            embedding = EXCLUDED.embedding
+                        """,
+                        (
+                            tenant,
+                            c.chunk_id,
+                            c.document_id,
+                            c.project_id,
+                            c.chunk_index,
+                            c.text,
+                            c.text_hash,
+                            s3_uri,
+                            c.text,
+                            list(embeddings[idx]),
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO path_graph.chunks
+                            (tenant, id, document_id, project_id, chunk_index,
+                             text, text_hash, s3_uri, text_tsv)
+                        VALUES (%s, %s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s,
+                                to_tsvector('simple', %s))
+                        ON CONFLICT (tenant, id) DO UPDATE SET
+                            text = EXCLUDED.text,
+                            text_tsv = to_tsvector('simple', EXCLUDED.text),
+                            s3_uri = EXCLUDED.s3_uri,
+                            project_id = EXCLUDED.project_id
+                        """,
+                        (
+                            tenant,
+                            c.chunk_id,
+                            c.document_id,
+                            c.project_id,
+                            c.chunk_index,
+                            c.text,
+                            c.text_hash,
+                            s3_uri,
+                            c.text,
+                        ),
+                    )
+            conn.commit()
+
+    def search_vector(
+        self,
+        tenant: str,
+        project_id: str,
+        query_vector: Sequence[float],
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with self._vector_conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT
+                    c.id::text AS chunk_id,
+                    c.document_id::text AS document_id,
+                    c.project_id::text AS project_id,
+                    c.text,
+                    1 - (c.embedding <=> %s) AS score
+                FROM path_graph.chunks c
+                WHERE c.tenant = %s
+                  AND c.project_id = %s::uuid
+                  AND c.embedding IS NOT NULL
+                ORDER BY c.embedding <=> %s
+                LIMIT %s
+                """,
+                (list(query_vector), tenant, project_id, list(query_vector), limit),
+            ).fetchall()
+        return [
+            {
+                "chunk_id": row[0],
+                "document_id": row[1],
+                "project_id": row[2],
+                "text": row[3],
+                "score": float(row[4]),
+            }
+            for row in rows
+        ]
+
+    def clear_embeddings_for_document(self, tenant: str, document_id: str) -> int:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
-            for c in chunks:
-                conn.execute(
-                    """
-                    INSERT INTO path_graph.chunks
-                        (tenant, id, document_id, project_id, chunk_index, text, text_hash, s3_uri, qdrant_point_id, text_tsv)
-                    VALUES (%s, %s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s, %s, to_tsvector('simple', %s))
-                    ON CONFLICT (tenant, id) DO UPDATE SET
-                        text = EXCLUDED.text,
-                        text_tsv = to_tsvector('simple', EXCLUDED.text),
-                        s3_uri = EXCLUDED.s3_uri,
-                        qdrant_point_id = EXCLUDED.qdrant_point_id,
-                        project_id = EXCLUDED.project_id
-                    """,
-                    (
-                        tenant,
-                        c.chunk_id,
-                        c.document_id,
-                        c.project_id,
-                        c.chunk_index,
-                        c.text,
-                        c.text_hash,
-                        s3_uri,
-                        c.chunk_id,
-                        c.text,
-                    ),
-                )
+            cur = conn.execute(
+                """
+                UPDATE path_graph.chunks
+                SET embedding = NULL
+                WHERE tenant = %s AND document_id = %s::uuid
+                """,
+                (tenant, document_id),
+            )
+            conn.commit()
+            return cur.rowcount
+
+    def clear_embeddings_for_chunks(
+        self, tenant: str, chunk_ids: list[str]
+    ) -> int:
+        if not chunk_ids:
+            return 0
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            cur = conn.execute(
+                """
+                UPDATE path_graph.chunks
+                SET embedding = NULL
+                WHERE tenant = %s AND id = ANY(%s::uuid[])
+                """,
+                (tenant, chunk_ids),
+            )
+            conn.commit()
+            return cur.rowcount
+
+    def clear_embeddings_for_project(self, tenant: str, project_id: str) -> int:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            cur = conn.execute(
+                """
+                UPDATE path_graph.chunks
+                SET embedding = NULL
+                WHERE tenant = %s AND project_id = %s::uuid
+                """,
+                (tenant, project_id),
+            )
+            conn.commit()
+            return cur.rowcount
+
+    def analyze_chunks_embeddings(self, tenant: str, project_id: str) -> None:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            conn.execute("ANALYZE path_graph.chunks")
             conn.commit()
 
     def search_fts(
@@ -917,7 +1076,7 @@ class PgMetaStore:
         tenant: str,
         project_id: str,
         *,
-        qdrant_orphans_deleted: int,
+        vector_orphans_cleared: int,
         nebula_orphans_deleted: int,
         pg_missing_points: int,
         duration_ms: int,
@@ -928,7 +1087,7 @@ class PgMetaStore:
             conn.execute(
                 """
                 INSERT INTO path_graph.reconcile_reports
-                    (tenant, project_id, id, qdrant_orphans_deleted,
+                    (tenant, project_id, id, vector_orphans_cleared,
                      nebula_orphans_deleted, pg_missing_points, duration_ms)
                 VALUES (%s, %s::uuid, %s::uuid, %s, %s, %s, %s)
                 """,
@@ -936,7 +1095,7 @@ class PgMetaStore:
                     tenant,
                     project_id,
                     report_id,
-                    qdrant_orphans_deleted,
+                    vector_orphans_cleared,
                     nebula_orphans_deleted,
                     pg_missing_points,
                     duration_ms,

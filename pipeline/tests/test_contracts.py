@@ -26,7 +26,7 @@ from path_graph.ids import (
     document_id,
     nebula_space_name,
     normalize_tenant_slug,
-    qdrant_collection_name,
+    index_namespace,
     wiki_slug_for_community,
     sha256_text,
 )
@@ -68,8 +68,8 @@ def test_chunk_id_deterministic():
 
 def test_tenant_slug_and_storage_names():
     slug = normalize_tenant_slug("Acme Corp")
-    assert qdrant_collection_name("Acme Corp", "product-docs") == f"path_graph_{slug}_product-docs"
-    assert nebula_space_name("Acme Corp", "product-docs") == qdrant_collection_name(
+    assert index_namespace("Acme Corp", "product-docs") == f"path_graph_{slug}_product-docs"
+    assert nebula_space_name("Acme Corp", "product-docs") == index_namespace(
         "Acme Corp", "product-docs"
     )
 
@@ -77,7 +77,7 @@ def test_tenant_slug_and_storage_names():
 def test_knowledge_binding_resolve():
     binding = resolve_knowledge_binding("acme", PROJECT_ID, "product-docs")
     assert isinstance(binding, KnowledgeBinding)
-    assert binding.rag.qdrant_collection == "path_graph_acme_product-docs"
+    assert binding.rag.index_namespace == "path_graph_acme_product-docs"
     assert binding.graph.nebula_space == "path_graph_acme_product-docs"
     assert binding.rag.filter["project_id"] == PROJECT_ID
     assert binding.wiki.s3_prefix == s3_key_wiki_prefix("acme", PROJECT_ID)

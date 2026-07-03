@@ -11,7 +11,7 @@ from path_graph.admin.retrieval import api_search_project
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Hybrid PG FTS + Qdrant search for a Knowledge Project"
+        description="Hybrid PG FTS + pgvector search for a Knowledge Project"
     )
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--project-id", required=True)

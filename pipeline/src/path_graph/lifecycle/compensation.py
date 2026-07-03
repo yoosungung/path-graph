@@ -7,7 +7,6 @@ from path_graph.config import Settings, get_settings
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.ids import nebula_space_name
 from path_graph.meta.pg import PgMetaStore
-from path_graph.rag.qdrant_store import make_qdrant_store
 
 
 def compensate_document_index(
@@ -18,7 +17,7 @@ def compensate_document_index(
     settings: Settings | None = None,
     pg: PgMetaStore | None = None,
 ) -> dict[str, Any]:
-    """Remove Qdrant points and Nebula chunk vertices for a document before re-ingest."""
+    """Clear pgvector embeddings and Nebula chunk vertices before re-ingest."""
     s = settings or get_settings()
     if not s.path_graph_dsn:
         return {"skipped": True, "reason": "no_dsn"}
@@ -33,12 +32,7 @@ def compensate_document_index(
         raise ValueError(f"project not found: {project_id}")
     project_slug = profile.slug
 
-    qdrant_deleted = 0
-    if s.qdrant_url and chunk_ids:
-        qdrant = make_qdrant_store(s)
-        qdrant_deleted = qdrant.delete_by_document_id(
-            tenant, project_slug, document_id, project_id=project_id
-        )
+    embeddings_cleared = store.clear_embeddings_for_document(tenant, document_id)
 
     nebula_deleted = 0
     if chunk_ids:
@@ -56,13 +50,13 @@ def compensate_document_index(
         "ok",
         {
             "chunk_count": len(chunk_ids),
-            "qdrant_deleted": qdrant_deleted,
+            "embeddings_cleared": embeddings_cleared,
             "nebula_deleted": nebula_deleted,
         },
     )
     return {
         "document_id": document_id,
         "chunk_ids": chunk_ids,
-        "qdrant_deleted": qdrant_deleted,
+        "embeddings_cleared": embeddings_cleared,
         "nebula_deleted": nebula_deleted,
     }

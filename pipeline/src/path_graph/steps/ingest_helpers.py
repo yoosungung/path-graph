@@ -118,7 +118,6 @@ def ingest_item(
             meta["document_id"],
             project_slug,
             skip_pg=not settings.path_graph_dsn,
-            skip_qdrant=not settings.qdrant_url,
         )
     return True, result["chunks_uri"]
 

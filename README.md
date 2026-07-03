@@ -1,6 +1,6 @@
 # path-graph
 
-**RAG · Graph · Wiki** 지식 파이프라인. 문서를 수집·파싱·청킹한 뒤 벡터 인덱스(Qdrant), 지식 그래프(Nebula), 커뮤니티 위키(S3)로 적재한다. 오케스트레이션은 **Argo Workflows** (`deploy/k8s/base/workflow-templates/`), 불변 계약은 [ARCHITECTURE.md](ARCHITECTURE.md).
+**RAG · Graph · Wiki** 지식 파이프라인. 문서를 수집·파싱·청킹한 뒤 벡터 인덱스(runtime PG pgvector), 지식 그래프(Nebula), 커뮤니티 위키(S3)로 적재한다. 오케스트레이션은 **Argo Workflows** (`deploy/k8s/base/workflow-templates/`), 불변 계약은 [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 무엇을 하는가
 
@@ -8,7 +8,7 @@
 |------|--------|
 | Collect | `raw/{tenant}/…`, `batches/…/manifest.jsonl` |
 | Parse · Chunk | `parsed/…`, `chunks/…/chunks.jsonl`, PG 메타 |
-| RAG | Qdrant point + `document_ingest_state.rag_at` |
+| RAG | `chunks.embedding` + `document_ingest_state.rag_at` |
 | Graph · Wiki | Nebula upsert, `wiki/{tenant}/{project}/…` |
 
 상세 흐름: [ARCHITECTURE.md §2](ARCHITECTURE.md#2-컴포넌트-간-형태) · 구현: [pipeline/DESIGN.md](pipeline/DESIGN.md)
@@ -22,7 +22,6 @@
 | `wire-dev.sh` port-forward | WF E2E on cluster (이미지 import 후) |
 | `make bootstrap-k8s` | Argo + secrets + dev overlay |
 | Filestash (Garage UI) | http://filestash.k8s-test — [deploy/SETUP.md](deploy/SETUP.md) |
-| Qdrant Dashboard | http://qdrant.k8s-test:6333/dashboard — API key `test-qdrant-api-key` |
 | `./scripts/submit-ingest-rag-e2e.sh` | WF E2E (manifest line → ingest) |
 
 ## 아키텍처 (한 장)
@@ -32,9 +31,9 @@ graph TD
     subgraph ingest["1. Ingest · RAG"]
         C[Collectors / ingest_web] --> S3[(Garage S3)]
         S3 --> P[Parse · Chunk]
-        P --> PG[(runtime PG)]
+        P --> PG[(runtime PG + pgvector)]
         P --> E[TEI bge-m3]
-        E --> Q[(Qdrant)]
+        E --> PG
     end
     subgraph graphrag["2. GraphRAG · Wiki"]
         PG --> AI[agent_invoke]
@@ -51,16 +50,16 @@ graph TD
 
 | 컴포넌트 | 저장소 |
 |---|---|
-| Agent invoke, Garage, runtime PG | [agents-runtime](../agents-runtime) |
-| Qdrant, NebulaGraph | path-graph [`deploy/k8s/infra/`](deploy/k8s/infra/) |
+| Agent invoke, Garage, runtime PG (pgvector) | [agents-runtime](../agents-runtime) |
+| NebulaGraph | path-graph [`deploy/k8s/infra/`](deploy/k8s/infra/) |
 | HWP 파서 | [rhwp_batch](../rhwp_batch) |
 
 ## Quickstart (로컬)
 
 ```bash
 # k8s dev 클러스터에 path-graph 의존 infra가 떠 있어야 함
-#   ../agents-runtime — make k8s-apply-dev
-#   path-graph        — make deploy-qdrant-nebula (Qdrant + NebulaGraph)
+#   ../agents-runtime — make k8s-apply-dev (runtime PG 17 + pgvector)
+#   path-graph        — make deploy-nebula
 
 make install
 ./scripts/wire-dev.sh up          # port-forward → 127.0.0.1
@@ -88,13 +87,3 @@ python -m path_graph.steps.ingest_onedrive --tenant dev --folder Documents --dry
 ```
 
 K8s 배포: [deploy/SETUP.md](deploy/SETUP.md)
-
-```bash
-git push origin main && make build-images   # GHCR :<git-sha> (로컬 docker 없음)
-make build-pipeline-image PUSH=1            # 또는 로컬 docker 빌드·push
-make k8s-apply-dev                          # SHA 태그 pin + dev overlay apply
-```
-
-## VS Code 디버그
-
-`.vscode/launch.json` — `Wire: dev cluster`로 k8s port-forward 후 `Debug: ingest_web` / `Debug: pytest` 실행. 사전에 Python 확장(debugpy)과 `make install`(.venv) 필요.

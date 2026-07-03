@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy Qdrant + NebulaGraph to k8s-test cluster (path-graph owned infra).
+# Deploy NebulaGraph to k8s-test cluster (path-graph owned infra).
 set -euo pipefail
 
 GREEN='\033[0;32m'
@@ -15,11 +15,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 INFRA_DIR="${ROOT_DIR}/deploy/k8s/infra"
 
-QDRANT_NAMESPACE="qdrant"
-QDRANT_RELEASE="qdrant"
-QDRANT_API_KEY="${QDRANT_API_KEY:-test-qdrant-api-key}"
-QDRANT_CHART_VERSION="${QDRANT_CHART_VERSION:-}"
-
 NEBULA_OPERATOR_NAMESPACE="nebula-operator-system"
 NEBULA_OPERATOR_RELEASE="nebula-operator"
 NEBULA_CLUSTER_NAMESPACE="nebula"
@@ -29,30 +24,6 @@ NEBULA_CLUSTER_CHART_VERSION="${NEBULA_CLUSTER_CHART_VERSION:-1.8.0}"
 NEBULA_STORAGE_CLASS="${NEBULA_STORAGE_CLASS:-local-path}"
 
 K8S_TEST_DOMAIN_SUFFIX="${K8S_TEST_DOMAIN_SUFFIX:-k8s-test}"
-
-deploy_qdrant() {
-  log_info "Ensuring Qdrant Helm repo is registered..."
-  helm repo add qdrant https://qdrant.github.io/qdrant-helm 2>/dev/null || true
-  helm repo update qdrant
-
-  local chart_version_args=()
-  if [[ -n "${QDRANT_CHART_VERSION}" ]]; then
-    chart_version_args=(--version "${QDRANT_CHART_VERSION}")
-  fi
-
-  log_info "Installing/upgrading Qdrant in namespace '${QDRANT_NAMESPACE}'..."
-  helm upgrade --install "${QDRANT_RELEASE}" qdrant/qdrant \
-    --namespace "${QDRANT_NAMESPACE}" \
-    --create-namespace \
-    -f "${INFRA_DIR}/helm/values/qdrant.yaml" \
-    --set "apiKey=${QDRANT_API_KEY}" \
-    "${chart_version_args[@]}" \
-    --wait \
-    --timeout 10m
-
-  log_info "Qdrant in-cluster: http://${QDRANT_RELEASE}.${QDRANT_NAMESPACE}.svc.cluster.local:6333"
-  log_info "Qdrant external:   http://qdrant.${K8S_TEST_DOMAIN_SUFFIX}:6333/ (api-key; UI: /dashboard)"
-}
 
 deploy_nebula() {
   log_info "Ensuring NebulaGraph Operator Helm repo is registered..."
@@ -91,14 +62,13 @@ deploy_nebula() {
 
 apply_manifests() {
   log_info "Applying namespaces..."
-  kubectl apply -f "${INFRA_DIR}/manifests/qdrant-namespace.yaml"
   kubectl apply -f "${INFRA_DIR}/manifests/nebula-operator-namespace.yaml"
   kubectl apply -f "${INFRA_DIR}/manifests/nebula-namespace.yaml"
 
   log_info "Applying NebulaGraph Studio..."
   kubectl apply -f "${INFRA_DIR}/manifests/nebula-studio.yaml"
 
-  log_info "Applying Ingress routes (qdrant, nebula-studio)..."
+  log_info "Applying Ingress routes (nebula-studio)..."
   kubectl apply -f "${INFRA_DIR}/manifests/ingress-routes.yaml"
 }
 
@@ -116,7 +86,7 @@ CURRENT_CONTEXT="$(kubectl config current-context)"
 log_info "Current Kubernetes Context: ${CURRENT_CONTEXT}"
 
 if [[ "${1:-}" != "--force" ]]; then
-  read -p "Deploy Qdrant + NebulaGraph to [${CURRENT_CONTEXT}]? (y/N): " confirm
+  read -p "Deploy NebulaGraph to [${CURRENT_CONTEXT}]? (y/N): " confirm
   if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
     log_warn "Deployment cancelled by user."
     exit 0
@@ -124,14 +94,12 @@ if [[ "${1:-}" != "--force" ]]; then
 fi
 
 log_info "Running pre-deploy config tests..."
-"${ROOT_DIR}/scripts/test-qdrant-config.sh"
 "${ROOT_DIR}/scripts/test-nebula-config.sh"
 "${ROOT_DIR}/scripts/test-nebula-studio-config.sh"
 
 apply_manifests
-deploy_qdrant
 deploy_nebula
 
 log_info "Deployment completed."
-log_info "Verify: make verify-qdrant-nebula"
+log_info "Verify: make verify-nebula"
 log_info "Local debug: ./scripts/wire-dev.sh up"

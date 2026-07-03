@@ -34,9 +34,6 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
     s3_region: str = "us-east-1"
 
-    qdrant_url: str = "http://127.0.0.1:6333"
-    qdrant_api_key: str = ""
-
     nebula_host: str = "127.0.0.1"
     nebula_port: int = 9669
     nebula_user: str = "root"
@@ -53,7 +50,7 @@ class Settings(BaseSettings):
     argo_workflow_name: str = ""  # ARGO_WORKFLOW_NAME
 
     embedding_model: str = "BAAI/bge-m3"  # EMBEDDING_MODEL
-    embedding_dim: int = 1024  # EMBEDDING_DIM — Qdrant cosine
+    embedding_dim: int = 1024  # EMBEDDING_DIM — pgvector cosine
     embedding_base_url: str = (
         "http://bge-m3-tei.llm-serving.svc.cluster.local:8080"  # EMBEDDING_BASE_URL
     )

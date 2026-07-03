@@ -11,7 +11,7 @@ from path_graph.lifecycle.reconcile import reconcile_project_index
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Reconcile PG vs Qdrant/Nebula")
+    parser = argparse.ArgumentParser(description="Reconcile PG vs Nebula")
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--project-id", required=True)
     args = parser.parse_args(argv)

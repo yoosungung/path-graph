@@ -8,7 +8,6 @@ from path_graph.config import Settings, get_settings
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.ids import nebula_space_name
 from path_graph.meta.pg import PgMetaStore
-from path_graph.rag.qdrant_store import make_qdrant_store
 
 
 def reconcile_project_index(
@@ -17,7 +16,7 @@ def reconcile_project_index(
     *,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """PG chunks as source of truth; delete Qdrant/Nebula orphans."""
+    """PG chunks as source of truth; delete Nebula orphans."""
     started = time.monotonic()
     s = settings or get_settings()
     if not s.path_graph_dsn:
@@ -28,20 +27,7 @@ def reconcile_project_index(
         raise ValueError(f"project not found: {project_id}")
 
     active_chunks = pg.list_active_chunk_ids(tenant, project_id)
-    qdrant_orphans = 0
     nebula_orphans = 0
-
-    if s.qdrant_url:
-        qdrant = make_qdrant_store(s)
-        indexed = qdrant.scroll_chunk_ids(
-            tenant, profile.slug, project_id=project_id
-        )
-        orphan_ids = [cid for cid, _ in indexed if cid not in active_chunks]
-        if orphan_ids:
-            qdrant_orphans = qdrant.delete_by_chunk_ids(
-                tenant, profile.slug, orphan_ids
-            )
-        qdrant.optimize_collection(tenant, profile.slug)
 
     nebula = make_nebula_store(s)
     space = nebula_space_name(tenant, profile.slug)
@@ -55,14 +41,14 @@ def reconcile_project_index(
     report_id = pg.insert_reconcile_report(
         tenant,
         project_id,
-        qdrant_orphans_deleted=qdrant_orphans,
+        vector_orphans_cleared=0,
         nebula_orphans_deleted=nebula_orphans,
         pg_missing_points=0,
         duration_ms=duration_ms,
     )
     return {
         "report_id": report_id,
-        "qdrant_orphans_deleted": qdrant_orphans,
+        "vector_orphans_cleared": 0,
         "nebula_orphans_deleted": nebula_orphans,
         "duration_ms": duration_ms,
     }

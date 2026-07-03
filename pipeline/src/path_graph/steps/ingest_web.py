@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--url", help="HTTP URL to collect")
     parser.add_argument("--file", help="Local file path")
     parser.add_argument("--source-id", default="web")
-    parser.add_argument("--rag", action="store_true", help="Run embed + Qdrant index")
+    parser.add_argument("--rag", action="store_true", help="Run embed + pgvector index")
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -92,7 +92,6 @@ def main(argv: list[str] | None = None) -> int:
             meta["document_id"],
             project_slug,
             skip_pg=not settings.path_graph_dsn,
-            skip_qdrant=not settings.qdrant_url,
         )
         print(f"indexed {n} chunks")
 

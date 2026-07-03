@@ -49,12 +49,12 @@ def normalize_project_slug(project_slug: str) -> str:
     return slug
 
 
-def qdrant_collection_name(tenant: str, project_slug: str) -> str:
+def index_namespace(tenant: str, project_slug: str) -> str:
     return f"path_graph_{normalize_tenant_slug(tenant)}_{normalize_project_slug(project_slug)}"
 
 
 def nebula_space_name(tenant: str, project_slug: str) -> str:
-    return qdrant_collection_name(tenant, project_slug)
+    return index_namespace(tenant, project_slug)
 
 
 def community_id(

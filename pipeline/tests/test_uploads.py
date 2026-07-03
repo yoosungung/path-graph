@@ -17,7 +17,7 @@ from path_graph.storage.blob import read_jsonl
 def local_store(tmp_path, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     monkeypatch.setenv("PIPELINE_STORAGE_DIR", str(tmp_path))
-    monkeypatch.delenv("PATH_GRAPH_DSN", raising=False)
+    monkeypatch.setenv("PATH_GRAPH_DSN", "")
     from path_graph.config import get_settings
 
     get_settings.cache_clear()

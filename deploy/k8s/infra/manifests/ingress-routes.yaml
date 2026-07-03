@@ -1,32 +1,5 @@
-# Ingress routes for Qdrant REST and NebulaGraph Studio (host *.k8s-test).
-# Requires ingress-nginx with socat hostPort 6333/7001 — see ingress-nginx-qdrant-nebula.snippet.yaml
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: qdrant
-  namespace: qdrant
-  labels:
-    app.kubernetes.io/name: qdrant
-    app.kubernetes.io/component: ingress
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: qdrant.k8s-test
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: qdrant
-                port:
-                  number: 6333
+# Ingress routes for NebulaGraph Studio (host *.k8s-test).
+# Requires ingress-nginx with socat hostPort 7001 — see ingress-nginx-nebula.snippet.yaml
 
 ---
 apiVersion: networking.k8s.io/v1

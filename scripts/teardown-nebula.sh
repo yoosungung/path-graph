@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove Qdrant + NebulaGraph Helm releases (path-graph owned infra).
+# Remove NebulaGraph Helm releases (path-graph owned infra).
 set -euo pipefail
 
 GREEN='\033[0;32m'
@@ -14,7 +14,7 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 INFRA_DIR="${ROOT_DIR}/deploy/k8s/infra"
 
 if [[ "${1:-}" != "--force" ]]; then
-  read -p "Teardown Qdrant + NebulaGraph on [$(kubectl config current-context)]? (y/N): " confirm
+  read -p "Teardown NebulaGraph on [$(kubectl config current-context)]? (y/N): " confirm
   if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
     log_warn "Teardown cancelled."
     exit 0
@@ -26,8 +26,6 @@ if command -v helm &>/dev/null; then
   helm uninstall nebula --namespace nebula 2>/dev/null || true
   log_info "Uninstalling NebulaGraph Operator..."
   helm uninstall nebula-operator --namespace nebula-operator-system 2>/dev/null || true
-  log_info "Uninstalling Qdrant..."
-  helm uninstall qdrant --namespace qdrant 2>/dev/null || true
 else
   log_warn "helm not found; skipping Helm uninstall"
 fi

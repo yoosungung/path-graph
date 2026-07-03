@@ -39,4 +39,4 @@ def test_resolve_binding(mock_connect):
     binding = store.resolve_binding("dev", "550e8400-e29b-41d4-a716-446655440000")
 
     assert binding.project_slug == "default"
-    assert binding.rag.qdrant_collection == "path_graph_dev_default"
+    assert binding.rag.index_namespace == "path_graph_dev_default"

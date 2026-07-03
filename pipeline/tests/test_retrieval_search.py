@@ -6,6 +6,7 @@ from unittest.mock import ANY, patch
 import pytest
 
 from path_graph.admin.retrieval import api_search_project
+from path_graph.config import Settings
 from path_graph.steps.retrieval_search import main as retrieval_main
 
 from constants import PROJECT_ID
@@ -37,7 +38,13 @@ def test_api_search_project(mock_store_cls, mock_hybrid, _project_profile):
         }
     ]
 
-    out = api_search_project("dev", PROJECT_ID, "hello", top_k=5)
+    out = api_search_project(
+        "dev",
+        PROJECT_ID,
+        "hello",
+        top_k=5,
+        settings=Settings(path_graph_dsn="postgresql://localhost/test"),
+    )
 
     assert out["query"] == "hello"
     assert out["project_id"] == PROJECT_ID
@@ -57,7 +64,12 @@ def test_api_search_project(mock_store_cls, mock_hybrid, _project_profile):
 def test_api_search_project_not_found(mock_store_cls):
     mock_store_cls.return_value.get_project.return_value = None
     with pytest.raises(ValueError, match="project not found"):
-        api_search_project("dev", PROJECT_ID, "q")
+        api_search_project(
+            "dev",
+            PROJECT_ID,
+            "q",
+            settings=Settings(path_graph_dsn="postgresql://localhost/test"),
+        )
 
 
 @patch("path_graph.steps.retrieval_search.api_search_project")

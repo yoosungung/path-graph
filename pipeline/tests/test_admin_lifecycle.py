@@ -55,12 +55,12 @@ def test_api_get_binding(mock_proj, mock_settings, mock_resolve):
         tenant="dev",
         project_id=PROJECT_ID,
         project_slug="default",
-        rag=KnowledgeBindingRag(qdrant_collection="path_graph_dev_default"),
+        rag=KnowledgeBindingRag(index_namespace="path_graph_dev_default"),
         graph=KnowledgeBindingGraph(nebula_space="path_graph_dev_default"),
         wiki=KnowledgeBindingWiki(s3_prefix=f"wiki/dev/{PROJECT_ID}/"),
     )
     out = api_get_binding("dev", PROJECT_ID)
-    assert out["rag"]["qdrant_collection"] == "path_graph_dev_default"
+    assert out["rag"]["index_namespace"] == "path_graph_dev_default"
 
 
 @patch("path_graph.admin.lifecycle.get_settings")

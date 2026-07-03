@@ -72,7 +72,7 @@ graph TD
    - 문서 정보 및 청크 메타데이터는 PostgreSQL 데이터베이스([PostgreSQL 스키마 계약](file:///Users/suyoo/Documents/works/path-graph/ARCHITECTURE.md#22-runtime-postgresql-path_graph-schema))의 `documents`, `chunks` 테이블에 저장되어 관리됩니다.
 4. **임베딩 및 벡터 저장 (RAG 준비)**:
    - S3(Garage)에 저장된 청크 파일(`chunks.jsonl`)을 입력으로 읽어와 외부 embedding 서비스(TEI `BAAI/bge-m3`, OpenAI `/v1/embeddings`)로 벡터화합니다.
-   - 벡터화된 값은 Qdrant DB([Qdrant 스펙](file:///Users/suyoo/Documents/works/path-graph/ARCHITECTURE.md#23-qdrant-test_infra-소비만))의 테넌트별 컬렉션 `path_graph_{tenant}_{project}`에 저장됩니다. (단, Qdrant에는 청크의 본문 텍스트를 저장하지 않고 메타데이터와 S3 URI만 payload로 저장합니다.)
+   - 벡터화된 값은 runtime Postgres `path_graph.chunks.embedding vector(1024)`에 저장됩니다 (cosine, `project_id`·`tenant` Silo).
 
 ### 2) Agent 활용 (Hybrid GraphRAG Agent Pipeline)
 

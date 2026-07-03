@@ -1,7 +1,7 @@
 .PHONY: venv test install build-wheel publish-wheel wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
 	ensure-namespace ensure-registry-secret k8s-apply-dev set-dev-image-tag deploy-dev build-images build-pipeline-image \
-	e2e-ingest-rag e2e-downstream test-infra-config deploy-qdrant-nebula verify-qdrant-nebula teardown-qdrant-nebula tune-node-inotify
+	e2e-ingest-rag e2e-downstream test-infra-config deploy-nebula verify-nebula teardown-nebula tune-node-inotify
 
 VENV := .venv
 PY := $(VENV)/bin/python3
@@ -127,26 +127,24 @@ e2e-downstream: install
 	./scripts/submit-downstream-e2e.sh
 
 test-infra-config:
-	chmod +x scripts/test-qdrant-config.sh scripts/test-nebula-config.sh scripts/test-nebula-studio-config.sh scripts/test-filestash-config.sh scripts/test-path-graph-secrets-config.sh deploy/k8s/base/render-filestash-config.sh scripts/render-filestash-config.sh
-	./scripts/test-qdrant-config.sh
+	chmod +x scripts/test-nebula-config.sh scripts/test-nebula-studio-config.sh scripts/test-filestash-config.sh scripts/test-path-graph-secrets-config.sh deploy/k8s/base/render-filestash-config.sh scripts/render-filestash-config.sh
 	./scripts/test-nebula-config.sh
 	./scripts/test-nebula-studio-config.sh
 	./scripts/test-filestash-config.sh
 	./scripts/test-path-graph-secrets-config.sh
 
-deploy-qdrant-nebula:
-	chmod +x scripts/deploy-qdrant-nebula.sh
-	./scripts/deploy-qdrant-nebula.sh --force
+deploy-nebula:
+	chmod +x scripts/deploy-nebula.sh
+	./scripts/deploy-nebula.sh --force
 
-verify-qdrant-nebula:
-	chmod +x scripts/verify-qdrant.sh scripts/verify-nebula.sh scripts/verify-nebula-studio.sh
-	./scripts/verify-qdrant.sh
+verify-nebula:
+	chmod +x scripts/verify-nebula.sh scripts/verify-nebula-studio.sh
 	./scripts/verify-nebula.sh
 	./scripts/verify-nebula-studio.sh
 
-teardown-qdrant-nebula:
-	chmod +x scripts/teardown-qdrant-nebula.sh
-	./scripts/teardown-qdrant-nebula.sh --force
+teardown-nebula:
+	chmod +x scripts/teardown-nebula.sh
+	./scripts/teardown-nebula.sh --force
 
 tune-node-inotify:
 	chmod +x ./scripts/tune-node-inotify.sh

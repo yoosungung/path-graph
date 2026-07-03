@@ -7,7 +7,8 @@
 | 항목 | 확인 |
 |------|------|
 | agents-runtime `runtime` NS | Garage, postgres, envoy |
-| path-graph infra | Qdrant, Nebula — `make deploy-qdrant-nebula` |
+| path-graph infra | Nebula — `make deploy-nebula` |
+| runtime PG | **17 + pgvector** (`pgvector/pgvector:pg17` in agents-runtime) |
 | Argo Workflows | **path-graph** — `make argo-install` (`deploy/k8s/argo/`) |
 | pipeline 이미지 | **GHA** `make build-images` (로컬 docker 없음) |
 | GHCR pull | `registry-creds` in `path-graph` NS (`make ensure-registry-secret`) |
@@ -46,35 +47,29 @@ make k8s-apply-dev    # set-dev-image-tag + secrets + dev overlay
 
 `k8s-apply-dev`는 `deploy/k8s/overlays/dev/kustomization.yaml`의 `newTag`를 현재 `IMAGE_TAG`(기본 HEAD SHA)로 갱신하고 `deploy/k8s/pipeline-image-tag`에 기록한다. 다른 SHA를 배포할 때: `IMAGE_TAG=<sha> make k8s-apply-dev`.
 
-## Qdrant · NebulaGraph
+## NebulaGraph
 
-path-graph가 [`deploy/k8s/infra/`](k8s/infra/)에서 Qdrant·NebulaGraph를 설치·운영한다.
+path-graph가 [`deploy/k8s/infra/`](k8s/infra/)에서 NebulaGraph를 설치·운영한다. 벡터(pgvector)는 agents-runtime **runtime Postgres** (`PATH_GRAPH_DSN`).
 
 ### 배포
 
 ```bash
-make test-infra-config       # pre-deploy (helm template + dry-run)
-make deploy-qdrant-nebula    # namespaces + Helm + Studio + Ingress
-make verify-qdrant-nebula    # post-deploy smoke
+make test-infra-config
+make deploy-nebula
+make verify-nebula
 ```
 
 | 항목 | 값 |
 |------|-----|
-| Qdrant NS | `qdrant` — in-cluster `http://qdrant.qdrant.svc.cluster.local:6333` |
-| Qdrant API key (dev) | `test-qdrant-api-key` (`QDRANT_API_KEY`로 override) |
-| Qdrant Dashboard | http://qdrant.k8s-test:6333/dashboard — **최초 접속 시 API key 입력** (`test-qdrant-api-key`). 브라우저 localStorage에 저장됨 |
-| Qdrant external (REST) | `http://qdrant.k8s-test:6333/` (Ingress + ingress-nginx socat `:6333`) |
 | Nebula graphd | `nebula-graphd-svc.nebula.svc.cluster.local:9669` — user `root` / `nebula` |
 | Nebula Studio | `http://nebula-studio.k8s-test:7001/` |
 
-로컬 디버그: `./scripts/wire-dev.sh up` → `:6333`, `:9669` port-forward (Ingress 불필요).
-
-**Ingress (LAN)**: `make deploy-qdrant-nebula`가 Ingress route를 적용한다. 공유 ingress-nginx(`test_infra`의 `helm/values/ingress-nginx.yaml`)에 hostPort `:6333`/`:7001`/TCP `:6334`가 있어야 LAN URL이 동작한다.
+로컬 디버그: `./scripts/wire-dev.sh up` → `:9669` port-forward.
 
 ### Teardown
 
 ```bash
-make teardown-qdrant-nebula
+make teardown-nebula
 ```
 
 ## Secrets

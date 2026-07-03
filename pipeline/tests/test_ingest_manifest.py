@@ -100,7 +100,7 @@ def test_ingest_manifest_reads_manifest_line_env(local_store, monkeypatch):
 def local_store(tmp_path, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     monkeypatch.setenv("PIPELINE_STORAGE_DIR", str(tmp_path))
-    monkeypatch.delenv("PATH_GRAPH_DSN", raising=False)
+    monkeypatch.setenv("PATH_GRAPH_DSN", "")
     get_settings.cache_clear()
     yield tmp_path
     get_settings.cache_clear()

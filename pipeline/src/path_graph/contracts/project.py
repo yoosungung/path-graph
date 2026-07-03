@@ -7,7 +7,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from path_graph.contracts.s3_keys import s3_key_wiki_prefix
-from path_graph.ids import nebula_space_name, normalize_project_slug, qdrant_collection_name, sha256_text
+from path_graph.ids import index_namespace, nebula_space_name, normalize_project_slug, sha256_text
 
 
 class ProjectProfile(BaseModel):
@@ -45,7 +45,7 @@ class ProjectUpdate(BaseModel):
 
 
 class KnowledgeBindingRag(BaseModel):
-    qdrant_collection: str
+    index_namespace: str
     filter: dict[str, str] = Field(default_factory=dict)
 
 
@@ -81,14 +81,14 @@ def resolve_knowledge_binding(tenant: str, project_id: str, project_slug: str) -
     if not project_id:
         raise ValueError("project_id is required")
     slug = normalize_project_slug(project_slug)
-    collection = qdrant_collection_name(tenant, slug)
+    namespace = index_namespace(tenant, slug)
     space = nebula_space_name(tenant, slug)
     return KnowledgeBinding(
         tenant=tenant,
         project_id=project_id,
         project_slug=slug,
         rag=KnowledgeBindingRag(
-            qdrant_collection=collection,
+            index_namespace=namespace,
             filter={"project_id": project_id},
         ),
         graph=KnowledgeBindingGraph(nebula_space=space),

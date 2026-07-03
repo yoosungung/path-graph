@@ -15,11 +15,10 @@ from path_graph.contracts.s3_keys import (
     s3_key_wiki_prefix,
 )
 from path_graph.graph.chunk_partition import make_nebula_store
-from path_graph.ids import nebula_space_name, qdrant_collection_name
+from path_graph.ids import nebula_space_name
 from path_graph.lifecycle.compensation import compensate_document_index
 from path_graph.lifecycle.wiki_stale import mark_project_wiki_stale
 from path_graph.meta.pg import PgMetaStore
-from path_graph.rag.qdrant_store import make_qdrant_store
 from path_graph.storage.blob import make_blob_store
 
 
@@ -173,10 +172,7 @@ def purge_project(
     wiki_prefix_deleted = blob.delete_prefix(s3_key_wiki_prefix(tenant, project_id))
     raw_prefix_deleted = blob.delete_prefix(s3_key_raw_prefix(tenant, project_id))
 
-    if s.qdrant_url:
-        qdrant = make_qdrant_store(s)
-        collection = qdrant_collection_name(tenant, profile.slug)
-        qdrant.delete_collection(collection)
+    pg.clear_embeddings_for_project(tenant, project_id)
 
     nebula = make_nebula_store(s)
     space = nebula_space_name(tenant, profile.slug)

@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-recursive", action="store_true")
     parser.add_argument("--dry-run", action="store_true", help="List files only, no download/ingest")
     parser.add_argument("--collect-only", action="store_true", help="Download to raw S3 only")
-    parser.add_argument("--rag", action="store_true", help="Run embed + Qdrant index")
+    parser.add_argument("--rag", action="store_true", help="Run embed + pgvector index")
     args = parser.parse_args(argv)
 
     settings = get_settings()

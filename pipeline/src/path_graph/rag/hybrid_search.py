@@ -1,11 +1,10 @@
-"""Hybrid PG FTS + Qdrant vector search with RRF fusion."""
+"""Hybrid PG FTS + pgvector search with RRF fusion."""
 
 from __future__ import annotations
 
 from path_graph.config import Settings, get_settings
 from path_graph.meta.pg import PgMetaStore
 from path_graph.rag.embed import EmbeddingClient
-from path_graph.rag.qdrant_store import make_qdrant_store
 from path_graph.rag.rrf import reciprocal_rank_fusion
 
 
@@ -40,7 +39,7 @@ def hybrid_search(
     rrf_k: int = 60,
     settings: Settings | None = None,
 ) -> list[dict]:
-    """Run PG FTS and Qdrant vector search in parallel channels, merge with RRF."""
+    """Run PG FTS and pgvector search in parallel channels, merge with RRF."""
     q = query.strip()
     if not q:
         return []
@@ -56,12 +55,10 @@ def hybrid_search(
 
     embedder = EmbeddingClient(s)
     query_vector = embedder.embed([q])[0]
-    qdrant = make_qdrant_store(s)
-    vector_rows = qdrant.search(
+    vector_rows = pg.search_vector(
         tenant,
-        project_slug,
+        project_id,
         query_vector,
-        project_id=project_id,
         limit=channel_limit,
     )
 

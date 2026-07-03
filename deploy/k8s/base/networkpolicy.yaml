@@ -36,14 +36,7 @@ spec:
           port: 5432
         - protocol: TCP
           port: 8080
-    # path-graph infra: Qdrant, Nebula
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: qdrant
-      ports:
-        - protocol: TCP
-          port: 6333
+    # path-graph infra: Nebula
     - to:
         - namespaceSelector:
             matchLabels:
@@ -70,8 +63,6 @@ spec:
           port: 3900
         - protocol: TCP
           port: 5432
-        - protocol: TCP
-          port: 6333
         - protocol: TCP
           port: 9669
         - protocol: TCP

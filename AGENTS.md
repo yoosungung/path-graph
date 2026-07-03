@@ -27,7 +27,7 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 - **README.md vs ARCHITECTURE.md / DESIGN.md.** README는 **인간 독자**(저장소 방문자·기여자)용이다. 계약·내부 설계는 README에 복사하지 않고 [ARCHITECTURE.md](ARCHITECTURE.md)·`<comp>/DESIGN.md`로 **링크만** 한다.
 - **배포 가능한 패키지·실행 하네스**에는 README를 둘 수 있다 — 해당 디렉터리 **로컬 사용법만**.
 - 파일이 새로 생기거나 용도가 바뀌면 위 표를 즉시 갱신한다.
-- 배포 런북은 `deploy/SETUP.md`, Kustomize 베이스는 `deploy/k8s/base/`, Qdrant/Nebula는 `deploy/k8s/infra/`, PR/push CI는 `.github/workflows/ci.yml`. 빈 stub을 만들지 않는다.
+- 배포 런북은 `deploy/SETUP.md`, Kustomize 베이스는 `deploy/k8s/base/`, Nebula는 `deploy/k8s/infra/`, PR/push CI는 `.github/workflows/ci.yml`. 빈 stub을 만들지 않는다.
 
 ## 2. 수행 방법 (How we work in this repo)
 
@@ -41,4 +41,4 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console ingest + GraphRAG downstream · GHA `build-images` → GHCR (git SHA tag) · `make test` (253 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console ingest + GraphRAG downstream · GHA `build-images` → GHCR (git SHA tag) · `make test` (266 tests).
