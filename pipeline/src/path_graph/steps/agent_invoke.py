@@ -10,7 +10,11 @@ from typing import Any
 import httpx
 
 from path_graph.config import Settings, get_settings
-from path_graph.contracts.schemas import AgentInvokeInput, AgentInvokePayload
+from path_graph.contracts.schemas import (
+    AgentInvokeInput,
+    AgentInvokePayload,
+    unwrap_agent_graph_output,
+)
 
 
 class AgentInvokeError(RuntimeError):
@@ -29,9 +33,7 @@ def _auth_headers(token: str) -> dict[str, str]:
 
 
 def _unwrap_output(body: dict[str, Any]) -> dict[str, Any]:
-    if isinstance(body, dict) and "output" in body:
-        return body["output"]
-    return body
+    return unwrap_agent_graph_output(body)
 
 
 def _argo_callback(job_id: str, settings: Settings) -> dict[str, Any] | None:
@@ -139,7 +141,9 @@ def _poll_async_job(
                 output = data.get("output")
                 if output is None:
                     raise AgentInvokeError(f"job {job_id} succeeded without output")
-                return output if isinstance(output, dict) else json.loads(json.dumps(output))
+                if isinstance(output, dict):
+                    return _unwrap_output(output)
+                return unwrap_agent_graph_output(json.loads(json.dumps(output)))
             if status == "failed":
                 raise AgentInvokeError(data.get("error") or f"job {job_id} failed")
             if interval:

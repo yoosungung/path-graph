@@ -40,6 +40,21 @@ class GraphExtractorInput(BaseModel):
     idempotency_key: str
 
 
+def unwrap_agent_graph_output(body: Any) -> dict[str, Any]:
+    """Peel runtime ``{\"output\": ...}`` envelopes until graph_v1 keys are visible."""
+    if not isinstance(body, dict):
+        return {}
+    current: dict[str, Any] = body
+    while isinstance(current, dict) and "output" in current:
+        if "entities" in current or "edges" in current:
+            break
+        inner = current.get("output")
+        if not isinstance(inner, dict):
+            break
+        current = inner
+    return current
+
+
 class WikiSynthesizerInput(BaseModel):
     tenant: str
     project_id: str

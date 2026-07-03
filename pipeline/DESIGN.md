@@ -475,6 +475,7 @@ MS GraphRAG 사상을 **Knowledge Project** 경계와 정합되게 구현한다.
 2. `run_graph_pipeline` — project별 graph-extractor + Nebula upsert (`graph/nebula_store.py`)
    - **정본**: `graph-extractor` semantic `entities`/`edges` → `EXTRACTED`/`INFERRED`
    - **보조**: chunk `[[wikilink]]` → `MENTIONS` (일반 PDF/HWP ingest에는 없음)
+   - agent job `output`은 runtime이 `{"output": <LangGraph state>}`로 한 겹 감쌀 수 있다. `unwrap_agent_graph_output()`으로 `entities`/`edges`가 있는 dict까지 벗긴 뒤 Nebula upsert한다 (fixture: `tests/fixtures/graph_extractor/opik_span_019f2579-93b7.json`).
    - 반환: `batch_entity_ids` — semantic `entities[].id` 집합 (community batch 스코프)
    - **Nebula space bootstrap** (`NebulaGraphStore.ensure_space`): `CREATE SPACE` → heartbeat 대기 → `USE` → `CREATE TAG`/`CREATE EDGE` DDL → schema 전파 대기. 태그 `Entity`, `Chunk`; 엣지 `EXTRACTED`, `INFERRED`, `MENTIONS`. DDL은 비동기 반영이므로 `SHOW TAGS`/`SHOW EDGES` 폴링(`NEBULA_SCHEMA_WAIT_SEC`, 기본 20s).
    - upsert 실패 시 `RuntimeError` — silent ignore 금지.

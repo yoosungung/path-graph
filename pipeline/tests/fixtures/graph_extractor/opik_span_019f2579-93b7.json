@@ -1,0 +1,81 @@
+{
+  "source": "opik",
+  "trace_id": "019f2579-9390-72d0-b0f4-a65233312cd1",
+  "span_id": "019f2579-93b7-7158-8888-59f236b24954",
+  "agent_job_output": {
+    "entities": [
+      {
+        "id": "entity:프로젝트 지원 규정",
+        "name": "프로젝트 지원 규정",
+        "description": "파견근무 시 발생하는 비용의 지원 기준과 범위를 정의하는 규정"
+      },
+      {
+        "id": "entity:프로젝트",
+        "name": "프로젝트",
+        "description": "고객사 사업장에 상주하거나 고객사의 관리/감독/통제를 받으며 수행하는 근무 형태"
+      },
+      {
+        "id": "entity:현장대리인(PM)",
+        "name": "현장대리인(PM)",
+        "description": "프로젝트 현장에서 사업 전반을 관리하고 책임지는 자"
+      },
+      {
+        "id": "entity:프로젝트 지원비",
+        "name": "프로젝트 지원비",
+        "description": "파견근무 직원의 복리후생 및 프로젝트 원가관리를 위해 지원되는 비용"
+      },
+      {
+        "id": "entity:대표이사",
+        "name": "대표이사",
+        "description": "영업이익률 10% 미만 프로젝트의 전략적 투자비용에 대한 별도 승인 권한 보유자"
+      },
+      {
+        "id": "entity:원격지 근무",
+        "name": "원격지 근무",
+        "description": "수도권 외 지역에서 근무하며 체류가 필요한 경우 발생하는 근무 형태"
+      },
+      {
+        "id": "entity:파견수당 지급규정",
+        "name": "파견수당 지급규정",
+        "description": "2026년 2월 28일자로 폐지되는 기존 파견수당 규정"
+      }
+    ],
+    "edges": [
+      {
+        "type": "EXTRACTED",
+        "source": "entity:프로젝트",
+        "target": "entity:프로젝트 지원비",
+        "confidence": 1.0,
+        "description": "프로젝트 수행 시 발생하는 비용를 지원함"
+      },
+      {
+        "type": "EXTRACTED",
+        "source": "entity:현장대리인(PM)",
+        "target": "entity:프로젝트 지원비",
+        "confidence": 1.0,
+        "description": "현장대리인(PM)에게 프로젝트 지원비 집행 권한이 한정됨"
+      },
+      {
+        "type": "EXTRACTED",
+        "source": "entity:프로젝트 지원비",
+        "target": "entity:현장대리인(PM)",
+        "confidence": 1.0,
+        "description": "현장대리인(PM)에게 월 30만원 한도 내 지원됨"
+      },
+      {
+        "type": "EXTRACTED",
+        "source": "entity:대표이사",
+        "target": "entity:프로젝트 지원비",
+        "confidence": 1.0,
+        "description": "영업이익률 10% 미만 시 대표이사의 별도 승인으로 지원 가능"
+      },
+      {
+        "type": "EXTRACTED",
+        "source": "entity:원격지 근무",
+        "target": "entity:프로젝트 지원비",
+        "confidence": 1.0,
+        "description": "원격지 근무 시 교통비 및 숙박비가 별도로 지원됨"
+      }
+    ]
+  }
+}

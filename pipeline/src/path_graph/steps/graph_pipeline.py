@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from path_graph.config import get_settings
-from path_graph.contracts.schemas import GraphExtractorInput
+from path_graph.contracts.schemas import GraphExtractorInput, unwrap_agent_graph_output
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.ids import nebula_space_name
@@ -45,7 +45,7 @@ def graph_extract_semantic(
         output_schema="graph_v1",
         idempotency_key=f"{batch_id}:{project_id}",
     )
-    return invoke_agent("graph-extractor", inp, session_id)
+    return unwrap_agent_graph_output(invoke_agent("graph-extractor", inp, session_id))
 
 
 def _entity_id(name: str) -> str:
@@ -67,6 +67,7 @@ def _upsert_semantic_edges(
     space: str,
     semantic: dict,
 ) -> None:
+    semantic = unwrap_agent_graph_output(semantic)
     entities = semantic.get("entities") or []
     if entities:
         nebula.upsert_entities(space, entities)
