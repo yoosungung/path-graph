@@ -8,8 +8,20 @@ resources:
 images:
   - name: path-graph/pipeline
     newName: ghcr.io/yoosungung/path-graph/pipeline
-    newTag: e09b09c0ef1048af05bac28c8f168fe1b52e2615
+    newTag: b1442da87ff96ce8e67a659356c6f9e50542810c
 patches:
+  - patch: |-
+      - op: remove
+        path: /spec/parallelism
+    target:
+      kind: WorkflowTemplate
+      name: pipeline-ingest-rag
+  - patch: |-
+      - op: remove
+        path: /spec/parallelism
+    target:
+      kind: WorkflowTemplate
+      name: pipeline-collect-ingest-rag
   - patch: |-
       - op: replace
         path: /data/default-v1

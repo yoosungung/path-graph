@@ -24,8 +24,10 @@ deploy/
 
 | 리소스 | 용도 |
 |--------|------|
-| `argo/values.yaml` | Helm values — controller + server, Ingress `argo.k8s-test` |
+| `argo/values.yaml` | Helm values — controller + server, Ingress `argo.k8s-test`, `workflowDefaults.spec.podGC.deleteDelayDuration` |
 | `scripts/install-argo.sh` | `helm upgrade --install argo-workflows` (`argo` NS) |
+
+`deleteDelayDuration`는 **WorkflowTemplate CR에 넣지 않는다** — `workflowDefaults`와 병합 시 Argo v4.0.6 `int64` 검증 오류. `podGC.strategy`·`parallelism: "{{workflow.parameters.max_parallel}}"`는 **base** 템플릿에 둔다. dev overlay는 JSON patch로 `parallelism`만 제거(v4.0.6 런타임; 동시성은 `ingest-map` semaphore).
 
 ```bash
 make argo-install          # Helm upgrade + rollout wait

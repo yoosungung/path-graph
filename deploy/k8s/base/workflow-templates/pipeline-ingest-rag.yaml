@@ -24,10 +24,9 @@ spec:
       configMapKeyRef:
         name: path-graph-limits
         key: embed
-  parallelism: "{{workflow.parameters.max_parallel}}"
   podGC:
     strategy: OnPodCompletion
-    deleteDelayDuration: 60s
+  parallelism: "{{workflow.parameters.max_parallel}}"
   ttlStrategy:
     secondsAfterCompletion: 600
     secondsAfterFailure: 7200

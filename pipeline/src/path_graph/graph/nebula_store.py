@@ -417,6 +417,8 @@ class NebulaGraphStore:
         sess = self._session()
         deleted = 0
         try:
+            if not self._space_visible(sess, space):
+                return 0
             self._execute(sess, f"USE {space};")
             for cid in chunk_ids:
                 self._execute(sess, f"DELETE VERTEX {_ngql_string(cid)};")

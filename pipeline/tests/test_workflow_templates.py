@@ -45,6 +45,16 @@ def test_build_images_workflow_does_not_push_latest():
     assert "github.sha" in text
 
 
+def test_dev_kustomize_omits_templated_parallelism_for_argo_v4():
+    proc = subprocess.run(
+        ["kubectl", "kustomize", str(REPO_ROOT / "deploy/k8s/overlays/dev")],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert 'parallelism: "{{workflow.parameters.max_parallel}}"' not in proc.stdout
+
+
 def test_dev_kustomize_render_uses_pinned_registry_tag():
     proc = subprocess.run(
         ["kubectl", "kustomize", str(REPO_ROOT / "deploy/k8s/overlays/dev")],
@@ -63,13 +73,19 @@ def test_dev_kustomize_render_uses_pinned_registry_tag():
     assert match, "rendered manifests must pin pipeline image to git SHA"
 
 
-def test_pipeline_ingest_rag_parallelism_and_pod_gc():
+def test_pipeline_workflow_templates_no_delete_delay_duration():
+    """deleteDelayDuration in WorkflowTemplate merges with workflowDefaults → Argo v4.0.6 int64."""
+    for path in _pipeline_workflow_templates():
+        text = path.read_text(encoding="utf-8")
+        assert "deleteDelayDuration:" not in text, f"{path.name} must not declare deleteDelayDuration"
+
+
+def test_pipeline_ingest_rag_parallelism_pod_gc_and_ttl():
     text = INGEST_RAG.read_text(encoding="utf-8")
     assert 'name: max_parallel' in text
     assert 'parallelism: "{{workflow.parameters.max_parallel}}"' in text
-    assert "key: ingest-map" in text
     assert "strategy: OnPodCompletion" in text
-    assert "deleteDelayDuration: 60s" in text
+    assert "key: ingest-map" in text
     assert "secondsAfterCompletion: 600" in text
 
 
@@ -81,8 +97,8 @@ def test_pipeline_collect_only_template_exists():
     assert "pipeline-ingest-rag" not in text
 
 
-def test_pipeline_collect_ingest_rag_pod_gc():
+def test_pipeline_collect_ingest_rag_parallelism():
     text = COLLECT_INGEST.read_text(encoding="utf-8")
     assert 'name: max_parallel' in text
+    assert 'parallelism: "{{workflow.parameters.max_parallel}}"' in text
     assert "strategy: OnPodCompletion" in text
-    assert "deleteDelayDuration: 60s" in text

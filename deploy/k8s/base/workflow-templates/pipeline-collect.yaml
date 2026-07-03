@@ -19,7 +19,6 @@ spec:
         value: ""
   podGC:
     strategy: OnPodCompletion
-    deleteDelayDuration: 60s
   ttlStrategy:
     secondsAfterCompletion: 600
     secondsAfterFailure: 7200

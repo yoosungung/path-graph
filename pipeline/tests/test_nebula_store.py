@@ -149,5 +149,18 @@ def test_entity_ids_for_chunks_live_queries_mentions() -> None:
     assert "chunk-2" in nql
 
 
+def test_delete_chunks_skips_missing_space() -> None:
+    store = NebulaGraphStore("h", 9669, "root", "pw")
+    session = MagicMock()
+    session.execute.return_value = _FakeResult(rows=[])
+
+    with patch.object(store, "_session", return_value=session):
+        deleted = store.delete_chunks("path_graph_dev_missing", ["chunk-1"])
+
+    assert deleted == 0
+    joined = "\n".join(call.args[0] for call in session.execute.call_args_list)
+    assert "USE path_graph_dev_missing" not in joined
+
+
 def test_decode_value_bytes() -> None:
     assert _decode_value(_FakeValue("entity:x")) == "entity:x"
