@@ -54,6 +54,7 @@ def run_community_pipeline_for_project(
     nebula: NebulaGraphStore | None = None,
     settings: Settings | None = None,
     pg: PgMetaStore | None = None,
+    batch_entity_ids: set[str] | None = None,
 ) -> dict:
     s = settings or get_settings()
     store = make_blob_store(s)
@@ -62,7 +63,11 @@ def run_community_pipeline_for_project(
 
     lines = read_jsonl(store, chunks_key)
     batch_chunk_ids = {line["chunk_id"] for line in lines}
-    edges = nebula.export_project_graph(space, batch_chunk_ids=batch_chunk_ids)
+    edges = nebula.export_project_graph(
+        space,
+        batch_chunk_ids=batch_chunk_ids,
+        batch_entity_ids=batch_entity_ids,
+    )
     clusters = detect_communities(
         edges,
         max_cluster_size=s.community_max_cluster_size,
@@ -109,7 +114,9 @@ def run_community_pipeline(
     nebula: NebulaGraphStore | None = None,
     settings: Settings | None = None,
     pg: PgMetaStore | None = None,
+    batch_entity_ids_by_project: dict[str, set[str]] | None = None,
 ) -> list[dict]:
+    entity_ids_map = batch_entity_ids_by_project or {}
     results: list[dict] = []
     for project_id in sorted(project_chunks):
         results.append(
@@ -122,6 +129,7 @@ def run_community_pipeline(
                 nebula=nebula,
                 settings=settings,
                 pg=pg,
+                batch_entity_ids=entity_ids_map.get(project_id),
             )
         )
     return results

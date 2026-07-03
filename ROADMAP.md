@@ -150,6 +150,7 @@
 | 3.1.4 | `graphrag_pipeline` / WF `pipeline-graphrag` | [x] | cluster E2E (`submit-downstream-e2e.sh`, `skip_agent=1`) |
 | 3.1.5 | Graph-enhanced Wiki **프롬프트** (MS GraphRAG 템플릿) | [x] | `community_report.txt` |
 | 3.1.6 | graph-extractor / wiki-synthesizer **LangGraph** 본구현 | [x] | `StateGraph` load→LLM JSON schema; artifact는 presigned HTTP(`agent_artifact_uri`) — agent pool S3 credential 불필요 |
+| 3.1.7 | community export **semantic batch 스코핑** | [x] | `batch_entity_ids` from graph-extractor; MENTIONS-only scoping 폐기 (PDF/HWP GraphRAG) |
 
 ### 3.2 agents-runtime 연동
 

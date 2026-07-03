@@ -230,15 +230,31 @@ class NebulaGraphStore:
         finally:
             sess.release()
 
+    def _resolve_batch_scope(
+        self,
+        space: str,
+        *,
+        batch_entity_ids: set[str] | None,
+        batch_chunk_ids: set[str] | None,
+    ) -> set[str] | None:
+        if batch_entity_ids is not None:
+            return batch_entity_ids
+        if batch_chunk_ids:
+            return self._entity_ids_for_chunks(space, batch_chunk_ids)
+        return None
+
     def export_project_graph(
         self,
         space: str,
         *,
         batch_chunk_ids: set[str] | None = None,
+        batch_entity_ids: set[str] | None = None,
     ) -> list[tuple[str, str, float]]:
         """Export entity-entity edges within a single Nebula space."""
         if self._memory is not None:
-            return self._export_from_memory(space, batch_chunk_ids)
+            return self._export_from_memory(
+                space, batch_chunk_ids, batch_entity_ids=batch_entity_ids
+            )
         sess = self._session()
         try:
             self._execute(sess, f"USE {space};")
@@ -254,8 +270,12 @@ class NebulaGraphStore:
                 tgt = _decode_value(row.values[1])
                 if src and tgt:
                     edges.append((src, tgt, 1.0))
-            if batch_chunk_ids:
-                scoped = self._entity_ids_for_chunks(space, batch_chunk_ids)
+            scoped = self._resolve_batch_scope(
+                space,
+                batch_entity_ids=batch_entity_ids,
+                batch_chunk_ids=batch_chunk_ids,
+            )
+            if scoped is not None:
                 edges = [(s, t, w) for s, t, w in edges if s in scoped and t in scoped]
             return edges
         finally:
@@ -265,12 +285,16 @@ class NebulaGraphStore:
         self,
         space: str,
         batch_chunk_ids: set[str] | None,
+        *,
+        batch_entity_ids: set[str] | None = None,
     ) -> list[tuple[str, str, float]]:
         mem = self._memory.get(space) if self._memory else None
         if mem is None:
             return []
         scoped: set[str] | None = None
-        if batch_chunk_ids:
+        if batch_entity_ids is not None:
+            scoped = batch_entity_ids
+        elif batch_chunk_ids:
             scoped = {
                 eid
                 for chunk_id, eid in mem.mentions
@@ -287,7 +311,7 @@ class NebulaGraphStore:
                 continue
             weight = float(edge.get("confidence", 1.0))
             edges.append((src, tgt, weight))
-        if not edges and scoped:
+        if not edges and scoped and batch_entity_ids is None:
             # Wikilink-only graphs: infer co-mention edges between entities in batch
             entity_list = sorted(scoped)
             for i, a in enumerate(entity_list):

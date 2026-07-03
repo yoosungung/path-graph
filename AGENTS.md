@@ -41,4 +41,4 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 
 ## 3. Status
 
-ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console ingest + GraphRAG downstream · GHA `build-images` → GHCR (git SHA tag) · `make test` (218 tests).
+ARCHITECTURE.md · ROADMAP.md · pipeline v0.1.0 · Admin Console ingest + GraphRAG downstream · GHA `build-images` → GHCR (git SHA tag) · `make test` (253 tests).

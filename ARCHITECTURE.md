@@ -56,6 +56,9 @@ RAG ingest 이후 Graph(Nebula)·Wiki(S3) 적재. Console MVP는 **`pipeline-gra
 | **API** | `POST /api/pipeline/projects/{project_id}/graphrag` → **202** `{batch_id, chunks_key, workflow_name, …}` |
 | **멱등** | pipeline step Upsert/Merge. **동시 실행만 금지** — 동일 batch graphrag WF **Running/Pending/submitted** 시 **409**. Succeeded/Failed 후 **재빌드 허용** (run row 신규) |
 | **도메인** | `path_graph.admin.downstream` — 외부는 `path_graph.console.downstream` 경유 |
+| **그래프 추출 (정본)** | ingest 문서(PDF/HWP/SharePoint 등) plain chunk → **`graph-extractor` agent** semantic `entities`/`edges` → Nebula `EXTRACTED`/`INFERRED` |
+| **그래프 추출 (보조)** | chunk `text` 내 `[[wikilink]]` → deterministic `MENTIONS` — 컴파일드 마크다운·위키 소스용. **일반 ingest만으로는 wikilink를 요구하지 않는다** |
+| **Community batch 스코프** | hierarchical Leiden 입력은 **해당 batch graph-extractor가 반환한 entity id 집합**(`batch_entity_ids`)으로 `EXTRACTED`/`INFERRED` 엣지를 필터한다. `MENTIONS`만으로 batch를 스코핑하지 않는다 |
 
 ### Knowledge Project · Agent Binding
 
@@ -228,6 +231,7 @@ RLS: `tenant` = session `app.tenant`. 마이그레이션: `path_graph.migrations
 - Space: `path_graph_{tenant_slug}_{project_slug}` — Qdrant collection과 동일 (`ids.nebula_space_name`)
 - Vertex id: deterministic (`entity:{uuid}`, `chunk:{chunk_id}`)
 - Edge: `EXTRACTED`, `INFERRED`, `MENTIONS` — 양끝 vertex 동일 Space
+- Community export: batch별 `EXTRACTED`/`INFERRED` 스코프는 graph-extractor `entities[].id` 집합(§1 GraphRAG). `MENTIONS`는 wikilink 보조 경로일 때만 fallback 스코프로 쓴다.
 
 ### 2.5 Agent invoke (요약)
 

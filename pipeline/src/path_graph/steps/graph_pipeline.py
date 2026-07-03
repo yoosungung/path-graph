@@ -52,6 +52,16 @@ def _entity_id(name: str) -> str:
     return f"entity:{name}"
 
 
+def semantic_batch_entity_ids(semantic: dict) -> set[str] | None:
+    """Entity ids from graph-extractor output; None when empty (wikilink fallback)."""
+    ids = {
+        str(ent["id"])
+        for ent in (semantic.get("entities") or [])
+        if ent.get("id")
+    }
+    return ids if ids else None
+
+
 def _upsert_semantic_edges(
     nebula: NebulaGraphStore,
     space: str,
@@ -152,7 +162,9 @@ def run_graph_pipeline(
         skip_agent=skip_agent,
         nebula=nebula,
     )
+    batch_entity_ids = semantic_batch_entity_ids(result.get("semantic") or {})
     return {
         "project": result,
         "project_chunks": {project_id: project_chunks_key},
+        "batch_entity_ids": {project_id: batch_entity_ids} if batch_entity_ids else {},
     }

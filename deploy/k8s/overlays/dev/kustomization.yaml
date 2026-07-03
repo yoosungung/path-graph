@@ -8,7 +8,7 @@ resources:
 images:
   - name: path-graph/pipeline
     newName: ghcr.io/yoosungung/path-graph/pipeline
-    newTag: 8d8996deba1bcd3f74ddd9548efa09cd2a78110b
+    newTag: 08d992511349bbc6bba4b10714e82f3eefc86f2c
 patches:
   - patch: |-
       - op: replace

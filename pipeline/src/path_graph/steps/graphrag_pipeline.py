@@ -42,6 +42,7 @@ def run_graphrag_pipeline(
         nebula=nebula,
         settings=settings,
         pg=pg,
+        batch_entity_ids_by_project=graph_result.get("batch_entity_ids"),
     )
     all_records = []
     for comm in community_results:
