@@ -57,7 +57,7 @@ def test_api_get_binding(mock_proj, mock_settings, mock_resolve):
         project_slug="default",
         rag=KnowledgeBindingRag(index_namespace="path_graph_dev_default"),
         graph=KnowledgeBindingGraph(nebula_space="path_graph_dev_default"),
-        wiki=KnowledgeBindingWiki(s3_prefix=f"wiki/dev/{PROJECT_ID}/"),
+        wiki=KnowledgeBindingWiki(vfs_mount="/wiki/dev/"),
     )
     out = api_get_binding("dev", PROJECT_ID)
     assert out["rag"]["index_namespace"] == "path_graph_dev_default"

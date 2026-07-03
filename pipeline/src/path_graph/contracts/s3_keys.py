@@ -9,7 +9,6 @@ S3_PREFIXES = (
     "batches",
     "communities",
     "graph_context",
-    "wiki",
 )
 
 
@@ -75,11 +74,3 @@ def s3_key_graph_context(
 
 def s3_key_raw_prefix(tenant: str, project_id: str) -> str:
     return f"raw/{tenant}/{project_id}/"
-
-
-def s3_key_wiki_prefix(tenant: str, project_id: str) -> str:
-    return f"wiki/{tenant}/{project_id}/"
-
-
-def s3_key_wiki(tenant: str, project_id: str, page_slug: str) -> str:
-    return f"wiki/{tenant}/{project_id}/{page_slug}.md"

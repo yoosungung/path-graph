@@ -28,7 +28,7 @@ gh run watch   # 또는: gh run list --workflow=build-images.yml --limit=1
 Release publish 시 GHA가 `:<git-sha>`와 `:<release-tag>`를 함께 push한다:
 
 ```bash
-gh release create v0.1.1 --title "v0.1.1" --target main
+gh release create v0.1.2 --title "v0.1.2" --target main
 ```
 
 ### 로컬 빌드 (docker)

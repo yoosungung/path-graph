@@ -98,6 +98,9 @@ def test_graphrag_semantic_only_plain_chunk_builds_communities(local_store, monk
     ), patch(
         "path_graph.steps.wiki_pipeline.invoke_agent",
         side_effect=_mock_invoke_agent,
+    ), patch(
+        "path_graph.steps.wiki_pipeline.write_wiki_page",
+        lambda tenant, project_id, slug, content, **kwargs: f"/{slug}.md",
     ):
         result = run_graphrag_pipeline(
             "dev",

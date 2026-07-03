@@ -10,8 +10,6 @@ from path_graph.contracts.s3_keys import (
     s3_key_graph_context,
     s3_key_raw,
     s3_key_raw_prefix,
-    s3_key_wiki,
-    s3_key_wiki_prefix,
 )
 from path_graph.contracts.schemas import (
     AgentInvokePayload,
@@ -43,7 +41,6 @@ def test_s3_key_layout():
     doc = str(uuid.uuid4())
     assert s3_key_chunks(t, doc) == f"chunks/{t}/{doc}/chunks.jsonl"
     assert s3_key_raw_prefix(t, PROJECT_ID) == f"raw/{t}/{PROJECT_ID}/"
-    assert s3_key_wiki_prefix(t, PROJECT_ID) == f"wiki/{t}/{PROJECT_ID}/"
 
 
 def test_document_id_deterministic():
@@ -80,7 +77,6 @@ def test_knowledge_binding_resolve():
     assert binding.rag.index_namespace == "path_graph_acme_product-docs"
     assert binding.graph.nebula_space == "path_graph_acme_product-docs"
     assert binding.rag.filter["project_id"] == PROJECT_ID
-    assert binding.wiki.s3_prefix == s3_key_wiki_prefix("acme", PROJECT_ID)
     assert binding.wiki.vfs_mount == "/wiki/product-docs/"
 
 
@@ -131,7 +127,6 @@ def test_project_scoped_s3_keys():
     assert s3_key_graph_context(t, PROJECT_ID, b, cid) == (
         f"graph_context/{t}/{PROJECT_ID}/{b}/{cid}.json"
     )
-    assert s3_key_wiki(t, PROJECT_ID, "page-1") == f"wiki/{t}/{PROJECT_ID}/page-1.md"
 
 
 def test_community_id_includes_project():

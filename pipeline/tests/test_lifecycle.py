@@ -69,6 +69,7 @@ def test_lifecycle_step_modules_import_without_cycle():
         importlib.import_module(mod)
 
 
+@patch("path_graph.lifecycle.purge.delete_project_wiki_tree", return_value=0)
 @patch("path_graph.lifecycle.purge.make_nebula_store")
 @patch("path_graph.lifecycle.purge.make_blob_store")
 @patch("path_graph.lifecycle.purge.PgMetaStore")
@@ -78,6 +79,7 @@ def test_purge_project_deletes_raw_prefix_for_already_purged_docs(
     mock_pg_cls,
     mock_blob_factory,
     mock_nebula_factory,
+    mock_delete_wiki,
     tmp_path,
 ):
     tenant = "didim"

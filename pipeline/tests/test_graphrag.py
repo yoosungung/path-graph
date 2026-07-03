@@ -34,6 +34,10 @@ def test_graphrag_pipeline_skip_agent(local_store, monkeypatch):
         "path_graph.steps.graph_pipeline.make_nebula_store",
         lambda settings=None: nebula,
     )
+    monkeypatch.setattr(
+        "path_graph.steps.wiki_pipeline.write_wiki_page",
+        lambda tenant, project_id, slug, content, **kwargs: f"/{slug}.md",
+    )
 
     result = run_graphrag_pipeline(
         "dev", PROJECT_ID, "default", "b1", chunks_key, "sess", skip_agent=True
@@ -77,6 +81,10 @@ def test_graphrag_pipeline_marks_ingest_state(local_store, monkeypatch):
     monkeypatch.setattr(
         "path_graph.steps.graph_pipeline.make_nebula_store",
         lambda settings=None: nebula,
+    )
+    monkeypatch.setattr(
+        "path_graph.steps.wiki_pipeline.write_wiki_page",
+        lambda tenant, project_id, slug, content, **kwargs: f"/{slug}.md",
     )
 
     mark_mock = MagicMock(return_value=1)

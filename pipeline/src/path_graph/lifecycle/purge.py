@@ -12,7 +12,6 @@ from path_graph.contracts.s3_keys import (
     s3_key_parsed_md,
     s3_key_parsed_meta,
     s3_key_raw_prefix,
-    s3_key_wiki_prefix,
 )
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.ids import nebula_space_name
@@ -20,6 +19,7 @@ from path_graph.lifecycle.compensation import compensate_document_index
 from path_graph.lifecycle.wiki_stale import mark_project_wiki_stale
 from path_graph.meta.pg import PgMetaStore
 from path_graph.storage.blob import make_blob_store
+from path_graph.storage.wiki_vfs import delete_project_wiki_tree
 
 
 def _delete_parsed_artifacts(
@@ -169,7 +169,7 @@ def purge_project(
             )
 
     blob = make_blob_store(s)
-    wiki_prefix_deleted = blob.delete_prefix(s3_key_wiki_prefix(tenant, project_id))
+    wiki_rows_deleted = delete_project_wiki_tree(tenant, project_id, settings=s)
     raw_prefix_deleted = blob.delete_prefix(s3_key_raw_prefix(tenant, project_id))
 
     pg.clear_embeddings_for_project(tenant, project_id)
@@ -193,7 +193,7 @@ def purge_project(
     return {
         "status": "purged",
         "project_id": project_id,
-        "prefix_deleted": wiki_prefix_deleted,
+        "wiki_rows_deleted": wiki_rows_deleted,
         "raw_prefix_deleted": raw_prefix_deleted,
         "purged_documents": len(results),
     }

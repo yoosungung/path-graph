@@ -4,12 +4,12 @@ import json
 
 from path_graph.config import Settings, get_settings
 from path_graph.contracts.community import CommunityRecord
-from path_graph.contracts.s3_keys import s3_key_wiki
 from path_graph.contracts.schemas import WikiSynthesizerInput
 from path_graph.ids import wiki_slug_for_community
 from path_graph.meta.pg import PgMetaStore
 from path_graph.steps.agent_invoke import invoke_agent
 from path_graph.storage.blob import make_blob_store
+from path_graph.storage.wiki_vfs import write_wiki_page
 
 
 def wiki_synthesize(
@@ -47,25 +47,22 @@ def store_wiki_pages(
     batch_id: str | None = None,
     pg: PgMetaStore | None = None,
 ) -> list[str]:
-    store = make_blob_store(get_settings())
-    uris: list[str] = []
+    paths: list[str] = []
     for page in pages:
         slug = page["slug"]
         body = page.get("markdown") or page.get("content") or ""
-        key = s3_key_wiki(tenant, project_id, slug)
-        uri = store.put_bytes(key, body.encode("utf-8"))
-        uris.append(uri)
+        vfs_path = write_wiki_page(tenant, project_id, slug, body)
+        paths.append(vfs_path)
         if pg:
             pg.upsert_wiki_page(
                 tenant,
                 project_id,
                 slug,
-                uri,
                 title=page.get("title"),
                 community_id=community_id,
                 batch_id=batch_id,
             )
-    return uris
+    return paths
 
 
 def _stub_page_from_context(graph_context_key: str, record: CommunityRecord) -> dict:
@@ -107,7 +104,7 @@ def run_wiki_for_community(
     pages = result.get("pages") or []
     if not pages and skip_agent:
         pages = [_stub_page_from_context(record.graph_context_key, record)]
-    uris = (
+    paths = (
         store_wiki_pages(
             tenant,
             record.project_id,
@@ -119,7 +116,7 @@ def run_wiki_for_community(
         if pages
         else []
     )
-    return {"agent_result": result, "wiki_uris": uris, "community_id": record.community_id}
+    return {"agent_result": result, "wiki_paths": paths, "community_id": record.community_id}
 
 
 def run_wiki_pipeline(

@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
-from path_graph.contracts.s3_keys import s3_key_wiki_prefix
 from path_graph.ids import index_namespace, nebula_space_name, normalize_project_slug, sha256_text
 
 
@@ -54,7 +53,6 @@ class KnowledgeBindingGraph(BaseModel):
 
 
 class KnowledgeBindingWiki(BaseModel):
-    s3_prefix: str
     vfs_mount: str = "/wiki"
 
 
@@ -93,7 +91,6 @@ def resolve_knowledge_binding(tenant: str, project_id: str, project_slug: str) -
         ),
         graph=KnowledgeBindingGraph(nebula_space=space),
     wiki=KnowledgeBindingWiki(
-        s3_prefix=s3_key_wiki_prefix(tenant, project_id),
         vfs_mount=f"/wiki/{slug}/",
     ),
     )

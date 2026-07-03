@@ -7,8 +7,9 @@ from path_graph.steps.wiki_pipeline import run_wiki_for_community
 from constants import PROJECT_ID
 
 
+@patch("path_graph.steps.wiki_pipeline.write_wiki_page")
 @patch("path_graph.steps.wiki_pipeline.invoke_agent")
-def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, local_store, monkeypatch):
+def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, mock_write_wiki, local_store, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     mock_invoke_agent.return_value = {
         "pages": [
@@ -19,6 +20,7 @@ def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, local_store, monkey
             }
         ],
     }
+    mock_write_wiki.return_value = "/default-community-L0-abc12345.md"
 
     memory: dict = {}
     nebula = NebulaGraphStore("h", 1, "u", "p", memory=memory)
@@ -60,13 +62,19 @@ def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, local_store, monkey
     record = comm["records"][0]
 
     wiki = run_wiki_for_community("dev", record, "sess", skip_agent=False)
-    assert wiki["wiki_uris"]
+    assert wiki["wiki_paths"] == ["/default-community-L0-abc12345.md"]
     mock_invoke_agent.assert_called_once()
-    body = store.get_bytes(f"wiki/dev/{PROJECT_ID}/default-community-L0-abc12345.md")
-    assert b"From LLM." in body
+    mock_write_wiki.assert_called_once_with(
+        "dev",
+        PROJECT_ID,
+        "default-community-L0-abc12345",
+        "# Report\n\nFrom LLM.",
+    )
 
 
-def test_community_and_wiki_stub_pipeline(local_store, monkeypatch):
+@patch("path_graph.steps.wiki_pipeline.write_wiki_page")
+def test_community_and_wiki_stub_pipeline(mock_write_wiki, local_store, monkeypatch):
+    mock_write_wiki.return_value = "/stub-page.md"
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     memory: dict = {}
     nebula = NebulaGraphStore("h", 1, "u", "p", memory=memory)
@@ -111,4 +119,4 @@ def test_community_and_wiki_stub_pipeline(local_store, monkeypatch):
     assert record.project_id == PROJECT_ID
 
     wiki = run_wiki_for_community("dev", record, "sess", skip_agent=True)
-    assert wiki["wiki_uris"]
+    assert wiki["wiki_paths"]

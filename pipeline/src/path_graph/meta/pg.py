@@ -68,7 +68,6 @@ CREATE TABLE IF NOT EXISTS path_graph.wiki_pages (
     project_id UUID NOT NULL,
     slug TEXT NOT NULL,
     title TEXT,
-    s3_uri TEXT,
     community_id UUID,
     batch_id TEXT,
     updated_at TIMESTAMPTZ DEFAULT now(),
@@ -363,6 +362,10 @@ ALTER TABLE path_graph.reconcile_reports
     RENAME COLUMN qdrant_orphans_deleted TO vector_orphans_cleared;
 """
 
+WIKI_PAGES_DROP_S3_URI_SQL = """
+ALTER TABLE path_graph.wiki_pages DROP COLUMN IF EXISTS s3_uri;
+"""
+
 
 def iter_migration_sql() -> list[str]:
     return [
@@ -378,6 +381,7 @@ def iter_migration_sql() -> list[str]:
         RLS_POLICY_MIGRATION_SQL,
         CHUNKS_FTS_MIGRATION_SQL,
         PGVECTOR_MIGRATION_SQL,
+        WIKI_PAGES_DROP_S3_URI_SQL,
     ]
 
 
@@ -736,7 +740,6 @@ class PgMetaStore:
         tenant: str,
         project_id: str,
         slug: str,
-        s3_uri: str,
         *,
         title: str | None = None,
         community_id: str | None = None,
@@ -747,16 +750,15 @@ class PgMetaStore:
             conn.execute(
                 """
                 INSERT INTO path_graph.wiki_pages
-                    (tenant, project_id, slug, title, s3_uri, community_id, batch_id, updated_at)
-                VALUES (%s, %s::uuid, %s, %s, %s, %s::uuid, %s, now())
+                    (tenant, project_id, slug, title, community_id, batch_id, updated_at)
+                VALUES (%s, %s::uuid, %s, %s, %s::uuid, %s, now())
                 ON CONFLICT (tenant, project_id, slug) DO UPDATE SET
                     title = EXCLUDED.title,
-                    s3_uri = EXCLUDED.s3_uri,
                     community_id = EXCLUDED.community_id,
                     batch_id = EXCLUDED.batch_id,
                     updated_at = now()
                 """,
-                (tenant, project_id, slug, title, s3_uri, community_id, batch_id),
+                (tenant, project_id, slug, title, community_id, batch_id),
             )
             conn.commit()
 

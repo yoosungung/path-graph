@@ -50,7 +50,7 @@ collect / ingest_web
 |------|------|
 | `lifecycle/tombstone.py` | `(tenant, project_id, content_hash)` 차단 |
 | `lifecycle/compensation.py` | re-ingest·purge 전 embedding clear·Nebula 정리 |
-| `lifecycle/purge.py` | Document/Source/Project purge. **Project purge**는 미처리 문서를 `hard_raw`로 purge한 뒤 `raw/{tenant}/{project_id}/`·`wiki/{tenant}/{project_id}/` prefix 일괄 삭제(이미 `purged` 문서·미 ingest upload 포함). **`delete_project`**는 purge와 동일한 blob·인덱스 정리 + 프로젝트 `parsed`·`communities`·`graph_context` prefix + PG 행 hard delete |
+| `lifecycle/purge.py` | Document/Source/Project purge. **Project purge**는 미처리 문서를 `hard_raw`로 purge한 뒤 `raw/{tenant}/{project_id}/` prefix 일괄 삭제 + `vfs_wiki_files` project 트리 삭제(이미 `purged` 문서·미 ingest upload 포함). **`delete_project`**는 purge와 동일한 blob·인덱스 정리 + 프로젝트 `parsed`·`communities`·`graph_context` prefix + PG 행 hard delete |
 | `lifecycle/reconcile.py` | PG truth 기준 Nebula 고아 삭제 |
 | `lifecycle/artifact_cleanup.py` | temp S3 정리 (indexed 미접촉) |
 | `lifecycle/wiki_stale.py` | purge 후 stale_communities 기록 |
