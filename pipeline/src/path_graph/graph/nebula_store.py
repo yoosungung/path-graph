@@ -115,6 +115,11 @@ class NebulaGraphStore:
                 return True
         return False
 
+    def _space_usable(self, sess: Any, space: str) -> bool:
+        """True when graphd session cache accepts USE (not just SHOW SPACES)."""
+        result = sess.execute(f"USE {space};")
+        return result.is_succeeded()
+
     def _schema_ready(self, sess: Any) -> bool:
         tags = sess.execute("SHOW TAGS;")
         if not tags.is_succeeded():
@@ -134,10 +139,9 @@ class NebulaGraphStore:
         self._execute(sess, f"CREATE SPACE IF NOT EXISTS {space}(vid_type=FIXED_STRING(64));")
         self._wait_until(
             sess,
-            ready=lambda s: self._space_visible(s, space),
+            ready=lambda s: self._space_usable(s, space),
             label=f"space {space}",
         )
-        self._execute(sess, f"USE {space};")
         for ddl in (*_SCHEMA_TAG_DDL, *_SCHEMA_EDGE_DDL):
             self._execute(sess, ddl)
         self._wait_until(sess, ready=self._schema_ready, label=f"schema in {space}")

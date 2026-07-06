@@ -69,10 +69,17 @@ def test_ensure_space_live_applies_schema_ddl() -> None:
     )
     session = MagicMock()
     tags_seen = {"count": 0}
+    use_attempts = {"count": 0}
 
     def execute(nql: str) -> _FakeResult:
-        if nql.strip() == "SHOW SPACES;":
-            return _FakeResult(rows=[_FakeRow("path_graph_dev_test")])
+        if nql.strip().startswith("USE path_graph_dev_test"):
+            use_attempts["count"] += 1
+            if use_attempts["count"] < 2:
+                return _FakeResult(
+                    ok=False,
+                    error="SpaceNotFound: SpaceName `path_graph_dev_test`",
+                )
+            return _FakeResult()
         if nql.strip() == "SHOW TAGS;":
             tags_seen["count"] += 1
             if tags_seen["count"] >= 2:
@@ -93,8 +100,10 @@ def test_ensure_space_live_applies_schema_ddl() -> None:
     with patch.object(store, "_session", return_value=session):
         store.ensure_space("path_graph_dev_test")
 
+    assert use_attempts["count"] >= 2
     joined = "\n".join(call.args[0] for call in session.execute.call_args_list)
     assert "CREATE SPACE IF NOT EXISTS path_graph_dev_test" in joined
+    assert "SHOW SPACES" not in joined
     assert "CREATE TAG IF NOT EXISTS Entity" in joined
     assert "CREATE TAG IF NOT EXISTS Chunk" in joined
     assert "CREATE EDGE IF NOT EXISTS EXTRACTED" in joined
