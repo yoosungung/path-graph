@@ -14,7 +14,7 @@ IMAGE_TAG ?= $(shell ./scripts/resolve-image-tag.sh)
 PUSH ?=
 
 venv:
-	$(UV) venv $(VENV) --python 3.12
+	@test -d $(VENV) || $(UV) venv $(VENV) --python 3.12
 
 install: venv
 	$(UV) pip install -e "pipeline/[dev]"
