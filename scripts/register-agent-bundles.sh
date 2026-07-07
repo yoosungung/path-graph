@@ -7,14 +7,14 @@
 #   ./scripts/register-agent-bundles.sh all v2
 #
 # Env:
-#   AGENTS_HOST       default http://agents.k8s-test
+#   AGENTS_HOST       default https://agents.k8s-test
 #   ADMIN_USER        default admin
 #   ADMIN_PASSWORD    required (or read from runtime/initial-admin-password)
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENTS_HOST="${AGENTS_HOST:-http://agents.k8s-test}"
+AGENTS_HOST="${AGENTS_HOST:-https://agents.k8s-test}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 
 if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
@@ -67,7 +67,7 @@ register_one() {
     wiki-synthesizer)
       package="wiki_synthesizer"
       entrypoint="wiki_synthesizer.agent:factory"
-      config_json='{"langgraph":{"model":"openai:gpt-4o-mini"}}'
+      config_json='{"langgraph":{"model":"preset:GEMMA412B"},"wiki_synthesizer":{"max_completion_tokens":2048}}'
       ;;
     *)
       echo "error: unknown agent $agent_name" >&2

@@ -8,7 +8,7 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 |------|------|
 | invoke payload 계약 | [x] `WikiSynthesizerInput` — `project_id`, `project_slug` |
 | pipeline 연동 | [x] `wiki_pipeline.py` + `test_wiki.py` (agent mock) |
-| LangGraph 본구현 | [x] `graph.py` — graph_context → LLM JSON → markdown page |
+| LangGraph 본구현 | [x] `graph.py` — graph_context → LLM JSON → bounded sections → markdown page |
 | agents-runtime 번들 배포 | [x] `./scripts/register-agent-bundles.sh` — `agent:compiled_graph` |
 
 ## 입출력

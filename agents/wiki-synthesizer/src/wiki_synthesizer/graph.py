@@ -41,7 +41,15 @@ async def load_context(state: WikiState) -> dict:
     return {"graph_context_text": json.dumps(ctx, ensure_ascii=False, indent=2)}
 
 
-async def synthesize_page(state: WikiState, llm: Any) -> dict:
+DEFAULT_MAX_COMPLETION_TOKENS = 2048
+
+
+async def synthesize_page(
+    state: WikiState,
+    llm: Any,
+    *,
+    max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
+) -> dict:
     template = read_prompt("community_report.txt")
     context_text = state.get("graph_context_text") or ""
     prompt = template.replace("{graph_context}", context_text)
@@ -49,6 +57,7 @@ async def synthesize_page(state: WikiState, llm: Any) -> dict:
         llm,
         prompt,
         response_format=wiki_v1_response_format(),
+        max_tokens=max_completion_tokens,
     )
 
     project_slug = state.get("project_slug") or "project"
@@ -72,12 +81,20 @@ def build_graph(cfg: dict, secrets: Any) -> Any:
 
     _ = secrets
     llm = prepare_langgraph_llm(cfg)
+    wiki_cfg = cfg.get("wiki_synthesizer") or {}
+    max_completion_tokens = int(
+        wiki_cfg.get("max_completion_tokens", DEFAULT_MAX_COMPLETION_TOKENS)
+    )
 
     async def load_node(state: WikiState) -> dict:
         return await load_context(state)
 
     async def synthesize_node(state: WikiState) -> dict:
-        return await synthesize_page(state, llm)
+        return await synthesize_page(
+            state,
+            llm,
+            max_completion_tokens=max_completion_tokens,
+        )
 
     builder = StateGraph(WikiState)
     builder.add_node("load", load_node)

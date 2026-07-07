@@ -64,5 +64,8 @@ async def test_synthesize_page_binds_json_schema(wiki_modules):
         },
         llm,
     )
-    llm.bind.assert_called_once_with(response_format=schema_mod.wiki_v1_response_format())
+    llm.bind.assert_called_once_with(
+        response_format=schema_mod.wiki_v1_response_format(),
+        max_tokens=graph_mod.DEFAULT_MAX_COMPLETION_TOKENS,
+    )
     assert out["pages"][0]["title"] == "Community"

@@ -142,6 +142,7 @@ def load_or_invoke_wiki_synthesize(
             validate_meta={
                 "graph_context_key": graph_context_key,
                 "graph_context_sha256": graph_context_sha256,
+                "output_schema": "wiki_v1",
             },
         )
         if cached is not None:
@@ -165,6 +166,7 @@ def load_or_invoke_wiki_synthesize(
         meta={
             "graph_context_key": graph_context_key,
             "graph_context_sha256": graph_context_sha256,
+            "output_schema": "wiki_v1",
             "agent": "wiki-synthesizer",
         },
     )

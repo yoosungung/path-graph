@@ -100,8 +100,8 @@ TEMPLATE=pipeline-graph ./scripts/submit-downstream-e2e.sh
 graph-extractor·wiki-synthesizer는 agents-runtime `agent:compiled_graph` 풀에 zip 번들로 등록한다. pipeline은 artifact를 **presigned URL**로 전달 — agent pool에 Garage/S3 credential을 두지 않는다.
 
 ```bash
-# agents-runtime admin 로그인 + bundle POST (AGENTS_HOST, ADMIN_PASSWORD)
-./scripts/register-agent-bundles.sh all v2
+# agents-runtime admin (기본 AGENTS_HOST=https://agents.k8s-test)
+./scripts/register-agent-bundles.sh wiki-synthesizer v3
 
 # live agent downstream (LLM port-forward + 번들 등록 후)
 SKIP_AGENT=0 ./scripts/submit-downstream-e2e.sh

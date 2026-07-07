@@ -143,6 +143,7 @@ def test_wiki_cache_hit_skips_invoke(local_store):
             {
                 "graph_context_key": ctx_key,
                 "graph_context_sha256": ctx_sha,
+                "output_schema": "wiki_v1",
                 "agent": "wiki-synthesizer",
             }
         ).encode(),
@@ -163,3 +164,43 @@ def test_wiki_cache_hit_skips_invoke(local_store):
 
     assert out == WIKI_RESULT
     mock_invoke.assert_not_called()
+
+
+def test_wiki_cache_miss_when_output_schema_stale(local_store):
+    store = LocalBlobStore(local_store)
+    ctx_key = "graph_context/dev/proj/b1/comm-1.json"
+    store.put_bytes(ctx_key, json.dumps({"entities": []}).encode())
+    wiki_key = s3_key_wiki_agent("dev", "proj-id", "b1", "comm-1")
+    meta_key = s3_key_wiki_agent_meta("dev", "proj-id", "b1", "comm-1")
+    from path_graph.ids import sha256_bytes
+
+    ctx_sha = sha256_bytes(store.get_bytes(ctx_key))
+    store.put_bytes(wiki_key, json.dumps(WIKI_RESULT).encode())
+    store.put_bytes(
+        meta_key,
+        json.dumps(
+            {
+                "graph_context_key": ctx_key,
+                "graph_context_sha256": ctx_sha,
+                "agent": "wiki-synthesizer",
+            }
+        ).encode(),
+    )
+
+    with patch(
+        "path_graph.steps.agent_cache.invoke_agent", return_value=WIKI_RESULT
+    ) as mock_invoke:
+        out = load_or_invoke_wiki_synthesize(
+            "dev",
+            "proj-id",
+            "slug",
+            "comm-1",
+            0,
+            ctx_key,
+            "b1",
+            "sess",
+            store=store,
+        )
+
+    assert out == WIKI_RESULT
+    mock_invoke.assert_called_once()
