@@ -44,3 +44,4 @@ def test_build_graph_context_from_memory():
     assert ctx["project_id"] == PROJECT_ID
     assert len(ctx["entities"]) == 2
     assert len(ctx["relationships"]) == 1
+    assert "source_chunk_ids" not in ctx

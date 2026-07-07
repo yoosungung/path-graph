@@ -11,7 +11,6 @@ def build_graph_context(
     nebula: NebulaGraphStore,
     *,
     max_entities: int = 50,
-    source_chunk_ids: list[str] | None = None,
 ) -> dict:
     space = record.nebula_space or nebula_space_name(record.tenant, record.project_slug)
     entity_ids = record.entity_ids[:max_entities]
@@ -43,7 +42,6 @@ def build_graph_context(
             }
             for rel in relationships
         ],
-        "source_chunk_ids": source_chunk_ids or [],
     }
 
 

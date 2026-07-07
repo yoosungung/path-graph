@@ -85,7 +85,6 @@ def run_community_pipeline_for_project(
             rec,
             nebula,
             max_entities=s.graph_context_max_entities,
-            source_chunk_ids=list(batch_chunk_ids),
         )
         ctx_key = graph_context_key_for(rec)
         ctx_uri = store.put_bytes(ctx_key, json.dumps(ctx, ensure_ascii=False).encode())
