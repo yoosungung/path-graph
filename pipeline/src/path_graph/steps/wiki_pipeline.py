@@ -6,6 +6,7 @@ from path_graph.config import Settings, get_settings
 from path_graph.contracts.community import CommunityRecord
 from path_graph.ids import wiki_path_for_community
 from path_graph.meta.pg import PgMetaStore
+from path_graph.retrieval.indexing import index_wiki_page
 from path_graph.steps.agent_cache import load_or_invoke_wiki_synthesize
 from path_graph.storage.blob import make_blob_store
 from path_graph.storage.wiki_vfs import write_wiki_page
@@ -60,13 +61,17 @@ def store_wiki_pages(
         vfs_path = write_wiki_page(tenant, project_id, slug, body)
         paths.append(vfs_path)
         if pg:
-            pg.upsert_wiki_page(
-                tenant,
-                project_id,
-                slug,
+            index_wiki_page(
+                pg,
+                tenant=tenant,
+                project_id=project_id,
+                slug=slug,
                 title=title,
+                body=body,
+                vfs_path=vfs_path,
                 community_id=community_id,
                 batch_id=batch_id,
+                settings=get_settings(),
             )
     return paths
 

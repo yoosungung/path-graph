@@ -423,10 +423,104 @@ class NebulaGraphStore:
             for edge in mem.edges:
                 src = edge["source"]
                 tgt = edge["target"]
-                if src in entity_ids and tgt in entity_ids:
-                    rels.append(edge)
+                if src in entity_ids or tgt in entity_ids:
+                    rels.append(
+                        {
+                            "source": src,
+                            "target": tgt,
+                            "type": edge.get("type", "EXTRACTED"),
+                            "description": edge.get("description", ""),
+                            "confidence": edge.get("confidence", 1.0),
+                        }
+                    )
             return rels
-        return []
+        if not entity_ids:
+            return []
+        sess = self._session()
+        try:
+            self._execute(sess, f"USE {space};")
+            ids_literal = ", ".join(_ngql_string(eid) for eid in sorted(entity_ids))
+            result = sess.execute(
+                "MATCH (a:Entity)-[e:EXTRACTED|INFERRED]->(b:Entity) "
+                f"WHERE id(a) IN [{ids_literal}] OR id(b) IN [{ids_literal}] "
+                "RETURN id(a) AS src, id(b) AS tgt, type(e) AS etype;"
+            )
+            if not result.is_succeeded():
+                return []
+            rels: list[dict[str, Any]] = []
+            for row in result.rows():
+                src = _decode_value(row.values[0])
+                tgt = _decode_value(row.values[1])
+                etype = _decode_value(row.values[2]) if len(row.values) > 2 else "EXTRACTED"
+                if src and tgt:
+                    rels.append(
+                        {
+                            "source": src,
+                            "target": tgt,
+                            "type": etype,
+                            "description": "",
+                            "confidence": 1.0,
+                        }
+                    )
+            return rels
+        finally:
+            sess.release()
+
+    def get_chunks_for_entities(self, space: str, entity_ids: list[str]) -> list[str]:
+        if not entity_ids:
+            return []
+        if self._memory is not None:
+            mem = self._memory.get(space, _MemorySpace())
+            wanted = set(entity_ids)
+            return sorted(
+                {
+                    cid
+                    for cid, eid in mem.mentions
+                    if eid in wanted
+                }
+            )
+        sess = self._session()
+        try:
+            self._execute(sess, f"USE {space};")
+            ids_literal = ", ".join(_ngql_string(eid) for eid in sorted(entity_ids))
+            result = sess.execute(
+                "MATCH (c:Chunk)-[:MENTIONS]->(e:Entity) "
+                f"WHERE id(e) IN [{ids_literal}] "
+                "RETURN DISTINCT id(c) AS cid;"
+            )
+            if not result.is_succeeded():
+                return []
+            return [
+                _decode_value(row.values[0])
+                for row in result.rows()
+                if row.values and _decode_value(row.values[0])
+            ]
+        finally:
+            sess.release()
+
+    def expand_entity_neighborhood(
+        self,
+        space: str,
+        seed_ids: list[str],
+        *,
+        max_entities: int = 20,
+        max_relationships: int = 30,
+    ) -> dict[str, list[dict[str, Any]]]:
+        seeds = [sid for sid in seed_ids if sid][:max_entities]
+        if not seeds:
+            return {"entities": [], "relationships": []}
+        seed_set = set(seeds)
+        relationships = self.get_relationships(space, seed_set)[:max_relationships]
+        neighbor_ids = set(seeds)
+        for rel in relationships:
+            neighbor_ids.add(str(rel.get("source") or ""))
+            neighbor_ids.add(str(rel.get("target") or ""))
+        neighbor_ids.discard("")
+        entity_list = self.get_entities(space, sorted(neighbor_ids)[:max_entities])
+        return {
+            "entities": entity_list,
+            "relationships": relationships,
+        }
 
     def delete_chunks(self, space: str, chunk_ids: list[str]) -> int:
         if not chunk_ids:

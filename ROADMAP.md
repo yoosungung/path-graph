@@ -169,6 +169,16 @@
 | 3.3.3 | ingest 검색 API / retrieval CLI | [x] | `retrieval_search` CLI · `api_search_project` · BFF `GET …/search` |
 | 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; [pipeline/DESIGN.md §VL OCR](pipeline/DESIGN.md#vl-ocr-ingest--빈-parse-fallback) |
 
+### 3.4 통합 Knowledge Search
+
+| # | 작업 | 상태 | 비고 |
+|---|---|---|---|
+| 3.4.0 | `knowledge_search` 4-mode + `auto` 라우터 | [x] | `path_graph.retrieval` |
+| 3.4.1 | wiki `wiki_pages` FTS+vector 인덱스 | [x] | wiki ingest 동기 |
+| 3.4.2 | `entities` PG mirror + local graph retrieval | [x] | graph-extractor upsert hook |
+| 3.4.3 | DRIFT-lite + `include_graph` community context | [x] | S3 `graph_context` 첨부 |
+| 3.4.4 | agents-runtime MCP `search` tool `mode` 연동 | [x] | path-graph-rag-mcp + BFF |
+
 ---
 
 ## 권장 실행 순서 (다음 4 sprint)

@@ -68,9 +68,11 @@ RAG ingest 이후 Graph(Nebula)·Wiki(PG VFS) 적재. Console MVP는 **`pipeline
 
 | 채널 | MVP (Silo) | 소비 주체 |
 |------|------------|-----------|
-| **RAG** | runtime PG `path_graph.chunks.embedding` + `project_id` 필터 | retrieval tool |
-| **Graph** | Nebula Space — `index_namespace`와 **동일 이름** | multi-hop 탐색 |
-| **Wiki** | runtime PG `vfs_wiki_files` (`tenant`, `project_id`) + VFS mount `/wiki/{project_name}/` | 컴파일드 지식 |
+| **RAG** | runtime PG `path_graph.chunks.embedding` + `project_id` 필터 | retrieval tool (`mode=basic`) |
+| **Graph** | Nebula Space + PG `path_graph.entities` mirror | retrieval tool (`mode=local` / `drift`) |
+| **Wiki** | PG `wiki_pages` 검색 인덱스 + `vfs_wiki_files` 본문 | retrieval tool (`mode=global`) · VFS read |
+
+**통합 retrieval** — `knowledge_search(mode=auto|basic|local|global|drift)` (MS GraphRAG Query Engine 대응, retrieval-only). 응답 `hits[]` (`kind`: `chunk`|`entity`|`relationship`|`wiki`). `include_graph=true` 시 wiki hit에 community `graph_context` 스냅샷 첨부.
 
 ```json
 {

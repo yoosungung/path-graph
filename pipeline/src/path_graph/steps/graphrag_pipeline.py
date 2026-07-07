@@ -34,6 +34,7 @@ def run_graphrag_pipeline(
         skip_agent=skip_agent,
         force_agent=force_agent,
         nebula=nebula,
+        pg=pg,
     )
     project_chunks = graph_result["project_chunks"]
     community_results = run_community_pipeline(

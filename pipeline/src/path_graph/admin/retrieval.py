@@ -6,7 +6,8 @@ from typing import Any
 
 from path_graph.admin.projects import ProjectStore
 from path_graph.config import Settings, get_settings
-from path_graph.rag.hybrid_search import hybrid_search
+from path_graph.retrieval.contracts import SearchMode, SearchRequest
+from path_graph.retrieval.unified import knowledge_search
 
 
 def api_search_project(
@@ -15,6 +16,9 @@ def api_search_project(
     query: str,
     *,
     top_k: int = 10,
+    mode: str = "auto",
+    include_graph: bool = False,
+    sub_queries: list[str] | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     s = settings or get_settings()
@@ -26,23 +30,27 @@ def api_search_project(
         raise ValueError(f"project not found: {project_id}")
     q = query.strip()
     if not q:
-        return {
-            "query": "",
-            "project_id": project_id,
-            "project_slug": profile.slug,
-            "results": [],
-        }
-    results = hybrid_search(
+        empty = knowledge_search(
+            tenant=tenant,
+            project_id=project_id,
+            project_slug=profile.slug,
+            request=SearchRequest(query=""),
+            settings=s,
+        )
+        return empty.to_api_dict()
+
+    mode_enum = SearchMode(mode)
+    response = knowledge_search(
         tenant=tenant,
         project_id=project_id,
         project_slug=profile.slug,
-        query=q,
-        top_k=top_k,
+        request=SearchRequest(
+            query=q,
+            mode=mode_enum,
+            top_k=top_k,
+            include_graph=include_graph,
+            sub_queries=sub_queries or [],
+        ),
         settings=s,
     )
-    return {
-        "query": q,
-        "project_id": project_id,
-        "project_slug": profile.slug,
-        "results": results,
-    }
+    return response.to_api_dict()

@@ -6,6 +6,8 @@ from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.graph.entity_vid import normalize_semantic_graph
 from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.ids import nebula_space_name
+from path_graph.meta.pg import PgMetaStore
+from path_graph.retrieval.indexing import sync_entities_to_pg
 from path_graph.steps.agent_cache import load_or_invoke_graph_semantic
 from path_graph.steps.agent_invoke import extract_wikilinks
 from path_graph.storage.blob import BlobStore, make_blob_store, read_jsonl
@@ -62,11 +64,23 @@ def _upsert_semantic_edges(
     nebula: NebulaGraphStore,
     space: str,
     semantic: dict,
+    *,
+    tenant: str | None = None,
+    project_id: str | None = None,
+    pg: PgMetaStore | None = None,
 ) -> None:
     normalized = normalize_semantic_graph(unwrap_agent_graph_output(semantic))
     entities = normalized.get("entities") or []
     if entities:
         nebula.upsert_entities(space, entities)
+        if pg and tenant and project_id:
+            sync_entities_to_pg(
+                pg,
+                tenant=tenant,
+                project_id=project_id,
+                entities=entities,
+                settings=get_settings(),
+            )
 
     entity_edges = normalized.get("edges") or []
     if entity_edges:
@@ -84,6 +98,7 @@ def run_graph_pipeline_for_project(
     skip_agent: bool = False,
     force_agent: bool = False,
     nebula: NebulaGraphStore | None = None,
+    pg: PgMetaStore | None = None,
 ) -> dict:
     settings = get_settings()
     store = make_blob_store(settings)
@@ -110,7 +125,14 @@ def run_graph_pipeline_for_project(
             force_agent=force_agent,
         )
     if semantic:
-        _upsert_semantic_edges(nebula, space, semantic)
+        _upsert_semantic_edges(
+            nebula,
+            space,
+            semantic,
+            tenant=tenant,
+            project_id=project_id,
+            pg=pg,
+        )
 
     return {
         "project_id": project_id,
@@ -131,6 +153,7 @@ def run_graph_pipeline(
     skip_agent: bool = False,
     force_agent: bool = False,
     nebula: NebulaGraphStore | None = None,
+    pg: PgMetaStore | None = None,
 ) -> dict:
     from path_graph.graph.chunk_partition import copy_chunks_to_project_batch
 
@@ -149,6 +172,7 @@ def run_graph_pipeline(
         skip_agent=skip_agent,
         force_agent=force_agent,
         nebula=nebula,
+        pg=pg,
     )
     batch_entity_ids = semantic_batch_entity_ids(result.get("semantic") or {})
     return {

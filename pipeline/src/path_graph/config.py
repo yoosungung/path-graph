@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     graph_context_max_relationships: int = 30  # GRAPH_CONTEXT_MAX_RELATIONSHIPS
     graph_context_max_description_chars: int = 200  # GRAPH_CONTEXT_MAX_DESCRIPTION_CHARS
 
+    drift_k_followups: int = 3  # DRIFT_K_FOLLOWUPS
+    drift_max_depth: int = 2  # DRIFT_MAX_DEPTH
+    search_graph_context_attach_limit: int = 2  # SEARCH_GRAPH_CONTEXT_ATTACH_LIMIT
+
     rhwp_batch_bin: str = "rhwp-batch"
 
     blocks_extractor: str = "md_heuristic"  # BLOCKS_EXTRACTOR — parsers.blocks_extractors registry key

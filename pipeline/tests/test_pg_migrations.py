@@ -18,3 +18,5 @@ def test_iter_migration_sql_includes_pgvector():
     assert "embedding vector(1024)" in combined
     assert "qdrant_point_id" not in combined.split("drop column if exists qdrant_point_id")[0] or True
     assert "drop column if exists qdrant_point_id" in combined
+    assert "path_graph.entities" in combined
+    assert "idx_wiki_pages_text_tsv" in combined

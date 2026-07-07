@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import ANY, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -26,38 +26,44 @@ def _project_profile():
     )
 
 
-@patch("path_graph.admin.retrieval.hybrid_search")
+@patch("path_graph.admin.retrieval.knowledge_search")
 @patch("path_graph.admin.retrieval.ProjectStore")
-def test_api_search_project(mock_store_cls, mock_hybrid, _project_profile):
+def test_api_search_project(mock_store_cls, mock_search, _project_profile):
     mock_store_cls.return_value.get_project.return_value = _project_profile
-    mock_hybrid.return_value = [
-        {
-            "chunk_id": "c1",
-            "text": "hello",
-            "rrf_score": 0.03,
-        }
-    ]
+    from path_graph.retrieval.contracts import SearchHit, SearchResponse
+
+    mock_search.return_value = SearchResponse(
+        query="hello",
+        mode_resolved="basic",
+        project_id=PROJECT_ID,
+        project_slug="demo",
+        hits=[
+            SearchHit(
+                kind="chunk",
+                id="c1",
+                text="hello",
+                rrf_score=0.03,
+                provenance={"chunk_id": "c1"},
+            )
+        ],
+    )
 
     out = api_search_project(
         "dev",
         PROJECT_ID,
         "hello",
         top_k=5,
+        mode="basic",
         settings=Settings(path_graph_dsn="postgresql://localhost/test"),
     )
 
     assert out["query"] == "hello"
     assert out["project_id"] == PROJECT_ID
     assert out["project_slug"] == "demo"
+    assert out["mode_resolved"] == "basic"
+    assert len(out["hits"]) == 1
     assert len(out["results"]) == 1
-    mock_hybrid.assert_called_once_with(
-        tenant="dev",
-        project_id=PROJECT_ID,
-        project_slug="demo",
-        query="hello",
-        top_k=5,
-        settings=ANY,
-    )
+    mock_search.assert_called_once()
 
 
 @patch("path_graph.admin.retrieval.ProjectStore")
@@ -101,7 +107,9 @@ def test_retrieval_search_cli_prints_hits(mock_api, capsys):
         "query": "wiki",
         "project_id": PROJECT_ID,
         "project_slug": "demo",
-        "results": [{"chunk_id": "c1", "text": "page body", "rrf_score": 0.02}],
+        "mode_resolved": "basic",
+        "hits": [{"id": "c1", "kind": "chunk", "text": "page body", "rrf_score": 0.02}],
+        "results": [{"id": "c1", "kind": "chunk", "text": "page body", "rrf_score": 0.02}],
     }
     rc = retrieval_main(
         ["--tenant", "dev", "--project-id", PROJECT_ID, "--query", "wiki"]

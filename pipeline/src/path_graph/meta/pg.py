@@ -194,7 +194,8 @@ BEGIN
   FOR tbl IN SELECT unnest(ARRAY[
     'documents', 'chunks', 'pipeline_runs', 'document_ingest_state',
     'wiki_pages', 'communities', 'sources', 'source_credentials', 'projects',
-    'document_tombstones', 'purge_audit_log', 'reconcile_reports', 'stale_communities'
+    'document_tombstones', 'purge_audit_log', 'reconcile_reports', 'stale_communities',
+    'entities'
   ])
   LOOP
     IF EXISTS (
@@ -366,6 +367,62 @@ WIKI_PAGES_DROP_S3_URI_SQL = """
 ALTER TABLE path_graph.wiki_pages DROP COLUMN IF EXISTS s3_uri;
 """
 
+WIKI_SEARCH_MIGRATION_SQL = """
+ALTER TABLE path_graph.wiki_pages
+    ADD COLUMN IF NOT EXISTS vfs_path TEXT,
+    ADD COLUMN IF NOT EXISTS body_text TEXT,
+    ADD COLUMN IF NOT EXISTS text_tsv tsvector,
+    ADD COLUMN IF NOT EXISTS embedding vector(1024);
+
+CREATE INDEX IF NOT EXISTS idx_wiki_pages_text_tsv
+    ON path_graph.wiki_pages USING GIN (text_tsv);
+
+CREATE INDEX IF NOT EXISTS idx_wiki_pages_embedding_hnsw
+    ON path_graph.wiki_pages USING hnsw (embedding vector_cosine_ops)
+    WHERE embedding IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_wiki_pages_tenant_project
+    ON path_graph.wiki_pages (tenant, project_id);
+"""
+
+ENTITIES_MIGRATION_SQL = """
+CREATE TABLE IF NOT EXISTS path_graph.entities (
+    tenant TEXT NOT NULL,
+    project_id UUID NOT NULL,
+    id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    name_tsv tsvector,
+    embedding vector(1024),
+    PRIMARY KEY (tenant, project_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entities_name_tsv
+    ON path_graph.entities USING GIN (name_tsv);
+
+CREATE INDEX IF NOT EXISTS idx_entities_embedding_hnsw
+    ON path_graph.entities USING hnsw (embedding vector_cosine_ops)
+    WHERE embedding IS NOT NULL;
+
+ALTER TABLE path_graph.entities ENABLE ROW LEVEL SECURITY;
+"""
+
+ENTITIES_RLS_MIGRATION_SQL = """
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'path_graph' AND table_name = 'entities'
+  ) THEN
+    EXECUTE 'DROP POLICY IF EXISTS tenant_isolation ON path_graph.entities';
+    EXECUTE
+      'CREATE POLICY tenant_isolation ON path_graph.entities '
+      'USING (tenant = current_setting(''app.tenant'', true)) '
+      'WITH CHECK (tenant = current_setting(''app.tenant'', true))';
+  END IF;
+END $$;
+"""
+
 
 def iter_migration_sql() -> list[str]:
     return [
@@ -382,6 +439,9 @@ def iter_migration_sql() -> list[str]:
         CHUNKS_FTS_MIGRATION_SQL,
         PGVECTOR_MIGRATION_SQL,
         WIKI_PAGES_DROP_S3_URI_SQL,
+        WIKI_SEARCH_MIGRATION_SQL,
+        ENTITIES_MIGRATION_SQL,
+        ENTITIES_RLS_MIGRATION_SQL,
     ]
 
 
@@ -656,6 +716,301 @@ class PgMetaStore:
             for row in rows
         ]
 
+    def search_wiki_fts(
+        self,
+        tenant: str,
+        project_id: str,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        q = query.strip()
+        if not q:
+            return []
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT
+                    w.slug,
+                    w.title,
+                    w.community_id::text,
+                    w.vfs_path,
+                    w.body_text,
+                    w.batch_id,
+                    ts_rank(w.text_tsv, q) AS rank
+                FROM path_graph.wiki_pages w,
+                     plainto_tsquery('simple', %s) q
+                WHERE w.tenant = %s
+                  AND w.project_id = %s::uuid
+                  AND w.text_tsv @@ q
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (q, tenant, project_id, limit),
+            ).fetchall()
+        return [
+            {
+                "slug": row[0],
+                "title": row[1],
+                "community_id": row[2],
+                "vfs_path": row[3],
+                "body_text": row[4],
+                "batch_id": row[5],
+                "score": float(row[6]),
+            }
+            for row in rows
+        ]
+
+    def search_wiki_vector(
+        self,
+        tenant: str,
+        project_id: str,
+        query_vector: Sequence[float],
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with self._vector_conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT
+                    w.slug,
+                    w.title,
+                    w.community_id::text,
+                    w.vfs_path,
+                    w.body_text,
+                    w.batch_id,
+                    1 - (w.embedding <=> %s) AS score
+                FROM path_graph.wiki_pages w
+                WHERE w.tenant = %s
+                  AND w.project_id = %s::uuid
+                  AND w.embedding IS NOT NULL
+                ORDER BY w.embedding <=> %s
+                LIMIT %s
+                """,
+                (list(query_vector), tenant, project_id, list(query_vector), limit),
+            ).fetchall()
+        return [
+            {
+                "slug": row[0],
+                "title": row[1],
+                "community_id": row[2],
+                "vfs_path": row[3],
+                "body_text": row[4],
+                "batch_id": row[5],
+                "score": float(row[6]),
+            }
+            for row in rows
+        ]
+
+    def upsert_entities(
+        self,
+        tenant: str,
+        project_id: str,
+        entities: list[dict[str, Any]],
+        *,
+        embeddings: Sequence[Sequence[float]] | None = None,
+    ) -> None:
+        if not entities:
+            return
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            for idx, ent in enumerate(entities):
+                eid = str(ent.get("id") or "")
+                name = str(ent.get("name") or "")
+                if not eid:
+                    continue
+                description = str(ent.get("description") or "")
+                search_text = f"{name}\n{description}".strip()
+                emb = (
+                    list(embeddings[idx])
+                    if embeddings is not None and idx < len(embeddings)
+                    else None
+                )
+                if emb is not None:
+                    conn.execute(
+                        """
+                        INSERT INTO path_graph.entities
+                            (tenant, project_id, id, name, description, name_tsv, embedding)
+                        VALUES (%s, %s::uuid, %s, %s, %s, to_tsvector('simple', %s), %s)
+                        ON CONFLICT (tenant, project_id, id) DO UPDATE SET
+                            name = EXCLUDED.name,
+                            description = EXCLUDED.description,
+                            name_tsv = to_tsvector('simple', %s),
+                            embedding = EXCLUDED.embedding
+                        """,
+                        (
+                            tenant,
+                            project_id,
+                            eid,
+                            name,
+                            description,
+                            search_text,
+                            emb,
+                            search_text,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO path_graph.entities
+                            (tenant, project_id, id, name, description, name_tsv)
+                        VALUES (%s, %s::uuid, %s, %s, %s, to_tsvector('simple', %s))
+                        ON CONFLICT (tenant, project_id, id) DO UPDATE SET
+                            name = EXCLUDED.name,
+                            description = EXCLUDED.description,
+                            name_tsv = to_tsvector('simple', %s)
+                        """,
+                        (
+                            tenant,
+                            project_id,
+                            eid,
+                            name,
+                            description,
+                            search_text,
+                            search_text,
+                        ),
+                    )
+            conn.commit()
+
+    def search_entities_fts(
+        self,
+        tenant: str,
+        project_id: str,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        q = query.strip()
+        if not q:
+            return []
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT e.id, e.name, e.description, ts_rank(e.name_tsv, q) AS rank
+                FROM path_graph.entities e,
+                     plainto_tsquery('simple', %s) q
+                WHERE e.tenant = %s
+                  AND e.project_id = %s::uuid
+                  AND e.name_tsv @@ q
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (q, tenant, project_id, limit),
+            ).fetchall()
+        return [
+            {
+                "entity_id": row[0],
+                "name": row[1],
+                "description": row[2],
+                "score": float(row[3]),
+            }
+            for row in rows
+        ]
+
+    def search_entities_vector(
+        self,
+        tenant: str,
+        project_id: str,
+        query_vector: Sequence[float],
+        *,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        with self._vector_conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT e.id, e.name, e.description, 1 - (e.embedding <=> %s) AS score
+                FROM path_graph.entities e
+                WHERE e.tenant = %s
+                  AND e.project_id = %s::uuid
+                  AND e.embedding IS NOT NULL
+                ORDER BY e.embedding <=> %s
+                LIMIT %s
+                """,
+                (list(query_vector), tenant, project_id, list(query_vector), limit),
+            ).fetchall()
+        return [
+            {
+                "entity_id": row[0],
+                "name": row[1],
+                "description": row[2],
+                "score": float(row[3]),
+            }
+            for row in rows
+        ]
+
+    def get_chunks_by_ids(
+        self,
+        tenant: str,
+        project_id: str,
+        chunk_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        if not chunk_ids:
+            return []
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT c.id::text, c.document_id::text, c.project_id::text, c.text
+                FROM path_graph.chunks c
+                WHERE c.tenant = %s
+                  AND c.project_id = %s::uuid
+                  AND c.id = ANY(%s::uuid[])
+                """,
+                (tenant, project_id, chunk_ids),
+            ).fetchall()
+        return [
+            {
+                "chunk_id": row[0],
+                "document_id": row[1],
+                "project_id": row[2],
+                "text": row[3],
+            }
+            for row in rows
+        ]
+
+    def get_community(
+        self,
+        tenant: str,
+        project_id: str,
+        community_id: str,
+    ) -> dict[str, Any] | None:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            row = conn.execute(
+                """
+                SELECT id::text, batch_id, level, s3_uri, title
+                FROM path_graph.communities
+                WHERE tenant = %s AND project_id = %s::uuid AND id = %s::uuid
+                """,
+                (tenant, project_id, community_id),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "community_id": row[0],
+            "batch_id": row[1],
+            "level": row[2],
+            "s3_uri": row[3],
+            "title": row[4],
+        }
+
+    def stale_community_ids(self, tenant: str, project_id: str) -> set[str]:
+        with self._conn() as conn:
+            self._set_tenant(conn, tenant)
+            rows = conn.execute(
+                """
+                SELECT community_id::text
+                FROM path_graph.stale_communities
+                WHERE tenant = %s AND project_id = %s::uuid
+                """,
+                (tenant, project_id),
+            ).fetchall()
+        return {row[0] for row in rows if row[0]}
+
     def mark_rag_indexed(self, tenant: str, document_id: str) -> None:
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
@@ -744,22 +1099,80 @@ class PgMetaStore:
         title: str | None = None,
         community_id: str | None = None,
         batch_id: str | None = None,
+        vfs_path: str | None = None,
+        body_text: str | None = None,
+        embedding: Sequence[float] | None = None,
     ) -> None:
+        search_text = ""
+        if title:
+            search_text = title.strip()
+        if body_text:
+            body = body_text.strip()
+            search_text = f"{search_text}\n{body}".strip() if search_text else body
         with self._conn() as conn:
             self._set_tenant(conn, tenant)
-            conn.execute(
-                """
-                INSERT INTO path_graph.wiki_pages
-                    (tenant, project_id, slug, title, community_id, batch_id, updated_at)
-                VALUES (%s, %s::uuid, %s, %s, %s::uuid, %s, now())
-                ON CONFLICT (tenant, project_id, slug) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    community_id = EXCLUDED.community_id,
-                    batch_id = EXCLUDED.batch_id,
-                    updated_at = now()
-                """,
-                (tenant, project_id, slug, title, community_id, batch_id),
-            )
+            if embedding is not None:
+                conn.execute(
+                    """
+                    INSERT INTO path_graph.wiki_pages
+                        (tenant, project_id, slug, title, community_id, batch_id,
+                         vfs_path, body_text, text_tsv, embedding, updated_at)
+                    VALUES (%s, %s::uuid, %s, %s, %s::uuid, %s, %s, %s,
+                            to_tsvector('simple', %s), %s, now())
+                    ON CONFLICT (tenant, project_id, slug) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        community_id = EXCLUDED.community_id,
+                        batch_id = EXCLUDED.batch_id,
+                        vfs_path = EXCLUDED.vfs_path,
+                        body_text = EXCLUDED.body_text,
+                        text_tsv = to_tsvector('simple', %s),
+                        embedding = EXCLUDED.embedding,
+                        updated_at = now()
+                    """,
+                    (
+                        tenant,
+                        project_id,
+                        slug,
+                        title,
+                        community_id,
+                        batch_id,
+                        vfs_path,
+                        body_text,
+                        search_text,
+                        list(embedding),
+                        search_text,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO path_graph.wiki_pages
+                        (tenant, project_id, slug, title, community_id, batch_id,
+                         vfs_path, body_text, text_tsv, updated_at)
+                    VALUES (%s, %s::uuid, %s, %s, %s::uuid, %s, %s, %s,
+                            to_tsvector('simple', %s), now())
+                    ON CONFLICT (tenant, project_id, slug) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        community_id = EXCLUDED.community_id,
+                        batch_id = EXCLUDED.batch_id,
+                        vfs_path = EXCLUDED.vfs_path,
+                        body_text = EXCLUDED.body_text,
+                        text_tsv = to_tsvector('simple', %s),
+                        updated_at = now()
+                    """,
+                    (
+                        tenant,
+                        project_id,
+                        slug,
+                        title,
+                        community_id,
+                        batch_id,
+                        vfs_path,
+                        body_text,
+                        search_text,
+                        search_text,
+                    ),
+                )
             conn.commit()
 
     def get_document(self, tenant: str, document_id: str) -> dict[str, Any] | None:
