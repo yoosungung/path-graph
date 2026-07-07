@@ -9,6 +9,8 @@ S3_PREFIXES = (
     "batches",
     "communities",
     "graph_context",
+    "graph_extract",
+    "wiki_agent",
 )
 
 
@@ -70,6 +72,34 @@ def s3_key_graph_context(
     tenant: str, project_id: str, batch_id: str, community_id: str
 ) -> str:
     return f"graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json"
+
+
+def s3_key_graph_extract(tenant: str, project_id: str, batch_id: str) -> str:
+    return f"graph_extract/{tenant}/{project_id}/{batch_id}/graph_v1.json"
+
+
+def s3_key_graph_extract_meta(tenant: str, project_id: str, batch_id: str) -> str:
+    return f"graph_extract/{tenant}/{project_id}/{batch_id}/meta.json"
+
+
+def s3_key_wiki_agent(
+    tenant: str, project_id: str, batch_id: str, community_id: str
+) -> str:
+    return f"wiki_agent/{tenant}/{project_id}/{batch_id}/{community_id}.json"
+
+
+def s3_key_wiki_agent_meta(
+    tenant: str, project_id: str, batch_id: str, community_id: str
+) -> str:
+    return f"wiki_agent/{tenant}/{project_id}/{batch_id}/{community_id}.meta.json"
+
+
+def s3_prefix_graph_extract(tenant: str, project_id: str) -> str:
+    return f"graph_extract/{tenant}/{project_id}/"
+
+
+def s3_prefix_wiki_agent(tenant: str, project_id: str) -> str:
+    return f"wiki_agent/{tenant}/{project_id}/"
 
 
 def s3_key_raw_prefix(tenant: str, project_id: str) -> str:

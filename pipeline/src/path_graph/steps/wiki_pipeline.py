@@ -4,10 +4,9 @@ import json
 
 from path_graph.config import Settings, get_settings
 from path_graph.contracts.community import CommunityRecord
-from path_graph.contracts.schemas import WikiSynthesizerInput
 from path_graph.ids import wiki_slug_for_community
 from path_graph.meta.pg import PgMetaStore
-from path_graph.steps.agent_invoke import invoke_agent
+from path_graph.steps.agent_cache import load_or_invoke_wiki_synthesize
 from path_graph.storage.blob import make_blob_store
 from path_graph.storage.wiki_vfs import write_wiki_page
 
@@ -18,24 +17,26 @@ def wiki_synthesize(
     project_slug: str,
     community_id: str,
     community_level: int,
-    graph_context_s3: str,
+    graph_context_key: str,
     batch_id: str,
     session_id: str,
     *,
     skip_agent: bool = False,
+    force_agent: bool = False,
 ) -> dict:
     if skip_agent:
         return {"pages": []}
-    inp = WikiSynthesizerInput(
-        tenant=tenant,
-        project_id=project_id,
-        project_slug=project_slug,
-        community_id=community_id,
-        community_level=community_level,
-        graph_context_s3=graph_context_s3,
-        idempotency_key=f"{batch_id}:{project_id}:{community_id}",
+    return load_or_invoke_wiki_synthesize(
+        tenant,
+        project_id,
+        project_slug,
+        community_id,
+        community_level,
+        graph_context_key,
+        batch_id,
+        session_id,
+        force_agent=force_agent,
     )
-    return invoke_agent("wiki-synthesizer", inp, session_id)
 
 
 def store_wiki_pages(
@@ -86,20 +87,20 @@ def run_wiki_for_community(
     session_id: str,
     *,
     skip_agent: bool = False,
+    force_agent: bool = False,
     pg: PgMetaStore | None = None,
 ) -> dict:
-    store = make_blob_store(get_settings())
-    ctx_uri = store.agent_artifact_uri(record.graph_context_key)
     result = wiki_synthesize(
         tenant,
         record.project_id,
         record.project_slug,
         record.community_id,
         record.level,
-        ctx_uri,
+        record.graph_context_key,
         record.batch_id,
         session_id,
         skip_agent=skip_agent,
+        force_agent=force_agent,
     )
     pages = result.get("pages") or []
     if not pages and skip_agent:
@@ -126,6 +127,7 @@ def run_wiki_pipeline(
     session_id: str,
     *,
     skip_agent: bool = False,
+    force_agent: bool = False,
     pg: PgMetaStore | None = None,
     settings: Settings | None = None,
 ) -> dict:
@@ -138,6 +140,7 @@ def run_wiki_pipeline(
                 record,
                 session_id,
                 skip_agent=skip_agent,
+                force_agent=force_agent,
                 pg=pg,
             )
         )

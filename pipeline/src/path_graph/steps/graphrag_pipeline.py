@@ -18,6 +18,7 @@ def run_graphrag_pipeline(
     session_id: str,
     *,
     skip_agent: bool = False,
+    force_agent: bool = False,
 ) -> dict:
     settings = get_settings()
     nebula = make_nebula_store(settings)
@@ -31,6 +32,7 @@ def run_graphrag_pipeline(
         chunks_key,
         session_id,
         skip_agent=skip_agent,
+        force_agent=force_agent,
         nebula=nebula,
     )
     project_chunks = graph_result["project_chunks"]
@@ -54,6 +56,7 @@ def run_graphrag_pipeline(
         all_records,
         session_id,
         skip_agent=skip_agent,
+        force_agent=force_agent,
         pg=pg,
         settings=settings,
     )

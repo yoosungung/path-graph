@@ -8,7 +8,7 @@ from constants import PROJECT_ID
 
 
 @patch("path_graph.steps.wiki_pipeline.write_wiki_page")
-@patch("path_graph.steps.wiki_pipeline.invoke_agent")
+@patch("path_graph.steps.agent_cache.invoke_agent")
 def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, mock_write_wiki, local_store, monkeypatch):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
     mock_invoke_agent.return_value = {

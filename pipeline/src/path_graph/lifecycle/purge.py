@@ -12,6 +12,8 @@ from path_graph.contracts.s3_keys import (
     s3_key_parsed_md,
     s3_key_parsed_meta,
     s3_key_raw_prefix,
+    s3_prefix_graph_extract,
+    s3_prefix_wiki_agent,
 )
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.ids import nebula_space_name
@@ -234,6 +236,12 @@ def delete_project(
     graph_context_prefix_deleted = blob.delete_prefix(
         f"graph_context/{tenant}/{project_id}/"
     )
+    graph_extract_prefix_deleted = blob.delete_prefix(
+        s3_prefix_graph_extract(tenant, project_id)
+    )
+    wiki_agent_prefix_deleted = blob.delete_prefix(
+        s3_prefix_wiki_agent(tenant, project_id)
+    )
     batch_chunks_prefix_deleted = blob.delete_prefix(
         f"chunks/{tenant}/{project_id}/"
     )
@@ -245,6 +253,8 @@ def delete_project(
         "parsed_prefix_deleted": parsed_prefix_deleted,
         "communities_prefix_deleted": communities_prefix_deleted,
         "graph_context_prefix_deleted": graph_context_prefix_deleted,
+        "graph_extract_prefix_deleted": graph_extract_prefix_deleted,
+        "wiki_agent_prefix_deleted": wiki_agent_prefix_deleted,
         "batch_chunks_prefix_deleted": batch_chunks_prefix_deleted,
         "pg_deleted": pg_deleted,
         **{

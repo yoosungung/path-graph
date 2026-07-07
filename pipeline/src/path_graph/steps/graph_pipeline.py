@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from collections import defaultdict
-
 from path_graph.config import get_settings
-from path_graph.contracts.schemas import GraphExtractorInput, unwrap_agent_graph_output
+from path_graph.contracts.schemas import unwrap_agent_graph_output
 from path_graph.graph.chunk_partition import make_nebula_store
 from path_graph.graph.entity_vid import normalize_semantic_graph
 from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.ids import nebula_space_name
-from path_graph.steps.agent_invoke import extract_wikilinks, invoke_agent
-from path_graph.storage.blob import make_blob_store, read_jsonl
+from path_graph.steps.agent_cache import load_or_invoke_graph_semantic
+from path_graph.steps.agent_invoke import extract_wikilinks
+from path_graph.storage.blob import BlobStore, make_blob_store, read_jsonl
 
 
 def graph_extract_deterministic(chunks_key: str, tenant: str) -> list[dict]:
@@ -35,18 +34,21 @@ def graph_extract_semantic(
     tenant: str,
     project_id: str,
     batch_id: str,
-    chunks_s3: str,
+    chunks_key: str,
     session_id: str,
+    *,
+    store: BlobStore | None = None,
+    force_agent: bool = False,
 ) -> dict:
-    inp = GraphExtractorInput(
-        tenant=tenant,
-        project_id=project_id,
-        batch_id=batch_id,
-        chunks_s3=chunks_s3,
-        output_schema="graph_v1",
-        idempotency_key=f"{batch_id}:{project_id}",
+    return load_or_invoke_graph_semantic(
+        tenant,
+        project_id,
+        batch_id,
+        chunks_key,
+        session_id,
+        store=store,
+        force_agent=force_agent,
     )
-    return unwrap_agent_graph_output(invoke_agent("graph-extractor", inp, session_id))
 
 
 def semantic_batch_entity_ids(semantic: dict) -> set[str] | None:
@@ -80,6 +82,7 @@ def run_graph_pipeline_for_project(
     session_id: str,
     *,
     skip_agent: bool = False,
+    force_agent: bool = False,
     nebula: NebulaGraphStore | None = None,
 ) -> dict:
     settings = get_settings()
@@ -88,17 +91,24 @@ def run_graph_pipeline_for_project(
     space = nebula_space_name(tenant, project_slug)
 
     deterministic = graph_extract_deterministic(chunks_key, tenant)
-    semantic: dict = {}
-    if not skip_agent:
-        semantic = graph_extract_semantic(
-            tenant, project_id, batch_id, store.agent_artifact_uri(chunks_key), session_id
-        )
 
     nebula.ensure_space(space)
     for line in read_jsonl(store, chunks_key):
         entities = extract_wikilinks(line.get("text") or "")
         if entities:
             nebula.upsert_mentions(space, line["chunk_id"], entities)
+
+    semantic: dict = {}
+    if not skip_agent:
+        semantic = graph_extract_semantic(
+            tenant,
+            project_id,
+            batch_id,
+            chunks_key,
+            session_id,
+            store=store,
+            force_agent=force_agent,
+        )
     if semantic:
         _upsert_semantic_edges(nebula, space, semantic)
 
@@ -119,6 +129,7 @@ def run_graph_pipeline(
     session_id: str,
     *,
     skip_agent: bool = False,
+    force_agent: bool = False,
     nebula: NebulaGraphStore | None = None,
 ) -> dict:
     from path_graph.graph.chunk_partition import copy_chunks_to_project_batch
@@ -136,6 +147,7 @@ def run_graph_pipeline(
         project_chunks_key,
         session_id,
         skip_agent=skip_agent,
+        force_agent=force_agent,
         nebula=nebula,
     )
     batch_entity_ids = semantic_batch_entity_ids(result.get("semantic") or {})

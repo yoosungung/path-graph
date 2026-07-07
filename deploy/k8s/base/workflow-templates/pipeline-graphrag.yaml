@@ -17,6 +17,8 @@ spec:
       - name: chunks_key
       - name: skip_agent
         value: "0"
+      - name: force_agent
+        value: "0"
   synchronization:
     semaphore:
       configMapKeyRef:
@@ -44,6 +46,7 @@ spec:
                 os.environ["CHUNKS_KEY"],
                 os.environ.get("SESSION_ID", "graphrag-session"),
                 skip_agent=os.environ.get("SKIP_AGENT", "0") == "1",
+                force_agent=os.environ.get("FORCE_AGENT", "0") == "1",
             )
             print(json.dumps({
                 "community_count": sum(c.get("community_count", 0) for c in result["communities"]),
@@ -62,6 +65,8 @@ spec:
             value: "{{workflow.parameters.chunks_key}}"
           - name: SKIP_AGENT
             value: "{{workflow.parameters.skip_agent}}"
+          - name: FORCE_AGENT
+            value: "{{workflow.parameters.force_agent}}"
         envFrom:
           - secretRef:
               name: path-graph-env

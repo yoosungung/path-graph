@@ -6,6 +6,7 @@ import pytest
 
 from path_graph.graph.nebula_store import (
     NebulaGraphStore,
+    _SCHEMA_PROBE_VID,
     _decode_value,
     _ngql_string,
     _schema_edge_types,
@@ -93,6 +94,10 @@ def test_ensure_space_live_applies_schema_ddl() -> None:
                     _FakeRow("MENTIONS"),
                 ]
             )
+        if "INSERT VERTEX IF NOT EXISTS Entity" in nql and _SCHEMA_PROBE_VID in nql:
+            return _FakeResult()
+        if f"DELETE VERTEX {_ngql_string(_SCHEMA_PROBE_VID)}" in nql:
+            return _FakeResult()
         return _FakeResult()
 
     session.execute.side_effect = execute
@@ -109,6 +114,52 @@ def test_ensure_space_live_applies_schema_ddl() -> None:
     assert "CREATE EDGE IF NOT EXISTS EXTRACTED" in joined
     assert "CREATE EDGE IF NOT EXISTS INFERRED" in joined
     assert "CREATE EDGE IF NOT EXISTS MENTIONS" in joined
+    assert _SCHEMA_PROBE_VID in joined
+
+
+def test_ensure_space_waits_for_entity_dml_after_catalog_visible() -> None:
+    store = NebulaGraphStore(
+        "h",
+        9669,
+        "root",
+        "pw",
+        schema_wait_sec=1.0,
+        schema_poll_interval_sec=0.01,
+    )
+    session = MagicMock()
+    dml_attempts = {"count": 0}
+
+    def execute(nql: str) -> _FakeResult:
+        if nql.strip().startswith("USE path_graph_dev_dml_probe"):
+            return _FakeResult()
+        if nql.strip() == "SHOW TAGS;":
+            return _FakeResult(rows=[_FakeRow("Entity"), _FakeRow("Chunk")])
+        if nql.strip() == "SHOW EDGES;":
+            return _FakeResult(
+                rows=[
+                    _FakeRow("EXTRACTED"),
+                    _FakeRow("INFERRED"),
+                    _FakeRow("MENTIONS"),
+                ]
+            )
+        if "INSERT VERTEX IF NOT EXISTS Entity" in nql and _SCHEMA_PROBE_VID in nql:
+            dml_attempts["count"] += 1
+            if dml_attempts["count"] < 3:
+                return _FakeResult(
+                    ok=False,
+                    error="SemanticError: No schema found for `Entity'",
+                )
+            return _FakeResult()
+        if f"DELETE VERTEX {_ngql_string(_SCHEMA_PROBE_VID)}" in nql:
+            return _FakeResult()
+        return _FakeResult()
+
+    session.execute.side_effect = execute
+
+    with patch.object(store, "_session", return_value=session):
+        store.ensure_space("path_graph_dev_dml_probe")
+
+    assert dml_attempts["count"] == 3
 
 
 def test_upsert_entities_raises_on_nebula_error() -> None:

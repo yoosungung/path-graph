@@ -45,7 +45,7 @@ def test_unwrap_agent_graph_output_peels_runtime_envelope() -> None:
     assert unwrapped["entities"][0]["id"] == "entity:프로젝트 지원 규정"
 
 
-@patch("path_graph.steps.graph_pipeline.invoke_agent")
+@patch("path_graph.steps.agent_cache.invoke_agent")
 @patch("path_graph.steps.graph_pipeline.make_nebula_store")
 @patch("path_graph.graph.chunk_partition.copy_chunks_to_project_batch")
 @patch("path_graph.steps.graph_pipeline.read_jsonl")
@@ -75,6 +75,10 @@ def test_graph_pipeline_upserts_opik_fixture_to_nebula(
     mock_nebula_factory.return_value = nebula
     store = MagicMock()
     store.agent_artifact_uri.return_value = "https://garage.example/presigned/chunks.jsonl"
+    store.exists.return_value = False
+    store.get_bytes.return_value = (
+        b'{"chunk_id": "2c74e221-6216-510b-a310-b033f08e687e", "text": "x"}\n'
+    )
     mock_blob.return_value = store
 
     run_graph_pipeline(

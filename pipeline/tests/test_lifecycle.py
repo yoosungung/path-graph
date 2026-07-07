@@ -142,7 +142,7 @@ def test_delete_project_purges_then_hard_deletes_pg(
     assert result["status"] == "deleted"
     mock_purge_project.assert_called_once()
     pg.delete_project_data.assert_called_once_with(tenant, PROJECT_ID)
-    assert blob.delete_prefix.call_count == 4
+    assert blob.delete_prefix.call_count == 6
     assert result["pg_deleted"]["projects"] == 1
 
 

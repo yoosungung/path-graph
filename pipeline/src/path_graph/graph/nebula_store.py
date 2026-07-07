@@ -36,6 +36,7 @@ _SCHEMA_EDGE_DDL = (
     "CREATE EDGE IF NOT EXISTS INFERRED(confidence double);",
     "CREATE EDGE IF NOT EXISTS MENTIONS();",
 )
+_SCHEMA_PROBE_VID = "__path_graph_schema_probe__"
 
 
 def _schema_tag_names() -> set[str]:
@@ -120,7 +121,7 @@ class NebulaGraphStore:
         result = sess.execute(f"USE {space};")
         return result.is_succeeded()
 
-    def _schema_ready(self, sess: Any) -> bool:
+    def _schema_catalog_ready(self, sess: Any) -> bool:
         tags = sess.execute("SHOW TAGS;")
         if not tags.is_succeeded():
             return False
@@ -132,6 +133,23 @@ class NebulaGraphStore:
             return False
         edge_names = {_decode_value(row.values[0]) for row in edges.rows()}
         return _schema_edge_types() <= edge_names
+
+    def _schema_dml_ready(self, sess: Any) -> bool:
+        """True when Entity INSERT works — SHOW TAGS can list tags before DML accepts them."""
+        probe_vid = _ngql_string(_SCHEMA_PROBE_VID)
+        insert = sess.execute(
+            "INSERT VERTEX IF NOT EXISTS Entity(name, description) "
+            f'VALUES {probe_vid}:({_ngql_string("_probe")}, {_ngql_string("")});'
+        )
+        if not insert.is_succeeded():
+            return False
+        delete = sess.execute(f"DELETE VERTEX {probe_vid};")
+        return delete.is_succeeded()
+
+    def _schema_ready(self, sess: Any) -> bool:
+        if not self._schema_catalog_ready(sess):
+            return False
+        return self._schema_dml_ready(sess)
 
     def _ensure_live_schema(self, sess: Any, space: str) -> None:
         if space in self._prepared_spaces:

@@ -6,7 +6,7 @@ from path_graph.steps.graph_pipeline import run_graph_pipeline
 from constants import PROJECT_ID
 
 
-@patch("path_graph.steps.graph_pipeline.invoke_agent")
+@patch("path_graph.steps.agent_cache.invoke_agent")
 @patch("path_graph.steps.graph_pipeline.make_nebula_store")
 @patch("path_graph.graph.chunk_partition.copy_chunks_to_project_batch")
 @patch("path_graph.steps.graph_pipeline.read_jsonl")
@@ -40,6 +40,8 @@ def test_graph_pipeline_upserts_semantic_edges_from_agent(
     mock_nebula_factory.return_value = nebula
     store = MagicMock()
     store.agent_artifact_uri.return_value = "https://garage.example/presigned/chunks.jsonl"
+    store.exists.return_value = False
+    store.get_bytes.return_value = b'{"chunk_id": "chunk-0", "text": "[[Alpha]]"}\n'
     mock_blob.return_value = store
 
     run_graph_pipeline(
@@ -55,6 +57,8 @@ def test_graph_pipeline_upserts_semantic_edges_from_agent(
     mock_invoke_agent.assert_called_once()
     inp = mock_invoke_agent.call_args.args[1]
     assert inp.chunks_s3 == "https://garage.example/presigned/chunks.jsonl"
+    nebula.ensure_space.assert_called_once()
+    nebula.upsert_mentions.assert_called_once()
     nebula.upsert_entities.assert_called_once()
     nebula.upsert_edges.assert_called_once()
 

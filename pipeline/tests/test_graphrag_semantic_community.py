@@ -93,10 +93,7 @@ def test_graphrag_semantic_only_plain_chunk_builds_communities(local_store, monk
     )
 
     with patch(
-        "path_graph.steps.graph_pipeline.invoke_agent",
-        side_effect=_mock_invoke_agent,
-    ), patch(
-        "path_graph.steps.wiki_pipeline.invoke_agent",
+        "path_graph.steps.agent_cache.invoke_agent",
         side_effect=_mock_invoke_agent,
     ), patch(
         "path_graph.steps.wiki_pipeline.write_wiki_page",

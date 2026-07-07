@@ -473,11 +473,13 @@ MS GraphRAG 사상을 **Knowledge Project** 경계와 정합되게 구현한다.
 
 1. `copy_chunks_to_project_batch` — batch chunks → `chunks/{tenant}/{project_id}/{batch_id}/chunks.jsonl`
 2. `run_graph_pipeline` — project별 graph-extractor + Nebula upsert (`graph/nebula_store.py`)
+   - **순서**: `ensure_space` → wikilink `MENTIONS` upsert → graph-extractor (또는 캐시) → semantic upsert. downstream 실패 시 agent 재호출을 피한다.
+   - **Agent 캐시** (`steps/agent_cache.py`): graph-extractor·wiki-synthesizer 출력을 S3에 저장. 키 `graph_extract/{tenant}/{project_id}/{batch_id}/graph_v1.json` + `meta.json` (`chunks_sha256` 검증). wiki는 `wiki_agent/.../{community_id}.json`. hit 시 `invoke_agent` 생략. WF 파라미터 `force_agent=1`이면 캐시 무시.
    - **정본**: `graph-extractor` semantic `entities`/`edges` → `EXTRACTED`/`INFERRED`
    - **보조**: chunk `[[wikilink]]` → `MENTIONS` (일반 PDF/HWP ingest에는 없음)
    - agent job `output`은 runtime이 `{"output": <LangGraph state>}`로 한 겹 감쌀 수 있다. `unwrap_agent_graph_output()`으로 `entities`/`edges`가 있는 dict까지 벗긴 뒤 Nebula upsert한다 (fixture: `tests/fixtures/graph_extractor/opik_span_019f2579-93b7.json`).
    - 반환: `batch_entity_ids` — semantic `entities[].id` 집합 (community batch 스코프)
-   - **Nebula space bootstrap** (`NebulaGraphStore.ensure_space`): `CREATE SPACE` → `USE` 성공까지 폴링(graphd 캐시 전파; `SHOW SPACES`만으로는 부족) → `CREATE TAG`/`CREATE EDGE` DDL → schema 전파 대기. 태그 `Entity`, `Chunk`; 엣지 `EXTRACTED`, `INFERRED`, `MENTIONS`. DDL은 비동기 반영이므로 `SHOW TAGS`/`SHOW EDGES` 폴링(`NEBULA_SCHEMA_WAIT_SEC`, 기본 20s).
+   - **Nebula space bootstrap** (`NebulaGraphStore.ensure_space`): `CREATE SPACE` → `USE` 성공까지 폴링(graphd 캐시 전파; `SHOW SPACES`만으로는 부족) → `CREATE TAG`/`CREATE EDGE` DDL → schema 전파 대기. 태그 `Entity`, `Chunk`; 엣지 `EXTRACTED`, `INFERRED`, `MENTIONS`. DDL은 비동기 반영이므로 `SHOW TAGS`/`SHOW EDGES` 폴링 후 **Entity probe INSERT/DELETE**로 DML 준비까지 확인(`NEBULA_SCHEMA_WAIT_SEC`, 기본 20s).
    - **Entity VID** (`graph/entity_vid.py`): Nebula `FIXED_STRING(64)`는 **UTF-8 바이트** 상한. `entity:{name}` 형태는 한글·긴 조문명에서 64B를 초과할 수 있다. ingest 시 `entity_vid(name)` = `uuid5(PATH_GRAPH_NAMESPACE, "entity:{name}")`(36자)로 정규화하고, 원문은 `Entity.name` property에 저장한다. graph-extractor·wikilink의 legacy `entity:…` ref는 upsert 직전 `resolve_entity_vid()`로 canonical VID에 매핑한다. **기존 space의 legacy VID vertex와 공존하지 않음** — graphrag 재실행 전 space drop 또는 project purge 권장.
    - upsert 실패 시 `RuntimeError` — silent ignore 금지.
 3. `run_community_pipeline` — `batch_entity_ids`로 `export_project_graph` 스코프 후 project별 hierarchical Leiden

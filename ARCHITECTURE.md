@@ -167,6 +167,8 @@ s3://{bucket}/
   batches/{tenant}/{batch_id}/manifest.jsonl
   communities/{tenant}/{project_id}/{batch_id}/communities.jsonl
   graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json
+  graph_extract/{tenant}/{project_id}/{batch_id}/graph_v1.json
+  wiki_agent/{tenant}/{project_id}/{batch_id}/{community_id}.json
 ```
 
 Wiki 페이지 본문은 S3가 아닌 **`vfs_wiki_files`** (`public` schema, agents-runtime 마이그레이션)에 저장한다.
