@@ -53,6 +53,13 @@ def test_ngql_string_escapes_quotes() -> None:
     assert _ngql_string('a"b') == '"a\\"b"'
 
 
+def test_ngql_string_escapes_newlines_and_control_chars() -> None:
+    assert _ngql_string("면\n업") == '"면\\n업"'
+    assert _ngql_string("a\tb") == '"a\\tb"'
+    assert _ngql_string("a\rb") == '"a\\rb"'
+    assert _ngql_string("back\\slash") == '"back\\\\slash"'
+
+
 def test_schema_name_helpers() -> None:
     assert "Entity" in _schema_tag_names()
     assert "Chunk" in _schema_tag_names()
