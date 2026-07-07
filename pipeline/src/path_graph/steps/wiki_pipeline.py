@@ -4,7 +4,7 @@ import json
 
 from path_graph.config import Settings, get_settings
 from path_graph.contracts.community import CommunityRecord
-from path_graph.ids import wiki_slug_for_community
+from path_graph.ids import wiki_path_for_community
 from path_graph.meta.pg import PgMetaStore
 from path_graph.steps.agent_cache import load_or_invoke_wiki_synthesize
 from path_graph.storage.blob import make_blob_store
@@ -45,12 +45,17 @@ def store_wiki_pages(
     pages: list[dict],
     *,
     community_id: str | None = None,
+    community_level: int | None = None,
     batch_id: str | None = None,
     pg: PgMetaStore | None = None,
 ) -> list[str]:
     paths: list[str] = []
     for page in pages:
-        slug = page["slug"]
+        title = page.get("title") or "Community Report"
+        if community_id is not None and community_level is not None:
+            slug = wiki_path_for_community(community_level, title, community_id)
+        else:
+            slug = page.get("slug") or wiki_path_for_community(0, title, community_id or "")
         body = page.get("markdown") or page.get("content") or ""
         vfs_path = write_wiki_page(tenant, project_id, slug, body)
         paths.append(vfs_path)
@@ -59,7 +64,7 @@ def store_wiki_pages(
                 tenant,
                 project_id,
                 slug,
-                title=page.get("title"),
+                title=title,
                 community_id=community_id,
                 batch_id=batch_id,
             )
@@ -71,12 +76,9 @@ def _stub_page_from_context(graph_context_key: str, record: CommunityRecord) -> 
     raw = store.get_bytes(graph_context_key)
     ctx = json.loads(raw)
     entities = ", ".join(e.get("name", "") for e in ctx.get("entities", [])[:10])
-    slug = wiki_slug_for_community(
-        record.project_slug, record.level, record.community_id
-    )
+    title = f"Community L{record.level} ({record.project_slug})"
     return {
-        "slug": slug,
-        "title": f"Community L{record.level} ({record.project_slug})",
+        "title": title,
         "markdown": f"# Community Report\n\nEntities: {entities}\n",
     }
 
@@ -111,6 +113,7 @@ def run_wiki_for_community(
             record.project_id,
             pages,
             community_id=record.community_id,
+            community_level=record.level,
             batch_id=record.batch_id,
             pg=pg,
         )

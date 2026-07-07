@@ -73,7 +73,26 @@ def slug_from_name(name: str) -> str:
     return normalize_project_slug(slug)
 
 
-def resolve_knowledge_binding(tenant: str, project_id: str, project_slug: str) -> KnowledgeBinding:
+def wiki_vfs_mount_segment(name: str | None, slug: str) -> str:
+    if name:
+        segment = name.strip().replace("/", "-").replace("\\", "-")
+        segment = re.sub(r"\s+", " ", segment).strip()
+        if segment:
+            return segment
+    return slug
+
+
+def wiki_vfs_mount_path(name: str | None, slug: str) -> str:
+    segment = wiki_vfs_mount_segment(name, normalize_project_slug(slug))
+    return f"/wiki/{segment}/"
+
+
+def resolve_knowledge_binding(
+    tenant: str,
+    project_id: str,
+    project_slug: str,
+    project_name: str | None = None,
+) -> KnowledgeBinding:
     if not tenant:
         raise ValueError("tenant is required")
     if not project_id:
@@ -90,9 +109,9 @@ def resolve_knowledge_binding(tenant: str, project_id: str, project_slug: str) -
             filter={"project_id": project_id},
         ),
         graph=KnowledgeBindingGraph(nebula_space=space),
-    wiki=KnowledgeBindingWiki(
-        vfs_mount=f"/wiki/{slug}/",
-    ),
+        wiki=KnowledgeBindingWiki(
+            vfs_mount=wiki_vfs_mount_path(project_name, slug),
+        ),
     )
 
 

@@ -55,7 +55,6 @@ def _mock_invoke_agent(agent, _inp, _session_id, **_kwargs):
         return {
             "pages": [
                 {
-                    "slug": "default-community-L0-test0001",
                     "title": "Community Report",
                     "markdown": "# Report\n",
                 }

@@ -45,7 +45,6 @@ async def test_synthesize_node_builds_page(wiki_modules, tmp_path):
     bound.ainvoke.return_value = MagicMock(
         content=json.dumps(
             {
-                "slug": "p6907e343-community-L0-abc12345",
                 "title": "Community Alpha-Beta",
                 "executive_summary": "Summary here.",
                 "key_entities": ["Alpha", "Beta"],
@@ -66,7 +65,6 @@ async def test_synthesize_node_builds_page(wiki_modules, tmp_path):
 
     out = await graph_mod.synthesize_page({**state, **loaded}, llm)
     assert out["pages"][0]["title"] == "Community Alpha-Beta"
-    assert out["pages"][0]["slug"] == "p6907e343-community-L0-abc12345"
 
 
 def test_factory_returns_compiled_graph(wiki_modules):
@@ -102,7 +100,6 @@ async def test_compiled_graph_ainvoke_end_to_end(wiki_modules, tmp_path):
     bound.ainvoke.return_value = MagicMock(
         content=json.dumps(
             {
-                "slug": "p6907e343-community-L0-abc12345",
                 "title": "Community Alpha-Beta",
                 "executive_summary": "Summary here.",
                 "key_entities": ["Alpha", "Beta"],

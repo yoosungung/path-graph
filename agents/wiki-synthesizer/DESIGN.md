@@ -14,7 +14,7 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 ## 입출력
 
 - **input**: `{tenant, project_id, project_slug, community_id, community_level, graph_context_s3, output_schema, idempotency_key}`
-- **output**: `{pages: [{slug, title, markdown}], tenant, project_id}` — LLM structured output은 `executive_summary`·`key_entities` 등 bounded 필드이며 agent가 `markdown`을 조립한다.
+- **output**: `{pages: [{title, markdown}], tenant, project_id}` — LLM structured output은 `executive_summary`·`key_entities` 등 bounded 필드이며 agent가 `markdown`을 조립한다. wiki VFS path(`L{level}/{title}-{short_id}`)는 pipeline이 `community_id`·`title`로 결정한다.
 
 `graph_context_s3`는 `graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json` artifact URI. wiki S3는 `wiki/{tenant}/{project_id}/{slug}.md`.
 

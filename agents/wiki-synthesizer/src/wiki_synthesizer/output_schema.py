@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-WIKI_SLUG_MAX_CHARS = 128
 WIKI_TITLE_MAX_CHARS = 200
 WIKI_SUMMARY_MAX_CHARS = 1200
 WIKI_BULLET_MAX_CHARS = 300
@@ -13,7 +12,6 @@ WIKI_MAX_OPEN_QUESTIONS = 5
 WIKI_V1_SCHEMA: dict = {
     "type": "object",
     "properties": {
-        "slug": {"type": "string", "maxLength": WIKI_SLUG_MAX_CHARS},
         "title": {"type": "string", "maxLength": WIKI_TITLE_MAX_CHARS},
         "executive_summary": {
             "type": "string",
@@ -35,7 +33,7 @@ WIKI_V1_SCHEMA: dict = {
             "items": {"type": "string", "maxLength": WIKI_BULLET_MAX_CHARS},
         },
     },
-    "required": ["slug", "title", "executive_summary", "key_entities"],
+    "required": ["title", "executive_summary", "key_entities"],
     "additionalProperties": False,
 }
 

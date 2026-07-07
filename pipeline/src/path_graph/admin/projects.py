@@ -203,4 +203,6 @@ class ProjectStore:
         profile = self.get_project(tenant, project_id)
         if profile is None:
             raise ValueError(f"project not found: {project_id}")
-        return resolve_knowledge_binding(tenant, profile.id, profile.slug)
+        return resolve_knowledge_binding(
+            tenant, profile.id, profile.slug, profile.name
+        )

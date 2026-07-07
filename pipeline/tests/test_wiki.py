@@ -3,6 +3,7 @@ from unittest.mock import patch
 from path_graph.contracts.community import CommunityRecord
 from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.steps.community_pipeline import run_community_pipeline_for_project
+from path_graph.ids import wiki_path_for_community
 from path_graph.steps.wiki_pipeline import run_wiki_for_community
 from constants import PROJECT_ID
 
@@ -14,13 +15,11 @@ def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, mock_write_wiki, lo
     mock_invoke_agent.return_value = {
         "pages": [
             {
-                "slug": "default-community-L0-abc12345",
                 "title": "Community Report",
                 "markdown": "# Report\n\nFrom LLM.",
             }
         ],
     }
-    mock_write_wiki.return_value = "/default-community-L0-abc12345.md"
 
     memory: dict = {}
     nebula = NebulaGraphStore("h", 1, "u", "p", memory=memory)
@@ -60,14 +59,18 @@ def test_wiki_pipeline_stores_agent_pages(mock_invoke_agent, mock_write_wiki, lo
         nebula=nebula,
     )
     record = comm["records"][0]
+    expected_slug = wiki_path_for_community(
+        record.level, "Community Report", record.community_id
+    )
+    mock_write_wiki.return_value = f"/{expected_slug}.md"
 
     wiki = run_wiki_for_community("dev", record, "sess", skip_agent=False)
-    assert wiki["wiki_paths"] == ["/default-community-L0-abc12345.md"]
+    assert wiki["wiki_paths"] == [f"/{expected_slug}.md"]
     mock_invoke_agent.assert_called_once()
     mock_write_wiki.assert_called_once_with(
         "dev",
         PROJECT_ID,
-        "default-community-L0-abc12345",
+        expected_slug,
         "# Report\n\nFrom LLM.",
     )
 

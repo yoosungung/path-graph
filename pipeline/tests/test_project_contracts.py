@@ -1,6 +1,11 @@
 import pytest
 
-from path_graph.contracts.project import ProjectCreate, resolve_knowledge_binding, slug_from_name
+from path_graph.contracts.project import (
+    ProjectCreate,
+    resolve_knowledge_binding,
+    slug_from_name,
+    wiki_vfs_mount_path,
+)
 from path_graph.ids import index_namespace
 
 
@@ -28,3 +33,15 @@ def test_slug_from_name_non_latin_fallback():
     assert slug.startswith("p_")
     assert len(slug) == 10
     assert slug_from_name("문서 프로젝트") == slug
+
+
+def test_wiki_vfs_mount_path_uses_project_name():
+    assert wiki_vfs_mount_path("회사규정", "p_1dbc0db0") == "/wiki/회사규정/"
+    assert wiki_vfs_mount_path("Product Docs", "product_docs") == "/wiki/Product Docs/"
+
+
+def test_resolve_knowledge_binding_wiki_mount_from_name():
+    binding = resolve_knowledge_binding(
+        "dev", PROJECT_ID, "p_1dbc0db0", project_name="회사규정"
+    )
+    assert binding.wiki.vfs_mount == "/wiki/회사규정/"

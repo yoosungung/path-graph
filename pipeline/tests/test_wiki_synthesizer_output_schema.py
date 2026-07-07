@@ -31,7 +31,6 @@ def test_wiki_v1_response_format(wiki_modules):
     assert fmt["type"] == "json_schema"
     assert fmt["json_schema"]["name"] == "wiki_v1"
     assert set(fmt["json_schema"]["schema"]["required"]) == {
-        "slug",
         "title",
         "executive_summary",
         "key_entities",
@@ -47,7 +46,6 @@ async def test_synthesize_page_binds_json_schema(wiki_modules):
     bound.ainvoke.return_value = MagicMock(
         content=json.dumps(
             {
-                "slug": "p6907e343-community-L0-abc12345",
                 "title": "Community",
                 "executive_summary": "Summary.",
                 "key_entities": ["Alpha"],

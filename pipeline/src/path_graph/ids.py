@@ -72,7 +72,18 @@ def community_id(
     return str(uuid.uuid5(PATH_GRAPH_NAMESPACE, key))
 
 
-def wiki_slug_for_community(project_slug: str, level: int, community_id_value: str) -> str:
+def slugify_wiki_segment(text: str, *, max_len: int = 60) -> str:
+    segment = text.strip()
+    segment = re.sub(r"[/\\]+", "-", segment)
+    segment = re.sub(r"\s+", "-", segment).strip("-")
+    if not segment:
+        return "community"
+    if len(segment) > max_len:
+        segment = segment[:max_len].rstrip("-")
+    return segment or "community"
+
+
+def wiki_path_for_community(level: int, title: str, community_id_value: str) -> str:
     short = community_id_value.replace("-", "")[:8]
-    slug = normalize_project_slug(project_slug)
-    return f"{slug}-community-L{level}-{short}"
+    segment = slugify_wiki_segment(title)
+    return f"L{level}/{segment}-{short}"

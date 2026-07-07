@@ -167,7 +167,9 @@ def api_get_binding(tenant: str, project_id: str) -> dict[str, Any]:
     profile = ProjectStore(s.path_graph_dsn).get_project(tenant, project_id)
     if profile is None:
         raise ValueError("project not found")
-    binding = resolve_knowledge_binding(tenant, profile.id, profile.slug)
+    binding = resolve_knowledge_binding(
+        tenant, profile.id, profile.slug, profile.name
+    )
     return binding.model_dump()
 
 

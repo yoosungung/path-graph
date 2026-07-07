@@ -70,7 +70,7 @@ RAG ingest 이후 Graph(Nebula)·Wiki(PG VFS) 적재. Console MVP는 **`pipeline
 |------|------------|-----------|
 | **RAG** | runtime PG `path_graph.chunks.embedding` + `project_id` 필터 | retrieval tool |
 | **Graph** | Nebula Space — `index_namespace`와 **동일 이름** | multi-hop 탐색 |
-| **Wiki** | runtime PG `vfs_wiki_files` (`tenant`, `project_id`) + VFS mount `/wiki/{project_slug}/` | 컴파일드 지식 |
+| **Wiki** | runtime PG `vfs_wiki_files` (`tenant`, `project_id`) + VFS mount `/wiki/{project_name}/` | 컴파일드 지식 |
 
 ```json
 {
@@ -82,7 +82,7 @@ RAG ingest 이후 Graph(Nebula)·Wiki(PG VFS) 적재. Console MVP는 **`pipeline
     "filter": { "project_id": "550e8400-..." }
   },
   "graph": { "nebula_space": "path_graph_acme_product-docs" },
-  "wiki": { "vfs_mount": "/wiki/product-docs/" }
+  "wiki": { "vfs_mount": "/wiki/회사규정/" }
 }
 ```
 

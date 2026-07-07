@@ -25,7 +25,7 @@ def schema_mod():
 def test_wiki_v1_schema_uses_bounded_sections(schema_mod):
     schema = schema_mod.WIKI_V1_SCHEMA
     required = set(schema["required"])
-    assert required == {"slug", "title", "executive_summary", "key_entities"}
+    assert required == {"title", "executive_summary", "key_entities"}
     assert "markdown" not in schema["properties"]
     assert schema["properties"]["key_entities"]["maxItems"] == schema_mod.WIKI_MAX_ENTITY_BULLETS
 

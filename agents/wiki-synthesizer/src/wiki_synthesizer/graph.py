@@ -29,11 +29,6 @@ class WikiState(TypedDict, total=False):
     pages: list[dict]
 
 
-def _wiki_slug(project_slug: str, level: int, community_id: str) -> str:
-    short = community_id.replace("-", "")[:8]
-    return f"{project_slug}-community-L{level}-{short}"
-
-
 async def load_context(state: WikiState) -> dict:
     uri = state.get("graph_context_s3") or ""
     raw = fetch_bytes(uri)
@@ -60,14 +55,10 @@ async def synthesize_page(
         max_tokens=max_completion_tokens,
     )
 
-    project_slug = state.get("project_slug") or "project"
-    level = int(state.get("community_level") or 0)
-    community_id = state.get("community_id") or ""
-    slug = data.get("slug") or _wiki_slug(project_slug, level, community_id)
+    title = (data.get("title") or "Community Report").strip()
     page = {
-        "slug": slug,
-        "title": data.get("title") or slug,
-        "markdown": assemble_wiki_markdown({**data, "title": data.get("title") or slug}),
+        "title": title,
+        "markdown": assemble_wiki_markdown({**data, "title": title}),
     }
     return {
         "pages": [page],

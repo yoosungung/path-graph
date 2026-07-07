@@ -14,7 +14,6 @@ Graph context JSON:
 
 Return JSON (output is constrained to wiki_v1 schema by the API):
 {
-  "slug": "p{project}-community-L{level}-{short_id}",
   "title": "...",
   "executive_summary": "...",
   "key_entities": ["..."],

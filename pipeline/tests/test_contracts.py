@@ -25,7 +25,7 @@ from path_graph.ids import (
     nebula_space_name,
     normalize_tenant_slug,
     index_namespace,
-    wiki_slug_for_community,
+    wiki_path_for_community,
     sha256_text,
 )
 
@@ -153,10 +153,11 @@ def test_community_record_build():
     )
 
 
-def test_wiki_slug_for_community():
+def test_wiki_path_for_community():
     cid = community_id("t1", PROJECT_ID, "b1", 0, "c1")
-    slug = wiki_slug_for_community("product-docs", 0, cid)
-    assert slug.startswith("product-docs-community-L0-")
+    path = wiki_path_for_community(0, "인사 정책 개요", cid)
+    assert path.startswith("L0/인사-정책-개요-")
+    assert path.endswith(cid.replace("-", "")[:8])
 
 
 def test_graph_extractor_input():
