@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 
 from wiki_synthesizer.artifact_io import fetch_bytes, read_json_bytes
 from wiki_synthesizer.llm_json import invoke_json_llm
-from wiki_synthesizer.output_schema import wiki_v1_response_format
+from wiki_synthesizer.output_schema import assemble_wiki_markdown, wiki_v1_response_format
 from wiki_synthesizer.paths import read_prompt
 
 try:
@@ -58,7 +58,7 @@ async def synthesize_page(state: WikiState, llm: Any) -> dict:
     page = {
         "slug": slug,
         "title": data.get("title") or slug,
-        "markdown": data.get("markdown") or "",
+        "markdown": assemble_wiki_markdown({**data, "title": data.get("title") or slug}),
     }
     return {
         "pages": [page],

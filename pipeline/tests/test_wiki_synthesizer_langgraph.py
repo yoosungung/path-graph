@@ -47,7 +47,8 @@ async def test_synthesize_node_builds_page(wiki_modules, tmp_path):
             {
                 "slug": "p6907e343-community-L0-abc12345",
                 "title": "Community Alpha-Beta",
-                "markdown": "# Report\n\nSummary here.",
+                "executive_summary": "Summary here.",
+                "key_entities": ["Alpha", "Beta"],
             }
         )
     )
@@ -103,7 +104,8 @@ async def test_compiled_graph_ainvoke_end_to_end(wiki_modules, tmp_path):
             {
                 "slug": "p6907e343-community-L0-abc12345",
                 "title": "Community Alpha-Beta",
-                "markdown": "# Report\n\nSummary here.",
+                "executive_summary": "Summary here.",
+                "key_entities": ["Alpha", "Beta"],
             }
         )
     )
@@ -124,4 +126,4 @@ async def test_compiled_graph_ainvoke_end_to_end(wiki_modules, tmp_path):
 
     assert "Alpha" in result["graph_context_text"]
     assert result["pages"][0]["title"] == "Community Alpha-Beta"
-    assert result["pages"][0]["markdown"].startswith("# Report")
+    assert result["pages"][0]["markdown"].startswith("# Community Alpha-Beta")

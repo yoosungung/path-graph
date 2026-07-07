@@ -141,7 +141,7 @@ steps:
 | agent | nodes | structured output |
 |---|---|---|
 | graph-extractor | `load` → `extract` | `graph_v1` JSON schema (`entities[]`, `edges[]`) |
-| wiki-synthesizer | `load` → `synthesize` | `wiki_v1` JSON schema (`slug`, `title`, `markdown`) |
+| wiki-synthesizer | `load` → `synthesize` | `wiki_v1` JSON schema (`slug`, `title`, `executive_summary`, `key_entities`, …) → agent가 `markdown` 조립 |
 
 - **artifact I/O**: pipeline이 `BlobStore.agent_artifact_uri(key)`로 **presigned HTTPS**(S3) 또는 `file://`(local) URI를 invoke input에 넣는다. agent pool은 `httpx` GET만 사용 — **S3 credential env 불필요**.
 - **LLM**: `runtime_common.providers.langgraph.prepare_langgraph_llm(cfg)` + `llm.bind(response_format=...)`.
@@ -475,7 +475,7 @@ MS GraphRAG 사상을 **Knowledge Project** 경계와 정합되게 구현한다.
 2. `run_graph_pipeline` — project별 graph-extractor + Nebula upsert (`graph/nebula_store.py`)
    - **순서**: `ensure_space` → wikilink `MENTIONS` upsert → graph-extractor (또는 캐시) → semantic upsert. downstream 실패 시 agent 재호출을 피한다.
    - **Agent 캐시** (`steps/agent_cache.py`): graph-extractor·wiki-synthesizer 출력을 S3에 저장. 키 `graph_extract/{tenant}/{project_id}/{batch_id}/graph_v1.json` + `meta.json` (`chunks_sha256` 검증). wiki는 `wiki_agent/.../{community_id}.json`. hit 시 `invoke_agent` 생략. WF 파라미터 `force_agent=1`이면 캐시 무시.
-   - **graph_context** (`graph/graph_context.py`): wiki-synthesizer 입력. `GRAPH_CONTEXT_MAX_ENTITIES`(기본 50)만 포함 — **batch 전체 `chunk_id` 목록은 넣지 않음**(LLM 컨텍스트 폭주 방지).
+   - **graph_context** (`graph/graph_context.py`): wiki-synthesizer 입력. `GRAPH_CONTEXT_MAX_ENTITIES`(기본 20), `GRAPH_CONTEXT_MAX_RELATIONSHIPS`(30), `GRAPH_CONTEXT_MAX_DESCRIPTION_CHARS`(200)로 엔티티·관계·description을 제한 — **batch 전체 `chunk_id` 목록은 넣지 않음**(LLM 컨텍스트 폭주 방지).
    - **정본**: `graph-extractor` semantic `entities`/`edges` → `EXTRACTED`/`INFERRED`
    - **보조**: chunk `[[wikilink]]` → `MENTIONS` (일반 PDF/HWP ingest에는 없음)
    - agent job `output`은 runtime이 `{"output": <LangGraph state>}`로 한 겹 감쌀 수 있다. `unwrap_agent_graph_output()`으로 `entities`/`edges`가 있는 dict까지 벗긴 뒤 Nebula upsert한다 (fixture: `tests/fixtures/graph_extractor/opik_span_019f2579-93b7.json`).
@@ -493,10 +493,12 @@ Argo: `pipeline-graphrag.yaml` — WF 파라미터 `tenant`, `project_id`, `proj
 
 | env | 기본값 |
 |---|---|
-| `COMMUNITY_MAX_CLUSTER_SIZE` | 10 |
+| `COMMUNITY_MAX_CLUSTER_SIZE` | 6 |
 | `COMMUNITY_USE_LCC` | true |
-| `COMMUNITY_SEED` | 0xDEADBEEF |
-| `GRAPH_CONTEXT_MAX_ENTITIES` | 50 |
+| `COMMUNITY_SEED` | `0xDEADBEEF` |
+| `GRAPH_CONTEXT_MAX_ENTITIES` | 20 |
+| `GRAPH_CONTEXT_MAX_RELATIONSHIPS` | 30 |
+| `GRAPH_CONTEXT_MAX_DESCRIPTION_CHARS` | 200 |
 
 ### Embedding (외부 TEI)
 

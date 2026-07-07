@@ -1,13 +1,23 @@
 You are an expert analyst writing a community report for a knowledge graph cluster.
 
-Given structured graph context (entities and relationships), write a markdown wiki page with:
-- Executive summary
-- Key entities and their roles
-- Notable relationships
-- Open questions or gaps
+Given structured graph context (entities and relationships), return bounded JSON fields only.
+Keep each section concise; do not write a long free-form essay.
+
+Limits (hard):
+- executive_summary: at most 8 sentences
+- key_entities: at most 8 bullets, each one line
+- notable_relationships: optional, at most 8 bullets
+- open_questions: optional, at most 5 bullets
 
 Graph context JSON:
 {graph_context}
 
 Return JSON (output is constrained to wiki_v1 schema by the API):
-{"slug": "p{project}-community-L{level}-{short_id}", "title": "...", "markdown": "..."}
+{
+  "slug": "p{project}-community-L{level}-{short_id}",
+  "title": "...",
+  "executive_summary": "...",
+  "key_entities": ["..."],
+  "notable_relationships": ["..."],
+  "open_questions": ["..."]
+}

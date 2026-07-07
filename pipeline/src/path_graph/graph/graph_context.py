@@ -6,17 +6,26 @@ from path_graph.graph.nebula_store import NebulaGraphStore
 from path_graph.ids import nebula_space_name
 
 
+def _truncate_text(value: str, max_chars: int) -> str:
+    text = (value or "").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max(0, max_chars - 1)].rstrip() + "…"
+
+
 def build_graph_context(
     record: CommunityRecord,
     nebula: NebulaGraphStore,
     *,
-    max_entities: int = 50,
+    max_entities: int = 20,
+    max_relationships: int = 30,
+    max_description_chars: int = 200,
 ) -> dict:
     space = record.nebula_space or nebula_space_name(record.tenant, record.project_slug)
     entity_ids = record.entity_ids[:max_entities]
     entity_id_set = set(entity_ids)
     entities = nebula.get_entities(space, entity_ids)
-    relationships = nebula.get_relationships(space, entity_id_set)
+    relationships = nebula.get_relationships(space, entity_id_set)[:max_relationships]
     return {
         "community_id": record.community_id,
         "tenant": record.tenant,
@@ -29,7 +38,10 @@ def build_graph_context(
             {
                 "id": ent.get("id", ""),
                 "name": ent.get("name", ""),
-                "description": ent.get("description", ""),
+                "description": _truncate_text(
+                    str(ent.get("description", "")),
+                    max_description_chars,
+                ),
             }
             for ent in entities
         ],
@@ -38,7 +50,10 @@ def build_graph_context(
                 "source": rel.get("source", ""),
                 "target": rel.get("target", ""),
                 "type": rel.get("type", "EXTRACTED"),
-                "description": rel.get("description", ""),
+                "description": _truncate_text(
+                    str(rel.get("description", "")),
+                    max_description_chars,
+                ),
             }
             for rel in relationships
         ],

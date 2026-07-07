@@ -14,7 +14,7 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 ## 입출력
 
 - **input**: `{tenant, project_id, project_slug, community_id, community_level, graph_context_s3, output_schema, idempotency_key}`
-- **output**: `{pages: [{slug, title, markdown}], tenant, project_id}`
+- **output**: `{pages: [{slug, title, markdown}], tenant, project_id}` — LLM structured output은 `executive_summary`·`key_entities` 등 bounded 필드이며 agent가 `markdown`을 조립한다.
 
 `graph_context_s3`는 `graph_context/{tenant}/{project_id}/{batch_id}/{community_id}.json` artifact URI. wiki S3는 `wiki/{tenant}/{project_id}/{slug}.md`.
 
@@ -29,7 +29,7 @@ MS GraphRAG community report 프롬프트 사상으로 project·community 단위
 ## LangGraph
 
 1. `load_context` — `graph_context_s3` JSON
-2. `synthesize` — `community_report.txt` + LLM(`response_format` `wiki_v1` JSON schema) → `{slug, title, markdown}` → `pages[]`
+2. `synthesize` — `community_report.txt` + LLM(`response_format` `wiki_v1` JSON schema) → bounded sections → `assemble_wiki_markdown()` → `pages[]`
 3. `project_slug` — invoke input 필수 (`WikiSynthesizerInput`)
 
 ## Commands

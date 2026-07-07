@@ -60,10 +60,12 @@ class Settings(BaseSettings):
 
     chunk_max_chars: int = 1000  # CHUNK_MAX_CHARS — embed context (~1k tokens) safe limit
 
-    community_max_cluster_size: int = 10  # COMMUNITY_MAX_CLUSTER_SIZE
+    community_max_cluster_size: int = 6  # COMMUNITY_MAX_CLUSTER_SIZE
     community_use_lcc: bool = True  # COMMUNITY_USE_LCC
     community_seed: int = 0xDEADBEEF  # COMMUNITY_SEED
-    graph_context_max_entities: int = 50  # GRAPH_CONTEXT_MAX_ENTITIES
+    graph_context_max_entities: int = 20  # GRAPH_CONTEXT_MAX_ENTITIES
+    graph_context_max_relationships: int = 30  # GRAPH_CONTEXT_MAX_RELATIONSHIPS
+    graph_context_max_description_chars: int = 200  # GRAPH_CONTEXT_MAX_DESCRIPTION_CHARS
 
     rhwp_batch_bin: str = "rhwp-batch"
 
