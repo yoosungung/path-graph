@@ -29,6 +29,8 @@ pipeline/.data/
 
 # Cursor (agent plans, local IDE state)
 .cursor/
+!.cursor/rules/
+!.cursor/rules/**
 
 .DS_Store
 Thumbs.db
