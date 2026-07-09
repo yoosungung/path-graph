@@ -1,0 +1,86 @@
+---
+description: GitHub Release 제출 절차 — gh release + GHCR·wheel 정리
+alwaysApply: false
+---
+
+# Release 절차
+
+사용자가 release 제출을 요청하면 아래 순서를 따른다.
+
+## 1. 버전 bump + gh release 제출
+
+1. `pipeline/pyproject.toml`의 `version`을 올린다 (예: `0.1.5` → `0.1.6`).
+2. 커밋·푸시: `chore(release): bump pipeline version to X.Y.Z`
+3. **gh CLI로 release 생성** (GHA `publish-package`·`build-images`가 `release: published`로 트리거됨):
+
+```bash
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "$(cat <<'EOF'
+## Highlights
+...
+EOF
+)"
+```
+
+- release tag `vX.Y.Z` ↔ `pyproject.toml` `version` `X.Y.Z` **반드시 일치** (불일치 시 publish 실패).
+- GHA 완료까지 `gh run watch`로 확인: `Publish Python package`, `Build and push images`.
+
+## 2. GHCR 이전 OCI 이미지 모두 삭제
+
+새 release 이미지가 push된 **후**, GHCR에 남아 있는 **이전 package version을 전부 삭제**한다.
+
+| 항목 | 값 |
+|------|-----|
+| Registry | `ghcr.io` |
+| 이미지 | `ghcr.io/yoosungung/path-graph/pipeline` |
+| API package name | `path-graph%2Fpipeline` (슬래시 URL-encode) |
+| Owner | `yoosungung` (user scope) |
+
+```bash
+PKG="path-graph%2Fpipeline"
+OWNER="yoosungung"
+KEEP_TAG="vX.Y.Z"   # 방금 publish한 release tag
+
+gh api "/users/${OWNER}/packages/container/${PKG}/versions?per_page=100" --paginate \
+  | jq -r --arg keep "$KEEP_TAG" '
+      .[] | select(
+        (.metadata.container.tags | length) == 0
+        or ((.metadata.container.tags | index($keep)) | not)
+      ) | .id' \
+  | while read -r id; do
+      [ -n "$id" ] || continue
+      echo -n | gh api --silent --method DELETE \
+        "/users/${OWNER}/packages/container/${PKG}/versions/${id}" --input -
+      echo "deleted version id=$id"
+    done
+```
+
+- **새 release tag(`vX.Y.Z`)를 가진 version만 남긴다.** 나머지 release tag·git-sha·untagged version은 모두 삭제.
+- `gh api` DELETE는 `--input -` + `echo -n` workaround 필요 (cli#4286).
+- `read:packages`·`delete:packages` scope 필요. 403이면 `gh auth refresh -s read:packages,delete:packages,write:packages`.
+
+## 3. GitHub Release 이전 wheel 파일 모두 삭제
+
+GHA `publish-package`가 업로드한 **이전 release의 `.whl` asset을 전부 삭제**한다. 최신 release(`vX.Y.Z`)의 wheel만 남긴다.
+
+```bash
+KEEP_TAG="vX.Y.Z"
+
+gh release list --limit 100 --json tagName \
+  | jq -r --arg keep "$KEEP_TAG" '.[] | select(.tagName != $keep) | .tagName' \
+  | while read -r tag; do
+      gh release view "$tag" --json assets -q '.assets[].name' \
+        | grep -E '\.whl$' \
+        | while read -r asset; do
+            gh release delete-asset "$tag" "$asset" -y
+            echo "deleted $tag/$asset"
+          done
+    done
+```
+
+- wheel 패턴: `path_graph-<version>-py3-none-any.whl`
+- release 자체는 삭제하지 않는다 — **asset(wheel)만** 제거.
+
+## 금지
+
+- release tag 없이 wheel만 수동 upload하는 것을 표준 절차로 쓰지 않는다.
+- `:latest` 태그를 배포에 사용하지 않는다 (`deploy/DESIGN.md`).

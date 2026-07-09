@@ -28,7 +28,8 @@ htmlcov/
 pipeline/.data/
 
 # Cursor (agent plans, local IDE state)
-.cursor/
+# .cursor/ 자체를 ignore하면 하위 ! 예외가 적용되지 않음 → 내용만 ignore
+.cursor/*
 !.cursor/rules/
 !.cursor/rules/**
 

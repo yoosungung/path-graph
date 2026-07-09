@@ -1,0 +1,15 @@
+---
+description: 출시 전 — legacy 호환 분기 없이 계약을 그대로 반영
+alwaysApply: true
+---
+
+# Pre-release: no legacy compatibility
+
+path-graph는 **출시 전**이다. 구현·리팩터 시 아래를 따른다.
+
+- **legacy·backward-compat 분기를 만들지 않는다** — 예: 잘못된 inline manifest를 우선하거나, 누락 필드를 URI에서 추측해 보강하는 경로.
+- **계약(ARCHITECTURE·스키마)을 단일 정본으로 적용**한다. 동작이 바뀌면 문서·테스트를 함께 고친다.
+- **우선순위·필수 필드는 명시적으로** — 예: `batch_manifest_key`(S3)가 있으면 inline `batch_manifest`는 무시.
+- **“나중에 제거할” 호환 코드는 쓰지 않는다** — 지금 맞는 형태만 유지한다.
+
+예외는 사용자가 명시적으로 legacy 지원을 요청한 경우뿐이다.
