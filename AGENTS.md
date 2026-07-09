@@ -18,6 +18,8 @@ This file provides guidance to AI coding assistants (Claude Code, Codex, Gemini,
 | `<comp>/DESIGN.md`                                    | 컴포넌트 *내부* 설계 + `## Commands` (빌드/실행/테스트)          | `pipeline/` |
 | `deploy/DESIGN.md`                                    | K8S 배포·스케일 설계                                     | `deploy/`  |
 | `deploy/SETUP.md`                                     | K8S apply/rollback 런북                             | `deploy/`  |
+| `docs/개발가이드.md`                                    | 신규 개발자 — 구성·동작·기술 특이 사항                          | `docs/`    |
+| `docs/운영가이드.md`                                    | 운영자·고객 — 설치·모니터링·리소스 확인·장애 대응                    | `docs/`    |
 
 
 규칙:
