@@ -51,6 +51,8 @@
       "args": [
         "--tenant",
         "dev",
+        "--project-id",
+        "550e8400-e29b-41d4-a716-446655440000",
         "--file",
         "${workspaceFolder}/pipeline/dev/sample.txt"
       ],
@@ -68,6 +70,8 @@
       "args": [
         "--tenant",
         "dev",
+        "--project-id",
+        "550e8400-e29b-41d4-a716-446655440000",
         "--file",
         "${workspaceFolder}/pipeline/dev/sample.txt",
         "--rag"
@@ -83,7 +87,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "path_graph.steps.ingest_web",
-      "args": ["--tenant", "dev", "--url", "https://example.com"],
+      "args": ["--tenant", "dev", "--project-id", "550e8400-e29b-41d4-a716-446655440000", "--url", "https://example.com"],
       "cwd": "${workspaceFolder}",
       "python": "${workspaceFolder}/.venv/bin/python3",
       "envFile": "${workspaceFolder}/.env.dev.local",
@@ -98,6 +102,8 @@
       "args": [
         "--tenant",
         "dev",
+        "--project-id",
+        "550e8400-e29b-41d4-a716-446655440000",
         "--file",
         "${workspaceFolder}/pipeline/dev/sample.txt"
       ],
