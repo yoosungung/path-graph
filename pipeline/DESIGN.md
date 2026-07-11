@@ -692,13 +692,15 @@ Argo `WorkflowTemplate` YAML: [`deploy/k8s/base/workflow-templates/`](../deploy/
 ```bash
 # from repo root
 make install
-./scripts/wire-dev.sh up && ./scripts/wire-dev.sh env   # k8s → localhost
+./scripts/wire-dev.sh up && ./scripts/wire-dev.sh env   # k8s → localhost (TEI :8085 포함)
 make test
+make test-wire-dev-config
+make e2e-local-rag          # ingest_web --rag + pgvector (TEI·PG 필요)
 make workflow-validate   # kubectl dry-run
 
-# local ingest
+# local ingest (+ RAG)
 source .venv/bin/activate
-python -m path_graph.steps.ingest_web --tenant dev --file ./sample.txt
+python -m path_graph.steps.ingest_web --tenant dev --project-id UUID --file ./pipeline/dev/sample.txt --rag
 
 # SharePoint (MS Graph credentials in .env.dev.local)
 python -m path_graph.steps.ingest_sharepoint --tenant dev --folder 회사규정 --dry-run

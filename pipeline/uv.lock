@@ -795,7 +795,7 @@ wheels = [
 
 [[package]]
 name = "path-graph"
-version = "0.1.4"
+version = "0.1.6"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },

@@ -11,6 +11,7 @@
 #   runtime/postgres:5432, runtime/envoy:8084, runtime/auth:8081,
 #   nebula/nebula-graphd-svc:9669,
 #   runtime/garage-s3:3900 (profile s3)
+#   llm-serving/bge-m3-tei:8085 (optional; skipped when svc missing)
 #
 # Prerequisites:
 #   agents-runtime dev cluster: make k8s-apply-dev (or wire-dev in ../agents-runtime)
@@ -23,6 +24,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_NS="${RUNTIME_NS:-runtime}"
 NEBULA_NS="${NEBULA_NS:-nebula}"
+LLM_SERVING_NS="${LLM_SERVING_NS:-llm-serving}"
+TEI_LOCAL_PORT="${WIRE_DEV_TEI_LOCAL_PORT:-8085}"
 STATE_DIR="${WIRE_DEV_STATE_DIR:-$ROOT/.wire-dev}"
 PID_DIR="$STATE_DIR/pids"
 PROFILE="${WIRE_DEV_PROFILE:-core}"
@@ -138,6 +141,18 @@ wire_garage() {
   start_pf garage-s3 3900 3900 garage-s3 "$RUNTIME_NS"
 }
 
+wire_tei() {
+  start_pf bge-m3-tei "$TEI_LOCAL_PORT" 8080 bge-m3-tei "$LLM_SERVING_NS"
+}
+
+resolve_embedding_base_url() {
+  if port_listen "$TEI_LOCAL_PORT"; then
+    echo "http://127.0.0.1:${TEI_LOCAL_PORT}"
+  else
+    echo "http://bge-m3-tei.llm-serving.svc.cluster.local:8080"
+  fi
+}
+
 cmd_up() {
   local profile="$1"
   require_kubectl
@@ -147,11 +162,13 @@ cmd_up() {
     core)
       wire_runtime
       wire_test_infra
+      wire_tei
       ;;
     s3)
       wire_runtime
       wire_test_infra
       wire_garage
+      wire_tei
       ;;
     runtime) wire_runtime ;;
     test-infra) wire_test_infra ;;
@@ -256,7 +273,9 @@ cmd_env() {
   require_kubectl
   local env_file="$ROOT/.env.dev.local"
   local token
+  local embedding_base_url
   token="$(fetch_agent_token)"
+  embedding_base_url="$(resolve_embedding_base_url)"
 
   local storage_backend="$storage"
   local storage_dir=".data/pipeline"
@@ -300,9 +319,10 @@ ENVOY_URL=http://127.0.0.1:8084
 PIPELINE_AGENT_ACCESS_TOKEN=${token}
 
 # RAG embed (외부 TEI — BAAI/bge-m3)
+# Active when wire-dev forwards bge-m3-tei → 127.0.0.1:${TEI_LOCAL_PORT}
 EMBEDDING_MODEL=BAAI/bge-m3
 EMBEDDING_DIM=1024
-EMBEDDING_BASE_URL=http://bge-m3-tei.llm-serving.svc.cluster.local:8080
+EMBEDDING_BASE_URL=${embedding_base_url}
 
 # HWP parser (rhwp_batch)
 RHWP_BATCH_BIN=rhwp-batch

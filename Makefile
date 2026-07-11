@@ -1,7 +1,7 @@
 .PHONY: venv test install build-wheel publish-wheel wire-dev-up wire-dev-down wire-dev-status wire-dev-env \
 	workflow-validate kustomize-build argo-install bootstrap-k8s \
 	ensure-namespace ensure-registry-secret k8s-apply-dev set-dev-image-tag deploy-dev build-images build-pipeline-image \
-	e2e-ingest-rag e2e-downstream test-infra-config deploy-nebula verify-nebula teardown-nebula tune-node-inotify
+	e2e-ingest-rag e2e-local-rag e2e-downstream test-infra-config test-wire-dev-config test-knowledge-binding-setup-config deploy-nebula verify-nebula teardown-nebula tune-node-inotify
 
 VENV := .venv
 PY := $(VENV)/bin/python3
@@ -42,6 +42,13 @@ wire-dev-status:
 
 wire-dev-env:
 	./scripts/wire-dev.sh env
+
+test-wire-dev-config:
+	./scripts/test_wire_dev_config.sh
+
+test-knowledge-binding-setup-config:
+	chmod +x scripts/test_knowledge_binding_setup_config.sh
+	./scripts/test_knowledge_binding_setup_config.sh
 
 workflow-validate:
 	kubectl apply --dry-run=client -k deploy/k8s/overlays/dev
@@ -122,6 +129,9 @@ deploy-dev: build-pipeline-image k8s-apply-dev
 
 e2e-ingest-rag: install
 	./scripts/submit-ingest-rag-e2e.sh
+
+e2e-local-rag: install test-wire-dev-config
+	./scripts/run-local-rag-e2e.sh
 
 e2e-downstream: install
 	./scripts/submit-downstream-e2e.sh

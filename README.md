@@ -67,7 +67,7 @@ make install
 make test
 ```
 
-로컬 RAG 시 TEI port-forward 후 `EMBEDDING_BASE_URL=http://127.0.0.1:8085` 로 override (포트 맵: [`scripts/wire-dev.env.example`](scripts/wire-dev.env.example)).
+로컬 RAG: `./scripts/wire-dev.sh up` 시 TEI(`bge-m3-tei`)가 `:8085`로 자동 port-forward( svc 없으면 skip). `./scripts/wire-dev.sh env`가 `EMBEDDING_BASE_URL=http://127.0.0.1:8085` 로 생성. 검증: `make e2e-local-rag` (포트 맵: [`scripts/wire-dev.env.example`](scripts/wire-dev.env.example)).
 
 수동 env 템플릿: [`.env.dev.local.example`](.env.dev.local.example)
 
@@ -77,8 +77,8 @@ make test
 source .venv/bin/activate
 
 # 웹 / 로컬 파일
-python -m path_graph.steps.ingest_web --tenant dev --url https://example.com
-python -m path_graph.steps.ingest_web --tenant dev --file ./sample.pdf --rag
+python -m path_graph.steps.ingest_web --tenant dev --project-id 550e8400-e29b-41d4-a716-446655440000 --url https://example.com
+python -m path_graph.steps.ingest_web --tenant dev --project-id 550e8400-e29b-41d4-a716-446655440000 --file ./pipeline/dev/sample.txt --rag
 
 # SharePoint / GDrive / OneDrive (자격 증명은 .env.dev.local)
 python -m path_graph.steps.ingest_sharepoint --tenant dev --folder 회사규정 --dry-run

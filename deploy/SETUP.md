@@ -150,6 +150,50 @@ make argo-install   # Ingress 포함 Helm upgrade
 | graphrag agent 500 / Garage presigned 400 | `path-graph-env`에 `S3_REGION=garage` — `./scripts/create-path-graph-secrets.sh` 재실행 |
 | `fsnotify watcher: too many open files` | ingest map burst 시 노드 inotify 한도. `./scripts/tune-node-inotify.sh` (기본 `max_user_instances=512`). 오래된 Completed WF Pod 정리: `kubectl delete pods -n path-graph --field-selector=status.phase=Succeeded` |
 
+## 관리자 클러스터 검증 (일괄)
+
+ROADMAP §관리자 클러스터 검증 체크리스트. agents-runtime [`deploy/SETUP.md`](https://github.com/yoosungung/agents-runtime/blob/main/deploy/SETUP.md) 런북과 함께 요청한다.
+
+### SharePoint delta sync (2.1.7) — 보류
+
+ISMS 보안 심사 완료 전까지 Cron delta E2E는 **일괄 검증에서 제외**. pipeline·BFF persist는 완료 — 재개 시 ROADMAP 2.1.7 체크리스트 참고.
+
+### Knowledge Binding · General agent (3.2.0)
+
+General agent가 `knowledge_project_ids[]`로 선택한 project의 RAG·Graph·Wiki 백엔드를 invoke 시 runtime이 resolve하는지 검증한다. 규약: [`ARCHITECTURE.md` §Knowledge Project](../ARCHITECTURE.md) · `resolve_knowledge_binding` (`pipeline/src/path_graph/contracts/project.py`).
+
+**사전 조건**
+
+| 항목 | 확인 |
+|------|------|
+| ingest(RAG) | 대상 project에 ingest 완료 문서 ≥1 (`chunks.embedding` 존재) |
+| Console binding API | `GET /api/pipeline/projects/{project_id}/binding` (admin) — `rag.index_namespace`, `graph.nebula_space`, `wiki.vfs_mount` 반환 |
+| MCP | path-graph-rag-mcp에 `config.knowledge.requires_project=true` |
+
+**binding 스모크 (path-graph wheel / Console API)**
+
+```bash
+# project_id·tenant는 Console에서 확인
+TENANT=dev PROJECT_ID=<uuid>
+uv run python -c "
+from path_graph.console import api_get_binding
+import json
+print(json.dumps(api_get_binding('${TENANT}', '${PROJECT_ID}'), indent=2))
+"
+```
+
+기대 JSON 필드: `rag.index_namespace` = `path_graph_{tenant}_{slug}`, `rag.filter.project_id`, `graph.nebula_space`, `wiki.vfs_mount` (예: `/wiki/{project_name}/`).
+
+**agents-runtime 검증 (관리자 수행)**
+
+1. General agent 생성 — `knowledge_project_ids`에 위 project UUID 선택
+2. Chat invoke 1회 — agent-pool 로그에 `knowledge_binding_resolve` 성공, 또는 MCP `search`의 `collection`이 binding `rag.index_namespace`와 일치
+3. project 2개 연결 후 `search` tool — 양쪽 collection 병렬 호출 + RRF 병합 응답
+
+### Wiki VFS (3.2.1)
+
+자동: agents-runtime `deploy/examples/tests/e2e/test_wiki_vfs.sh` (agent-pool `VFS_DSN` + general agent invoke).
+
 ## Rollback
 
 ```bash
