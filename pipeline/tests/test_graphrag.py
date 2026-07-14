@@ -86,6 +86,11 @@ def test_graphrag_pipeline_marks_ingest_state(local_store, monkeypatch):
         "path_graph.steps.wiki_pipeline.write_wiki_page",
         lambda tenant, project_id, slug, content, **kwargs: f"/{slug}.md",
     )
+    # PATH_GRAPH_DSN → pg indexing calls EmbeddingClient; keep unit tests offline.
+    monkeypatch.setattr(
+        "path_graph.retrieval.indexing.EmbeddingClient.embed",
+        lambda self, texts: [[0.1] * 1024 for _ in texts],
+    )
 
     mark_mock = MagicMock(return_value=1)
     monkeypatch.setattr(
