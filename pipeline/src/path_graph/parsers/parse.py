@@ -6,6 +6,19 @@ from pathlib import Path
 
 from markitdown import MarkItDown
 
+from path_graph.parsers.route import (
+    ParseBackend,
+    UnsupportedFormatError,
+    route_parse,
+)
+
+__all__ = [
+    "UnsupportedFormatError",
+    "parse_document",
+    "parse_hwp_json",
+    "parse_bytes_markitdown",
+]
+
 
 def parse_markdown_file(path: Path) -> str:
     md = MarkItDown()
@@ -40,12 +53,12 @@ def parse_hwp_json(data: bytes, rhwp_bin: str = "rhwp-batch") -> dict:
 
 
 def parse_document(data: bytes, filename: str, *, rhwp_bin: str = "rhwp-batch") -> tuple[str, dict | None]:
-    lower = filename.lower()
-    if Path(filename).suffix.lower() == ".doc":
-        raise ValueError("legacy .doc is not supported; convert to .docx")
-    if lower.endswith((".hwp", ".hwpx")):
+    backend = route_parse(filename)
+    if backend is ParseBackend.RHWP_BATCH:
         doc_json = parse_hwp_json(data, rhwp_bin=rhwp_bin)
         return json.dumps(doc_json, ensure_ascii=False), doc_json
+    # Native Unstructured / PyMuPDF / TEXT adapters: #271. Until then markitdown
+    # still produces text for routed (non-rejected) formats.
     suffix = Path(filename).suffix or ".bin"
     text = parse_bytes_markitdown(data, suffix)
     return text, None
