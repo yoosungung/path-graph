@@ -75,17 +75,26 @@ def test_upload_rejects_extension(local_store):
 
 def test_manual_default_extensions_allow_office_formats(local_store):
     profile = _manual_profile(config={})
-    for name in ("a.hwpx", "b.doc", "c.xls", "d.xlsx"):
+    for name in ("a.hwpx", "b.pptx", "c.xls", "d.xlsx", "e.docx"):
         result = upload_raw_file(profile, b"x", name)
         assert result["status"] == "uploaded"
 
 
-def test_legacy_manual_extensions_expanded(local_store):
+def test_manual_default_rejects_legacy_office(local_store):
+    profile = _manual_profile(config={})
+    for name in ("b.doc", "deck.ppt"):
+        with pytest.raises(UploadValidationError, match="extension"):
+            upload_raw_file(profile, b"x", name)
+
+
+def test_explicit_allowed_extensions_honored(local_store):
     profile = _manual_profile(
         config={"allowed_extensions": ".pdf,.hwp,.docx,.txt,.md"},
     )
-    result = upload_raw_file(profile, b"x", "sheet.xlsx")
+    result = upload_raw_file(profile, b"x", "notes.txt")
     assert result["status"] == "uploaded"
+    with pytest.raises(UploadValidationError, match="extension"):
+        upload_raw_file(profile, b"x", "sheet.xlsx")
 
 
 def test_upload_rejects_size(local_store):

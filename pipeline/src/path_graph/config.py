@@ -96,8 +96,9 @@ class Settings(BaseSettings):
     sharepoint_site: str = "tripodoffice.sharepoint.com:/sites/kms"
     sharepoint_drive_name: str = "Documents"
     sharepoint_folder: str = "회사규정"
+    # Defaults match path_graph.parsers.route.allowed_extensions_csv()
     sharepoint_file_extensions: str = (
-        ".pdf,.doc,.docx,.hwp,.hwpx,.txt,.md,.ppt,.pptx"
+        ".docx,.hwp,.hwpx,.md,.pdf,.pptx,.txt,.xls,.xlsx"
     )
 
     gdrive_client_id: str = ""  # GDRIVE_CLIENT_ID
@@ -106,13 +107,13 @@ class Settings(BaseSettings):
     gdrive_folder_id: str = ""  # GDRIVE_FOLDER_ID
     gdrive_folder_path: str = ""  # GDRIVE_FOLDER_PATH — used when folder_id empty
     gdrive_file_extensions: str = (
-        ".pdf,.doc,.docx,.hwp,.hwpx,.txt,.md,.ppt,.pptx,.xlsx"
+        ".docx,.hwp,.hwpx,.md,.pdf,.pptx,.txt,.xls,.xlsx"
     )
 
     onedrive_refresh_token: str = ""  # ONEDRIVE_REFRESH_TOKEN
     onedrive_folder: str = ""  # ONEDRIVE_FOLDER — path from drive root
     onedrive_file_extensions: str = (
-        ".pdf,.doc,.docx,.hwp,.hwpx,.txt,.md,.ppt,.pptx"
+        ".docx,.hwp,.hwpx,.md,.pdf,.pptx,.txt,.xls,.xlsx"
     )
 
     @model_validator(mode="after")

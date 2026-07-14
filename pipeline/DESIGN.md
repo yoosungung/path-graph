@@ -211,8 +211,8 @@ raw bytes
 
 | 레이어 | 책임 | 구현 |
 |--------|------|------|
-| **router** | 확장자 + PDF `text_chars`/`image_ratio` | PyMuPDF 단일 스택 |
-| **parse** | 바이너리 → `content.json` blocks | Unstructured / PyMuPDF4LLM / rhwp-batch / VL OCR |
+| **router** | 확장자 → backend (+ PDF `text_chars`/`image_ratio`) | `parsers/route.py`; PDF 지표는 PyMuPDF |
+| **parse** | 바이너리 → `content.json` blocks | Unstructured / PyMuPDF4LLM / rhwp-batch / VL OCR / text |
 | **chunk** | `blocks[]` → `chunks.jsonl` | `chunk_from_blocks` (type-aware) |
 
 ### Block 계약
@@ -221,13 +221,23 @@ raw bytes
 
 선택 metadata (`content.json`만, ChunkRecord 제외): `metadata.page`, `metadata.bbox`, extractor 고유 필드.
 
-### Office
+### Office · 업로드 허용 · 라우팅 (#270)
 
-- 허용: `.docx`, `.pptx`, `.xlsx`, `.xls`
-- 경로: `unstructured[docx,pptx,xlsx]` — LibreOffice / tesseract / poppler / `all-docs` **비포함**
-- typed elements → blocks adapter
-- `.xls`: 지원 수준으로 시도, 실패 시 `dead_letter`
-- `.doc` / `.ppt`: 거부 (`dead_letter`)
+단일 정본: `path_graph.parsers.route` (`route_parse` / `allowed_extensions`).
+
+| 확장자 | backend | 비고 |
+|--------|---------|------|
+| `.docx` `.pptx` `.xlsx` `.xls` | `unstructured` | LibreOffice / tesseract / poppler / `all-docs` **비포함** (`unstructured[docx,pptx,xlsx]`) |
+| `.pdf` | `pymupdf` | 페이지 비율 router는 동일 스택 (VL OCR 연동은 #272) |
+| `.hwp` `.hwpx` | `rhwp_batch` | 기존 유지 |
+| `.txt` `.md` | `text` | 경량 텍스트 → blocks |
+| `.doc` `.ppt` | — | **거부** (업로드·collect 기본 allowlist 제외, parse `UnsupportedFormatError` → dead_letter) |
+
+정책 결정:
+
+- **PPTX**: 허용 — OOXML이며 LibreOffice 없이 `partition_pptx` 가능.
+- **`.xls`**: 업로드·라우팅 허용, parse 시 시도 후 실패하면 `dead_letter`(LibreOffice 변환 없음). BIFF를 못 읽으면 재시도·변환하지 않는다.
+- typed elements → blocks adapter는 **#271**.
 - **비범위**: Office embedded image VLM caption (후속 티켓)
 
 ### PDF
@@ -569,7 +579,10 @@ Entra ID 앱 등록 후 API 권한: `Sites.Read.All`, `Files.Read.All` (Applicat
 | `SHAREPOINT_SITE` | `tripodoffice.sharepoint.com:/sites/kms` | Graph site path |
 | `SHAREPOINT_DRIVE_NAME` | `Documents` | 문서 라이브러리 drive name |
 | `SHAREPOINT_FOLDER` | `회사규정` | 수집 폴더 |
-| `SHAREPOINT_FILE_EXTENSIONS` | `.pdf,.doc,...` | 허용 확장자 |
+| `SHAREPOINT_FILE_EXTENSIONS` | `route.allowed_extensions_csv()` | 허용 확장자 (기본은 parser 정책과 동일) |
+| `GDRIVE_FILE_EXTENSIONS` | 동일 | |
+| `ONEDRIVE_FILE_EXTENSIONS` | 동일 | |
+
 
 - **Application**: `MS_AUTH_MODE=app` + `MS_CLIENT_SECRET`
 - **Delegated**: 최초 `MS_AUTH_MODE=device`로 Device Code 로그인 → stderr에 출력된 `MS_REFRESH_TOKEN` 저장 → `MS_AUTH_MODE=delegated`

@@ -11,6 +11,7 @@ from path_graph.contracts.s3_keys import s3_key_batch_manifest, s3_key_raw
 from path_graph.contracts.source import SourceDriver, SourceProfile
 from path_graph.ids import sha256_bytes
 from path_graph.meta.pg import PgMetaStore
+from path_graph.parsers.route import allowed_extensions_csv
 from path_graph.storage.blob import make_blob_store
 
 
@@ -18,20 +19,15 @@ class UploadValidationError(ValueError):
     """Client-facing upload validation failure."""
 
 
-MANUAL_DEFAULT_ALLOWED_EXTENSIONS = (
-    ".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.txt,.md"
-)
-_LEGACY_MANUAL_ALLOWED_EXTENSIONS = ".pdf,.hwp,.docx,.txt,.md"
+# Single source: path_graph.parsers.route (parser policy).
+MANUAL_DEFAULT_ALLOWED_EXTENSIONS = allowed_extensions_csv()
 
 
 def effective_allowed_extensions(config: dict[str, Any]) -> str:
     raw = config.get("allowed_extensions")
     if not isinstance(raw, str) or not raw.strip():
         return MANUAL_DEFAULT_ALLOWED_EXTENSIONS
-    stripped = raw.strip()
-    if stripped.replace(" ", "") == _LEGACY_MANUAL_ALLOWED_EXTENSIONS.replace(" ", ""):
-        return MANUAL_DEFAULT_ALLOWED_EXTENSIONS
-    return stripped
+    return raw.strip()
 
 
 def filename_from_raw_uri(uri: str) -> str:
