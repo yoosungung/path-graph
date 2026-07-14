@@ -12,7 +12,7 @@
 |---|---|
 | pipeline 패키지 | v0.1.0, `make test` **218 tests** (2026-07) |
 | 로컬 ingest | CLI — web / file / SharePoint / GDrive / OneDrive → parse → **blocks** → chunk → (선택) RAG |
-| 파싱·청킹 | native parser → `content.json` `blocks[]` → `chunk_from_blocks` (D3 개정; 구현 parent #260 / #273→#270→#271→#272) |
+| 파싱·청킹 | native parser → `content.json` `blocks[]` → `chunk_from_blocks` (D3 개정; 구현 parent #260 / #274→#278→#279→#280) |
 | k8s dev 클러스터 | `runtime`·`nebula` port-forward (`wire-dev.sh`) |
 | Argo Workflows | path-graph 소유 — `argo` NS, `make argo-install` (D1) |
 | `path-graph` NS / WorkflowTemplate | **applied** — pipeline 이미지 **git SHA 태그** + `IfNotPresent` (D2) |
@@ -168,7 +168,7 @@
 | 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리) | [x] | **D3 개정으로 폐기 예정** — 당시 `md_heuristic`; 후속 3.3.5 |
 | 3.3.3 | ingest 검색 API / retrieval CLI | [x] | `retrieval_search` CLI · `api_search_project` · BFF `GET …/search` |
 | 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; native 전환 시 blocks 직행으로 재정렬 (3.3.5) |
-| 3.3.5 | **Native blocks parser** (markitdown/md_heuristic 폐기) | [ ] | parent #260; #273 문서 → #270 routing → #271 adapter/chunk → #272 VLM·검증 |
+| 3.3.5 | **Native blocks parser** (markitdown/md_heuristic 폐기) | [ ] | parent #260; #274 문서 → #278 routing → #279 adapter/chunk → #280 VLM·검증 |
 
 ### 3.4 통합 Knowledge Search
 

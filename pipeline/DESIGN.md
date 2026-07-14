@@ -221,14 +221,14 @@ raw bytes
 
 선택 metadata (`content.json`만, ChunkRecord 제외): `metadata.page`, `metadata.bbox`, extractor 고유 필드.
 
-### Office · 업로드 허용 · 라우팅 (#270)
+### Office · 업로드 허용 · 라우팅 (#278)
 
 단일 정본: `path_graph.parsers.route` (`route_parse` / `allowed_extensions`).
 
 | 확장자 | backend | 비고 |
 |--------|---------|------|
 | `.docx` `.pptx` `.xlsx` `.xls` | `unstructured` | LibreOffice / tesseract / poppler / `all-docs` **비포함** (`unstructured[docx,pptx,xlsx]`) |
-| `.pdf` | `pymupdf` | 페이지 비율 router는 동일 스택 (VL OCR 연동은 #272) |
+| `.pdf` | `pymupdf` | 페이지 비율 router는 동일 스택 (VL OCR 연동은 #280) |
 | `.hwp` `.hwpx` | `rhwp_batch` | 기존 유지 |
 | `.txt` `.md` | `text` | 경량 텍스트 → blocks |
 | `.doc` `.ppt` | — | **거부** (업로드·collect 기본 allowlist 제외, parse `UnsupportedFormatError` → dead_letter) |
@@ -237,7 +237,7 @@ raw bytes
 
 - **PPTX**: 허용 — OOXML이며 LibreOffice 없이 `partition_pptx` 가능.
 - **`.xls`**: 업로드·라우팅 허용, parse 시 시도 후 실패하면 `dead_letter`(LibreOffice 변환 없음). BIFF를 못 읽으면 재시도·변환하지 않는다.
-- typed elements → blocks adapter는 **#271**.
+- typed elements → blocks adapter는 **#279**.
 - **비범위**: Office embedded image VLM caption (후속 티켓)
 
 ### PDF

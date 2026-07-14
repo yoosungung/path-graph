@@ -9,7 +9,7 @@ from path_graph.parsers.route import UnsupportedFormatError, allowed_extensions_
 
 
 def test_markitdown_extras_still_listed_until_native_adapters() -> None:
-    """#271 swaps markitdown → unstructured[docx,pptx,xlsx]; keep until then."""
+    """#279 swaps markitdown → unstructured[docx,pptx,xlsx]; keep until then."""
     root = Path(__file__).resolve().parents[1]
     text = (root / "pyproject.toml").read_text(encoding="utf-8")
     assert "markitdown[pdf,docx,xlsx,xls]" in text
