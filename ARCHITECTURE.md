@@ -60,6 +60,12 @@ RAG ingest 이후 Graph(Nebula)·Wiki(PG VFS) 적재. Console MVP는 **`pipeline
 | **그래프 추출 (보조)** | chunk `text` 내 `[[wikilink]]` → deterministic `MENTIONS` — 컴파일드 마크다운·위키 소스용. **일반 ingest만으로는 wikilink를 요구하지 않는다** |
 | **Community batch 스코프** | hierarchical Leiden 입력은 **해당 batch graph-extractor가 반환한 entity id 집합**(`batch_entity_ids`)으로 `EXTRACTED`/`INFERRED` 엣지를 필터한다. `MENTIONS`만으로 batch를 스코핑하지 않는다 |
 
+### Parse · blocks
+
+- **청킹 정본**은 `parsed/{tenant}/{doc_id}/content.json`의 `blocks[]`만 본다. 포맷별 **native parser**가 blocks를 직접 생성한다.
+- **`content.md`**는 optional debug artifact다. 청킹·재추출 필수가 아니다.
+- **출시 전 legacy 없음** — `markitdown → Markdown → md_heuristic` 경로 및 md fallback을 두지 않는다. 상세 형태: [`§2.1`](#21-s3-garage), [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
+
 ### Knowledge Project · Agent Binding
 
 - **`project`** = 사용자가 정의한 관련 정보 집합. 수집(`source` → `document` → `chunk`)과 산출물(RAG·graph·wiki)이 **동일 `project_id`** 안에 닫힌다.
@@ -160,7 +166,8 @@ RAG ingest 이후 Graph(Nebula)·Wiki(PG VFS) 적재. Console MVP는 **`pipeline
 ```
 s3://{bucket}/
   raw/{tenant}/{project_id}/{source_id}/{content_hash}/{filename}
-  parsed/{tenant}/{doc_id}/content.md | content.json
+  parsed/{tenant}/{doc_id}/content.json          # 필수 — blocks 정본
+  parsed/{tenant}/{doc_id}/content.md            # optional debug
   parsed/{tenant}/{doc_id}/meta.json
   chunks/{tenant}/{doc_id}/chunks.jsonl
   chunks/{tenant}/{project_id}/{batch_id}/chunks.jsonl   # GraphRAG project별 배치 청크
@@ -175,15 +182,15 @@ s3://{bucket}/
 
 Wiki 페이지 본문은 S3가 아닌 **`vfs_wiki_files`** (`public` schema, agents-runtime 마이그레이션)에 저장한다.
 
-**`content.json` (blocks, 청킹 정본)** — PDF/DOCX(markitdown·VL OCR)와 HWP(rhwp-batch) 공통:
+**`content.json` (blocks, 청킹 정본)** — Office(Unstructured)·PDF(PyMuPDF/PyMuPDF4LLM)·스캔 PDF(VL OCR)·HWP(rhwp-batch)가 공통으로 기록:
 
 | 필드 | 필수 | 설명 |
 |------|------|------|
 | `schema_version` | ✓ | `"1"` |
-| `extractor` | ✓ | 구현 식별자 — 예: `md_heuristic`, `rhwp_batch` |
+| `extractor` | ✓ | 구현 식별자 — 예: `unstructured`, `pymupdf4llm`, `vl_ocr`, `rhwp_batch` |
 | `blocks` | ✓ | 배열; block마다 `type`, `heading_path`, 본문(`text` \| `markdown` \| `rows`) |
 
-**blocks 추출기**: ingest는 `BLOCKS_EXTRACTOR=md_heuristic`(기본·정본). md 생성(markitdown/VL OCR)과 blocks 추출은 분리. 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
+`page`/`bbox` 등 layout metadata는 **`content.json`에만** 두고, **`ChunkRecord`에는 넣지 않는다**. 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
 
 ### 2.2 runtime PostgreSQL (`path_graph` schema)
 
