@@ -1,7 +1,7 @@
 """Extension → parse backend routing (ARCHITECTURE D3 / DESIGN Blocks).
 
 Upload/collector allowlists must match ``allowed_extensions()``.
-Adapters that consume these backends land in follow-up tickets (#271+).
+Adapters that consume these backends land in follow-up tickets (#279+).
 """
 
 from __future__ import annotations

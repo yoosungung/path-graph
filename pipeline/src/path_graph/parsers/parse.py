@@ -57,7 +57,7 @@ def parse_document(data: bytes, filename: str, *, rhwp_bin: str = "rhwp-batch") 
     if backend is ParseBackend.RHWP_BATCH:
         doc_json = parse_hwp_json(data, rhwp_bin=rhwp_bin)
         return json.dumps(doc_json, ensure_ascii=False), doc_json
-    # Native Unstructured / PyMuPDF / TEXT adapters: #271. Until then markitdown
+    # Native Unstructured / PyMuPDF / TEXT adapters: #279. Until then markitdown
     # still produces text for routed (non-rejected) formats.
     suffix = Path(filename).suffix or ".bin"
     text = parse_bytes_markitdown(data, suffix)
