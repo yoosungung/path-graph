@@ -14,12 +14,10 @@ from path_graph.contracts.s3_keys import (
     s3_key_parsed_ocr_page_md,
     s3_key_parsed_page_png,
 )
-from path_graph.parsers.blocks_contract import normalize_blocks_document
 from path_graph.parsers.blocks_extractors import get_blocks_extractor
 from path_graph.parsers.image_caption import enrich_image_block_captions
-from path_graph.parsers.parse import parse_document, parse_pdf_to_blocks
+from path_graph.parsers.parse import parse_non_pdf_to_blocks, parse_pdf_to_blocks
 from path_graph.parsers.pdf_metrics import PdfKind, classify_pdf
-from path_graph.parsers.route import ParseBackend as RouteBackend
 from path_graph.parsers.route import route_parse
 from path_graph.parsers.vl_ocr import ParseBackend, vl_ocr_pdf_to_markdown
 from path_graph.storage.blob import BlobStore, make_blob_store, write_jsonl
@@ -95,10 +93,6 @@ def _run_vl_ocr(
 
 def _blocks_from_markdown(parsed_text: str, settings: Settings) -> dict[str, Any]:
     return get_blocks_extractor(settings.blocks_extractor).extract(parsed_text)
-
-
-def _blocks_from_rhwp(rhwp_doc: dict[str, Any]) -> dict[str, Any]:
-    return normalize_blocks_document(rhwp_doc, extractor="rhwp_batch")
 
 
 def _chunk_from_blocks_doc(
@@ -391,7 +385,7 @@ def ingest_raw_bytes(
     try:
         route_backend = route_parse(filename)
         parse_backend_label = route_backend.value
-        parsed_text, rhwp_doc = parse_document(
+        blocks_doc = parse_non_pdf_to_blocks(
             data, filename, rhwp_bin=settings.rhwp_batch_bin
         )
     except Exception as exc:
@@ -403,19 +397,7 @@ def ingest_raw_bytes(
         )
         raise ParseError(str(exc)) from exc
 
-    if rhwp_doc is not None:
-        blocks_doc = _blocks_from_rhwp(rhwp_doc)
-        parse_backend_label = RouteBackend.RHWP_BATCH.value
-        parsed_key = _persist_parsed(store, tenant, doc_id, blocks_doc)
-    else:
-        blocks_doc = _blocks_from_markdown(parsed_text, settings)
-        parsed_key = _persist_parsed(
-            store,
-            tenant,
-            doc_id,
-            blocks_doc,
-            markdown=parsed_text,
-        )
+    parsed_key = _persist_parsed(store, tenant, doc_id, blocks_doc)
 
     chunks = _chunk_from_blocks_doc(
         blocks_doc,

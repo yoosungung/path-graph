@@ -41,8 +41,14 @@ def test_parse_manifest_line_from_json_string():
 
 def test_ingest_manifest_cli(local_store, monkeypatch):
     monkeypatch.setattr(
-        "path_graph.parsers.parse.parse_document",
-        lambda data, filename, rhwp_bin="rhwp-batch": ("# Hi\n\nBody", None),
+        "path_graph.steps.ingest.parse_non_pdf_to_blocks",
+        lambda data, filename, rhwp_bin="rhwp-batch": {
+            "schema_version": "1",
+            "extractor": "text",
+            "blocks": [
+                {"type": "paragraph", "text": "Hi Body", "heading_path": []},
+            ],
+        },
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest_manifest.resolve_project_slug",
@@ -68,8 +74,12 @@ def test_ingest_manifest_cli(local_store, monkeypatch):
 
 def test_ingest_manifest_reads_manifest_line_env(local_store, monkeypatch):
     monkeypatch.setattr(
-        "path_graph.parsers.parse.parse_document",
-        lambda data, filename, rhwp_bin="rhwp-batch": ("text", None),
+        "path_graph.steps.ingest.parse_non_pdf_to_blocks",
+        lambda data, filename, rhwp_bin="rhwp-batch": {
+            "schema_version": "1",
+            "extractor": "text",
+            "blocks": [{"type": "paragraph", "text": "text", "heading_path": []}],
+        },
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest_manifest.resolve_project_slug",

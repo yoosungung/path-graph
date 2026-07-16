@@ -461,7 +461,7 @@ sglang Gemma 4 cookbook: 이미지 품질이 중요하면 서버 측 `--attentio
 | 모듈 | 역할 |
 |------|------|
 | `parsers/pdf_metrics.py` | `text_chars`/`image_ratio`/`page_count` + digital\|scan 분류 |
-| `parsers/parse.py` | `parse_pdf_to_blocks` (pymupdf4llm→adapter); non-PDF markitdown/HWP |
+| `parsers/parse.py` | `parse_pdf_to_blocks` / `parse_office_to_blocks` / `parse_text_to_blocks`; HWP JSON |
 | `parsers/image_caption.py` | picture bbox crop → Vision caption → `image.caption` |
 | `parsers/pdf_render.py` | PDF → `list[bytes]` PNG (`OCR_RENDER_DPI`, 기본 200) |
 | `parsers/vl_ocr.py` | 페이지 PNG → Markdown; httpx Vision client |
@@ -496,7 +496,7 @@ sglang Gemma 4 cookbook: 이미지 품질이 중요하면 서버 측 `--attentio
 
 - Pipeline Pod egress: `llm-serving` **:30000** (sglang) — TEI `:8080`과 별도. [deploy/k8s/base/networkpolicy.yaml](../deploy/k8s/base/networkpolicy.yaml) `path-graph-pipeline-egress`에 TCP 30000 명시(구현 시).
 - ingest-rag Pod memory: VL OCR 시 페이지 PNG·base64 버퍼 — limits **2Gi → 4Gi** 검토(`pipeline-ingest-rag.yaml`).
-- **의존 패키지**: `pymupdf`·`pymupdf4llm`(PDF), `unstructured[docx,pptx,xlsx]`(Office), `openai`/`httpx`(Vision HTTP). `markitdown` 제거. pipeline 이미지·`test_parse_deps` 갱신.
+- **의존 패키지**: `pymupdf`·`pymupdf4llm`(PDF), `unstructured[docx,pptx,xlsx]`(Office), `httpx`(Vision HTTP). **`markitdown` 제거**. pipeline 이미지·`test_parse_deps`·`test_parse_smoke_imports` 갱신.
 
 ### TDD · 구현 순서
 
