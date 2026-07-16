@@ -213,7 +213,8 @@ raw bytes
 |--------|------|------|
 | **router** | 확장자 → backend (+ PDF `text_chars`/`image_ratio`) | `parsers/route.py`; PDF 지표는 PyMuPDF |
 | **parse** | 바이너리 → `content.json` blocks | Unstructured / PyMuPDF4LLM / rhwp-batch / VL OCR / text |
-| **chunk** | `blocks[]` → `chunks.jsonl` | `chunk_from_blocks` (type-aware) |
+| **adapter** | typed elements / page_chunks → blocks | `parsers/adapters/` (`unstructured`, `pymupdf`) — #293 |
+| **chunk** | `blocks[]` → `chunks.jsonl` | `chunk_from_blocks` (type-aware; heading 제외, table whole, image caption) |
 
 ### Block 계약
 
