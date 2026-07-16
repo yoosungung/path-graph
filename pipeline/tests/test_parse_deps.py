@@ -8,12 +8,13 @@ from path_graph.parsers.parse import parse_document
 from path_graph.parsers.route import UnsupportedFormatError, allowed_extensions_csv
 
 
-def test_markitdown_extras_still_listed_until_native_adapters() -> None:
-    """#279 swaps markitdown → unstructured[docx,pptx,xlsx]; keep until then."""
+def test_markitdown_office_extras_and_pymupdf4llm_listed() -> None:
+    """PDF uses pymupdf4llm; Office still markitdown until Unstructured wire-up."""
     root = Path(__file__).resolve().parents[1]
     text = (root / "pyproject.toml").read_text(encoding="utf-8")
     assert "markitdown[pdf,docx,xlsx,xls]" in text
     assert "pymupdf>=" in text
+    assert "pymupdf4llm>=" in text
 
 
 def test_legacy_doc_rejected_via_router() -> None:

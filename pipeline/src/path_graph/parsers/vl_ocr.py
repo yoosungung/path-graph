@@ -12,8 +12,8 @@ from path_graph.parsers.pdf_render import render_pdf_pages
 
 
 class ParseBackend(str, Enum):
-    MARKITDOWN = "markitdown"
-    MARKITDOWN_VL_OCR_FALLBACK = "markitdown+vl_ocr_fallback"
+    PYMUPDF4LLM = "pymupdf4llm"
+    PYMUPDF4LLM_VL_OCR_FALLBACK = "pymupdf4llm+vl_ocr_fallback"
     VL_OCR = "vl_ocr"
 
 

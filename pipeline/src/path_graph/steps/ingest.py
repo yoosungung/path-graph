@@ -16,7 +16,10 @@ from path_graph.contracts.s3_keys import (
 )
 from path_graph.parsers.blocks_contract import normalize_blocks_document
 from path_graph.parsers.blocks_extractors import get_blocks_extractor
-from path_graph.parsers.parse import parse_document
+from path_graph.parsers.parse import parse_document, parse_pdf_to_blocks
+from path_graph.parsers.pdf_metrics import PdfKind, classify_pdf
+from path_graph.parsers.route import ParseBackend as RouteBackend
+from path_graph.parsers.route import route_parse
 from path_graph.parsers.vl_ocr import ParseBackend, vl_ocr_pdf_to_markdown
 from path_graph.storage.blob import BlobStore, make_blob_store, write_jsonl
 
@@ -43,21 +46,6 @@ def _record_dead_letter(
 ) -> None:
     dl_key = s3_key_dead_letter(tenant, content_hash)
     store.put_bytes(dl_key, json.dumps(error, ensure_ascii=False).encode("utf-8"))
-
-
-def _should_fallback_to_ocr(
-    *,
-    parsed_text: str,
-    chunk_count: int,
-    ocr_available: bool,
-    ocr_attempted: bool,
-    settings: Settings,
-) -> bool:
-    if not ocr_available or ocr_attempted:
-        return False
-    if chunk_count == 0:
-        return True
-    return len(parsed_text.strip()) < settings.ocr_min_text_chars
 
 
 def _persist_ocr_artifacts(
@@ -129,6 +117,241 @@ def _chunk_from_blocks_doc(
     )
 
 
+def _persist_parsed(
+    store: BlobStore,
+    tenant: str,
+    doc_id: str,
+    blocks_doc: dict[str, Any],
+    *,
+    markdown: str | None = None,
+) -> str:
+    parsed_key = s3_key_parsed_json(tenant, doc_id)
+    store.put_bytes(
+        parsed_key,
+        json.dumps(blocks_doc, ensure_ascii=False).encode("utf-8"),
+    )
+    if markdown is not None:
+        store.put_bytes(s3_key_parsed_md(tenant, doc_id), markdown.encode("utf-8"))
+    return parsed_key
+
+
+def _ingest_pdf(
+    data: bytes,
+    filename: str,
+    tenant: str,
+    meta: dict[str, Any],
+    *,
+    settings: Settings,
+    store: BlobStore,
+) -> dict[str, Any]:
+    doc_id = meta["document_id"]
+    content_hash = meta["content_hash"]
+    ocr_available = _ocr_available(settings, filename)
+    try:
+        pdf_kind = classify_pdf(
+            data,
+            min_text_chars=settings.ocr_min_text_chars,
+        )
+    except Exception as exc:
+        _record_dead_letter(
+            store,
+            tenant,
+            content_hash,
+            {"stage": "parse", "error": str(exc)},
+        )
+        raise ParseError(str(exc)) from exc
+    fallback_reason: str | None = None
+    parse_error: str | None = None
+    parsed_text = ""
+    ocr_attempted = False
+    parse_backend = ParseBackend.PYMUPDF4LLM
+    blocks_doc: dict[str, Any] | None = None
+
+    if settings.ocr_force:
+        if not ocr_available:
+            _record_dead_letter(
+                store,
+                tenant,
+                content_hash,
+                {
+                    "stage": "parse_empty",
+                    "prior_backend": ParseBackend.VL_OCR.value,
+                    "error": "OCR_FORCE set but OCR_LLM_* not configured",
+                },
+            )
+            raise ParseError("OCR_FORCE requires OCR_LLM_BASE_URL and OCR_LLM_MODEL")
+        try:
+            parsed_text, _ = _run_vl_ocr(
+                data,
+                settings=settings,
+                store=store,
+                tenant=tenant,
+                doc_id=doc_id,
+                parse_backend=ParseBackend.VL_OCR,
+            )
+            parse_backend = ParseBackend.VL_OCR
+            ocr_attempted = True
+            blocks_doc = _blocks_from_markdown(parsed_text, settings)
+        except Exception as ocr_exc:
+            _record_dead_letter(
+                store,
+                tenant,
+                content_hash,
+                {
+                    "stage": "ocr_empty",
+                    "prior_backend": ParseBackend.VL_OCR.value,
+                    "ocr_error": str(ocr_exc),
+                },
+            )
+            raise ParseError(str(ocr_exc)) from ocr_exc
+    elif pdf_kind is PdfKind.SCAN:
+        if not ocr_available:
+            _record_dead_letter(
+                store,
+                tenant,
+                content_hash,
+                {
+                    "stage": "parse_empty",
+                    "prior_backend": ParseBackend.PYMUPDF4LLM.value,
+                    "pdf_kind": PdfKind.SCAN.value,
+                    "error": "scan PDF requires OCR_LLM_BASE_URL and OCR_LLM_MODEL",
+                },
+            )
+            raise ParseError("scan PDF requires OCR configuration")
+        try:
+            parsed_text, _ = _run_vl_ocr(
+                data,
+                settings=settings,
+                store=store,
+                tenant=tenant,
+                doc_id=doc_id,
+                parse_backend=ParseBackend.VL_OCR,
+            )
+            parse_backend = ParseBackend.VL_OCR
+            ocr_attempted = True
+            fallback_reason = "scan"
+            blocks_doc = _blocks_from_markdown(parsed_text, settings)
+        except Exception as ocr_exc:
+            _record_dead_letter(
+                store,
+                tenant,
+                content_hash,
+                {
+                    "stage": "ocr_empty",
+                    "prior_backend": ParseBackend.VL_OCR.value,
+                    "pdf_kind": PdfKind.SCAN.value,
+                    "ocr_error": str(ocr_exc),
+                },
+            )
+            raise ParseError(str(ocr_exc)) from ocr_exc
+    else:
+        try:
+            blocks_doc = parse_pdf_to_blocks(data)
+            parse_backend = ParseBackend.PYMUPDF4LLM
+        except Exception as exc:
+            parse_error = str(exc)
+            blocks_doc = {"blocks": [], "extractor": "pymupdf4llm"}
+            if not ocr_available:
+                _record_dead_letter(
+                    store,
+                    tenant,
+                    content_hash,
+                    {"stage": "parse", "error": parse_error},
+                )
+                raise ParseError(parse_error) from exc
+
+        chunks = _chunk_from_blocks_doc(
+            blocks_doc,
+            tenant,
+            content_hash,
+            meta["project_id"],
+            max_chars=settings.chunk_max_chars,
+        )
+        if not chunks and ocr_available and not ocr_attempted:
+            backend = (
+                ParseBackend.PYMUPDF4LLM_VL_OCR_FALLBACK
+                if not parse_error
+                else ParseBackend.VL_OCR
+            )
+            fallback_reason = "parse_error" if parse_error else "low_text"
+            try:
+                parsed_text, _ = _run_vl_ocr(
+                    data,
+                    settings=settings,
+                    store=store,
+                    tenant=tenant,
+                    doc_id=doc_id,
+                    parse_backend=backend,
+                )
+                parse_backend = backend
+                ocr_attempted = True
+                blocks_doc = _blocks_from_markdown(parsed_text, settings)
+            except Exception as ocr_exc:
+                err = {
+                    "stage": "ocr_empty",
+                    "prior_backend": ParseBackend.PYMUPDF4LLM.value,
+                    "ocr_error": str(ocr_exc),
+                }
+                if parse_error:
+                    err["parse_error"] = parse_error
+                _record_dead_letter(store, tenant, content_hash, err)
+                raise ParseError(str(ocr_exc)) from ocr_exc
+
+    assert blocks_doc is not None
+    chunks = _chunk_from_blocks_doc(
+        blocks_doc,
+        tenant,
+        content_hash,
+        meta["project_id"],
+        max_chars=settings.chunk_max_chars,
+    )
+    if not chunks:
+        stage = "ocr_empty" if ocr_attempted else "parse_empty"
+        err: dict[str, Any] = {
+            "stage": stage,
+            "prior_backend": parse_backend.value,
+            "pdf_kind": pdf_kind.value,
+        }
+        if parse_error:
+            err["parse_error"] = parse_error
+        _record_dead_letter(store, tenant, content_hash, err)
+        raise ParseError(f"no chunks after parse ({stage})")
+
+    parsed_key = _persist_parsed(
+        store,
+        tenant,
+        doc_id,
+        blocks_doc,
+        markdown=parsed_text or None,
+    )
+    meta_payload: dict[str, Any] = {
+        **meta,
+        "parsed_key": parsed_key,
+        "chunk_count": len(chunks),
+        "parse_backend": parse_backend.value,
+        "blocks_extractor": blocks_doc.get("extractor"),
+        "pdf_kind": pdf_kind.value,
+    }
+    if fallback_reason:
+        meta_payload["fallback_reason"] = fallback_reason
+
+    meta_key = s3_key_parsed_meta(tenant, doc_id)
+    store.put_bytes(
+        meta_key,
+        json.dumps(meta_payload, ensure_ascii=False).encode("utf-8"),
+    )
+    chunks_key = s3_key_chunks(tenant, doc_id)
+    chunks_uri = write_jsonl(chunks_key, chunks_to_jsonl_lines(chunks), store)
+    return {
+        **meta,
+        "parsed_uri": store.uri_for(parsed_key),
+        "chunks_uri": chunks_uri,
+        "chunks_key": chunks_key,
+        "chunks": chunks,
+        "parse_backend": parse_backend.value,
+    }
+
+
 def ingest_raw_bytes(
     data: bytes,
     filename: str,
@@ -140,7 +363,6 @@ def ingest_raw_bytes(
     store = make_blob_store(settings)
     doc_id = meta["document_id"]
     content_hash = meta["content_hash"]
-    ocr_available = _ocr_available(settings, filename)
 
     if not data:
         _record_dead_letter(
@@ -151,148 +373,80 @@ def ingest_raw_bytes(
         )
         raise ParseError("raw file is empty")
 
-    parse_backend = ParseBackend.MARKITDOWN
-    fallback_reason: str | None = None
-    markitdown_error: str | None = None
-    rhwp_doc: dict | None = None
-    parsed_text = ""
-    ocr_attempted = False
-
-    if settings.ocr_force and ocr_available:
-        parsed_text, _ocr_meta = _run_vl_ocr(
+    if _is_pdf(filename):
+        return _ingest_pdf(
             data,
+            filename,
+            tenant,
+            meta,
             settings=settings,
             store=store,
-            tenant=tenant,
-            doc_id=doc_id,
-            parse_backend=ParseBackend.VL_OCR,
         )
-        parse_backend = ParseBackend.VL_OCR
-        ocr_attempted = True
-    else:
-        try:
-            parsed_text, rhwp_doc = parse_document(
-                data, filename, rhwp_bin=settings.rhwp_batch_bin
-            )
-        except Exception as exc:
-            markitdown_error = str(exc)
-            if not ocr_available:
-                _record_dead_letter(
-                    store,
-                    tenant,
-                    content_hash,
-                    {"stage": "parse", "error": markitdown_error},
-                )
-                raise ParseError(markitdown_error) from exc
-            parsed_text = ""
+
+    try:
+        route_backend = route_parse(filename)
+        parse_backend_label = route_backend.value
+        parsed_text, rhwp_doc = parse_document(
+            data, filename, rhwp_bin=settings.rhwp_batch_bin
+        )
+    except Exception as exc:
+        _record_dead_letter(
+            store,
+            tenant,
+            content_hash,
+            {"stage": "parse", "error": str(exc)},
+        )
+        raise ParseError(str(exc)) from exc
 
     if rhwp_doc is not None:
         blocks_doc = _blocks_from_rhwp(rhwp_doc)
-        parsed_key = s3_key_parsed_json(tenant, doc_id)
-        store.put_bytes(
-            parsed_key,
-            json.dumps(blocks_doc, ensure_ascii=False).encode("utf-8"),
-        )
-        chunks = _chunk_from_blocks_doc(
-            blocks_doc,
-            tenant,
-            content_hash,
-            meta["project_id"],
-            max_chars=settings.chunk_max_chars,
-        )
+        parse_backend_label = RouteBackend.RHWP_BATCH.value
+        parsed_key = _persist_parsed(store, tenant, doc_id, blocks_doc)
     else:
         blocks_doc = _blocks_from_markdown(parsed_text, settings)
-        chunks = _chunk_from_blocks_doc(
+        parsed_key = _persist_parsed(
+            store,
+            tenant,
+            doc_id,
             blocks_doc,
+            markdown=parsed_text,
+        )
+
+    chunks = _chunk_from_blocks_doc(
+        blocks_doc,
+        tenant,
+        content_hash,
+        meta["project_id"],
+        max_chars=settings.chunk_max_chars,
+    )
+    if not chunks:
+        _record_dead_letter(
+            store,
             tenant,
             content_hash,
-            meta["project_id"],
-            max_chars=settings.chunk_max_chars,
+            {"stage": "parse_empty", "prior_backend": parse_backend_label},
         )
-
-        if _should_fallback_to_ocr(
-            parsed_text=parsed_text,
-            chunk_count=len(chunks),
-            ocr_available=ocr_available,
-            ocr_attempted=ocr_attempted,
-            settings=settings,
-        ):
-            backend = (
-                ParseBackend.MARKITDOWN_VL_OCR_FALLBACK
-                if not markitdown_error
-                else ParseBackend.VL_OCR
-            )
-            fallback_reason = "parse_error" if markitdown_error else "low_text"
-            try:
-                parsed_text, _ocr_meta = _run_vl_ocr(
-                    data,
-                    settings=settings,
-                    store=store,
-                    tenant=tenant,
-                    doc_id=doc_id,
-                    parse_backend=backend,
-                )
-                parse_backend = backend
-                ocr_attempted = True
-                blocks_doc = _blocks_from_markdown(parsed_text, settings)
-                chunks = _chunk_from_blocks_doc(
-                    blocks_doc,
-                    tenant,
-                    content_hash,
-                    meta["project_id"],
-                    max_chars=settings.chunk_max_chars,
-                )
-            except Exception as ocr_exc:
-                err = {
-                    "stage": "ocr_empty",
-                    "prior_backend": parse_backend.value,
-                    "ocr_error": str(ocr_exc),
-                }
-                if markitdown_error:
-                    err["parse_error"] = markitdown_error
-                _record_dead_letter(store, tenant, content_hash, err)
-                raise ParseError(str(ocr_exc)) from ocr_exc
-
-        if not chunks:
-            stage = "ocr_empty" if ocr_attempted else "parse_empty"
-            err: dict[str, Any] = {"stage": stage, "prior_backend": parse_backend.value}
-            if markitdown_error:
-                err["parse_error"] = markitdown_error
-            _record_dead_letter(store, tenant, content_hash, err)
-            raise ParseError(f"no chunks after parse ({stage})")
-
-        parsed_key = s3_key_parsed_json(tenant, doc_id)
-        store.put_bytes(
-            parsed_key,
-            json.dumps(blocks_doc, ensure_ascii=False).encode("utf-8"),
-        )
-        md_key = s3_key_parsed_md(tenant, doc_id)
-        store.put_bytes(md_key, parsed_text.encode("utf-8"))
+        raise ParseError("no chunks after parse (parse_empty)")
 
     meta_payload: dict[str, Any] = {
         **meta,
         "parsed_key": parsed_key,
         "chunk_count": len(chunks),
-        "parse_backend": parse_backend.value,
+        "parse_backend": parse_backend_label,
         "blocks_extractor": blocks_doc.get("extractor"),
     }
-    if fallback_reason:
-        meta_payload["fallback_reason"] = fallback_reason
-
     meta_key = s3_key_parsed_meta(tenant, doc_id)
     store.put_bytes(
         meta_key,
         json.dumps(meta_payload, ensure_ascii=False).encode("utf-8"),
     )
-
     chunks_key = s3_key_chunks(tenant, doc_id)
     chunks_uri = write_jsonl(chunks_key, chunks_to_jsonl_lines(chunks), store)
-
     return {
         **meta,
         "parsed_uri": store.uri_for(parsed_key),
         "chunks_uri": chunks_uri,
         "chunks_key": chunks_key,
         "chunks": chunks,
-        "parse_backend": parse_backend.value,
+        "parse_backend": parse_backend_label,
     }

@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     blocks_extractor: str = "md_heuristic"  # BLOCKS_EXTRACTOR — parsers.blocks_extractors registry key
 
     ocr_llm_base_url: str = ""  # OCR_LLM_BASE_URL — unset disables VL OCR fallback
-    ocr_force: bool = False  # OCR_FORCE — PDF markitdown skip (debug)
+    ocr_force: bool = False  # OCR_FORCE — PDF native parse skip (debug)
     ocr_llm_model: str = ""  # OCR_LLM_MODEL
     ocr_llm_api_key: str = "EMPTY"  # OCR_LLM_API_KEY
     ocr_llm_timeout_s: float = 120.0  # OCR_LLM_TIMEOUT_S

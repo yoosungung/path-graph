@@ -20,6 +20,17 @@ from path_graph.storage.blob import read_jsonl
 from constants import PROJECT_ID
 
 
+def _minimal_pdf_bytes() -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Collector fixture PDF body text.")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
 @pytest.fixture
 def local_store(monkeypatch, tmp_path):
     monkeypatch.setenv("PIPELINE_STORAGE_BACKEND", "local")
@@ -124,7 +135,7 @@ def _graph_transport(site_id: str = "site-1", drive_id: str = "drive-1") -> http
         if path.endswith("/items/item-1/content"):
             return httpx.Response(200, content=b"hello sharepoint")
         if path.endswith("/items/item-2/content"):
-            return httpx.Response(200, content=b"%PDF-1.4")
+            return httpx.Response(200, content=_minimal_pdf_bytes())
         return httpx.Response(404, json={"error": {"message": "not found"}})
 
     return httpx.MockTransport(handler)

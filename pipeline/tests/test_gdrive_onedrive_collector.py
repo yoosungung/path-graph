@@ -44,6 +44,17 @@ def test_gdrive_auth_token():
     assert provider.get_token() == "gdrive-token"
 
 
+def _minimal_pdf_bytes() -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Collector fixture PDF body text.")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
 def _gdrive_transport(folder_id: str = "folder-1") -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -65,7 +76,7 @@ def _gdrive_transport(folder_id: str = "folder-1") -> httpx.MockTransport:
         if url.endswith("/files/f1?alt=media"):
             return httpx.Response(200, content=b"gdrive text")
         if url.endswith("/files/f2?alt=media"):
-            return httpx.Response(200, content=b"%PDF")
+            return httpx.Response(200, content=_minimal_pdf_bytes())
         return httpx.Response(404)
 
     return httpx.MockTransport(handler)

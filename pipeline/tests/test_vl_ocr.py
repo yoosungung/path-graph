@@ -135,19 +135,19 @@ def test_vl_ocr_pdf_to_markdown_joins_pages():
     assert client.ocr_page_png.call_count == 2
 
 
-def test_ingest_empty_markitdown_triggers_ocr_fallback(local_store, monkeypatch):
+def test_ingest_empty_digital_triggers_ocr_fallback(local_store, monkeypatch):
     monkeypatch.setenv("OCR_LLM_BASE_URL", "http://ocr.test")
     monkeypatch.setenv("OCR_LLM_MODEL", "test-model")
 
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_document",
-        lambda data, filename, rhwp_bin="rhwp-batch": ("", None),
+        "path_graph.steps.ingest.parse_pdf_to_blocks",
+        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",
         lambda data, **kwargs: (
             "# Scanned title\n\nRecovered body text for chunking.",
-            {"page_count": 1, "parse_backend": "markitdown+vl_ocr_fallback"},
+            {"page_count": 1, "parse_backend": "pymupdf4llm+vl_ocr_fallback"},
         ),
     )
 
@@ -160,11 +160,11 @@ def test_ingest_empty_markitdown_triggers_ocr_fallback(local_store, monkeypatch)
         "s3_raw_uri": "file://x",
         "filename": "scan.pdf",
     }
-    result = ingest_raw_bytes(b"%PDF", "scan.pdf", "dev", "manual", meta)
+    result = ingest_raw_bytes(_minimal_pdf_bytes(), "scan.pdf", "dev", "manual", meta)
     assert result["chunks"]
     store = LocalBlobStore(local_store)
     saved_meta = json.loads(store.get_bytes("parsed/dev/00000000-0000-0000-0000-000000000001/meta.json"))
-    assert saved_meta["parse_backend"] == "markitdown+vl_ocr_fallback"
+    assert saved_meta["parse_backend"] == "pymupdf4llm+vl_ocr_fallback"
 
 
 def test_ingest_ocr_fallback_still_empty_records_dead_letter(local_store, monkeypatch):
@@ -172,8 +172,8 @@ def test_ingest_ocr_fallback_still_empty_records_dead_letter(local_store, monkey
     monkeypatch.setenv("OCR_LLM_MODEL", "test-model")
 
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_document",
-        lambda data, filename, rhwp_bin="rhwp-batch": ("", None),
+        "path_graph.steps.ingest.parse_pdf_to_blocks",
+        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",
@@ -190,7 +190,7 @@ def test_ingest_ocr_fallback_still_empty_records_dead_letter(local_store, monkey
         "filename": "scan.pdf",
     }
     with pytest.raises(ParseError, match="no chunks"):
-        ingest_raw_bytes(b"%PDF", "scan.pdf", "dev", "manual", meta)
+        ingest_raw_bytes(_minimal_pdf_bytes(), "scan.pdf", "dev", "manual", meta)
 
     store = LocalBlobStore(local_store)
     err = json.loads(store.get_bytes("dead_letter/dev/emptyocr/error.json"))
@@ -205,11 +205,11 @@ def test_ingest_item_returns_false_when_chunks_empty_after_fallback(local_store,
 
     raw_key = f"raw/dev/{PROJECT_ID}/manual/ocrfail/scan.pdf"
     store = LocalBlobStore(local_store)
-    store.put_bytes(raw_key, b"%PDF")
+    store.put_bytes(raw_key, _minimal_pdf_bytes())
 
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_document",
-        lambda data, filename, rhwp_bin="rhwp-batch": ("", None),
+        "path_graph.steps.ingest.parse_pdf_to_blocks",
+        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",
