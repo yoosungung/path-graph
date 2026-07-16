@@ -1,14 +1,15 @@
-"""Document parsers — native PDF blocks; HWP JSON; markitdown for remaining formats."""
+"""Document parsers — native PDF/Office/text blocks; HWP JSON."""
 
 from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
-from markitdown import MarkItDown
-
 from path_graph.parsers.adapters.pymupdf import blocks_from_pymupdf_page_chunks
+from path_graph.parsers.adapters.unstructured import blocks_from_unstructured_elements
+from path_graph.parsers.blocks_contract import normalize_blocks_document
 from path_graph.parsers.route import (
     ParseBackend,
     UnsupportedFormatError,
@@ -19,24 +20,11 @@ __all__ = [
     "UnsupportedFormatError",
     "parse_document",
     "parse_hwp_json",
-    "parse_bytes_markitdown",
     "parse_pdf_to_blocks",
+    "parse_office_to_blocks",
+    "parse_text_to_blocks",
+    "parse_non_pdf_to_blocks",
 ]
-
-
-def parse_markdown_file(path: Path) -> str:
-    md = MarkItDown()
-    result = md.convert(str(path))
-    return result.text_content or ""
-
-
-def parse_bytes_markitdown(data: bytes, suffix: str) -> str:
-    tmp = Path(f"/tmp/path-graph-parse{suffix}")
-    tmp.write_bytes(data)
-    try:
-        return parse_markdown_file(tmp)
-    finally:
-        tmp.unlink(missing_ok=True)
 
 
 def parse_hwp_json(data: bytes, rhwp_bin: str = "rhwp-batch") -> dict:
@@ -58,8 +46,6 @@ def parse_hwp_json(data: bytes, rhwp_bin: str = "rhwp-batch") -> dict:
 
 def parse_pdf_to_blocks(data: bytes) -> dict:
     """Digital PDF → pymupdf4llm page_chunks → content.json blocks."""
-    import tempfile
-
     import fitz
     import pymupdf4llm
 
@@ -78,18 +64,93 @@ def parse_pdf_to_blocks(data: bytes) -> dict:
     return blocks_from_pymupdf_page_chunks(pages)
 
 
-def parse_document(data: bytes, filename: str, *, rhwp_bin: str = "rhwp-batch") -> tuple[str, dict | None]:
-    """Parse non-PDF formats.
+def parse_text_to_blocks(data: bytes) -> dict:
+    """Plain ``.txt`` / ``.md`` → paragraph blocks (no markitdown)."""
+    text = data.decode("utf-8", errors="replace").strip()
+    blocks: list[dict] = []
+    if text:
+        for para in text.split("\n\n"):
+            body = para.strip()
+            if body:
+                blocks.append(
+                    {"type": "paragraph", "text": body, "heading_path": []}
+                )
+    return normalize_blocks_document({"blocks": blocks}, extractor="text")
 
-    PDF uses ``parse_pdf_to_blocks`` / ingest OCR path (#280).
-    Office/text still use markitdown until Unstructured wire-up.
-    """
+
+def _element_as_mapping(el: object) -> dict:
+    if hasattr(el, "to_dict"):
+        raw = el.to_dict()  # type: ignore[operator]
+        if isinstance(raw, dict):
+            return raw
+    return {
+        "type": getattr(el, "category", None) or type(el).__name__,
+        "text": getattr(el, "text", "") or "",
+        "metadata": getattr(getattr(el, "metadata", None), "to_dict", lambda: {})(),
+    }
+
+
+def parse_office_to_blocks(data: bytes, filename: str) -> dict:
+    """Office OOXML/BIFF → Unstructured elements → blocks."""
+    suffix = Path(filename).suffix.lower() or ".bin"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(data)
+        tmp.flush()
+        if suffix == ".docx":
+            from unstructured.partition.docx import partition_docx
+
+            elements = partition_docx(filename=tmp.name)
+        elif suffix == ".pptx":
+            from unstructured.partition.pptx import partition_pptx
+
+            elements = partition_pptx(filename=tmp.name)
+        elif suffix in {".xlsx", ".xls"}:
+            from unstructured.partition.xlsx import partition_xlsx
+
+            elements = partition_xlsx(filename=tmp.name)
+        else:
+            raise UnsupportedFormatError(f"office extension {suffix} is not supported")
+    mapped = [_element_as_mapping(el) for el in elements]
+    return blocks_from_unstructured_elements(mapped)
+
+
+def parse_non_pdf_to_blocks(
+    data: bytes,
+    filename: str,
+    *,
+    rhwp_bin: str = "rhwp-batch",
+) -> dict:
+    """Route non-PDF bytes to native blocks (HWP / Office / text)."""
     backend = route_parse(filename)
     if backend is ParseBackend.PYMUPDF:
         raise ValueError("PDF must use parse_pdf_to_blocks / ingest PDF path")
     if backend is ParseBackend.RHWP_BATCH:
+        return normalize_blocks_document(
+            parse_hwp_json(data, rhwp_bin=rhwp_bin),
+            extractor="rhwp_batch",
+        )
+    if backend is ParseBackend.UNSTRUCTURED:
+        return parse_office_to_blocks(data, filename)
+    if backend is ParseBackend.TEXT:
+        return parse_text_to_blocks(data)
+    raise UnsupportedFormatError(f"unsupported backend {backend}")
+
+
+def parse_document(
+    data: bytes,
+    filename: str,
+    *,
+    rhwp_bin: str = "rhwp-batch",
+) -> tuple[str, dict | None]:
+    """Compatibility wrapper — prefer ``parse_non_pdf_to_blocks``.
+
+    Returns ``("", blocks_doc)`` for native paths. HWP also exposes raw JSON as
+    the second value historically; callers should use blocks via
+    ``parse_non_pdf_to_blocks``.
+    """
+    backend = route_parse(filename)
+    if backend is ParseBackend.RHWP_BATCH:
         doc_json = parse_hwp_json(data, rhwp_bin=rhwp_bin)
         return json.dumps(doc_json, ensure_ascii=False), doc_json
-    suffix = Path(filename).suffix or ".bin"
-    text = parse_bytes_markitdown(data, suffix)
-    return text, None
+    blocks = parse_non_pdf_to_blocks(data, filename, rhwp_bin=rhwp_bin)
+    return "", blocks
