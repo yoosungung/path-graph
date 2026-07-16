@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build path-graph pipeline image (markitdown + rhwp-batch release binary).
+# Build path-graph pipeline image (native parsers + rhwp-batch release binary).
 #
 # Usage:
 #   ./scripts/build-pipeline-image.sh
@@ -35,6 +35,12 @@ if [[ "${PUSH:-}" == "1" ]]; then
 else
   docker "${build_args[@]}" --load "$ROOT"
   docker run --rm --platform "$PLATFORM" --entrypoint rhwp-batch "$IMAGE" --help >/dev/null
-  docker run --rm --platform "$PLATFORM" "$IMAGE" -c "import openpyxl, xlrd; from markitdown import MarkItDown; print('ok')"
-  echo "Smoke OK: rhwp-batch v${RHWP_BATCH_VERSION} + markitdown[xlsx,xls]"
+  docker run --rm --platform "$PLATFORM" "$IMAGE" -c "
+import openpyxl, xlrd, pymupdf4llm
+from unstructured.partition.docx import partition_docx
+from unstructured.partition.pptx import partition_pptx
+from unstructured.partition.xlsx import partition_xlsx
+print('ok')
+"
+  echo "Smoke OK: rhwp-batch v${RHWP_BATCH_VERSION} + unstructured[docx,pptx,xlsx] + pymupdf4llm + openpyxl/xlrd"
 fi
