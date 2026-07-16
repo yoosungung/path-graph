@@ -16,6 +16,7 @@ from path_graph.contracts.s3_keys import (
 )
 from path_graph.parsers.blocks_contract import normalize_blocks_document
 from path_graph.parsers.blocks_extractors import get_blocks_extractor
+from path_graph.parsers.image_caption import enrich_image_block_captions
 from path_graph.parsers.parse import parse_document, parse_pdf_to_blocks
 from path_graph.parsers.pdf_metrics import PdfKind, classify_pdf
 from path_graph.parsers.route import ParseBackend as RouteBackend
@@ -248,6 +249,10 @@ def _ingest_pdf(
         try:
             blocks_doc = parse_pdf_to_blocks(data)
             parse_backend = ParseBackend.PYMUPDF4LLM
+            if ocr_available:
+                blocks_doc = enrich_image_block_captions(
+                    blocks_doc, data, settings=settings
+                )
         except Exception as exc:
             parse_error = str(exc)
             blocks_doc = {"blocks": [], "extractor": "pymupdf4llm"}

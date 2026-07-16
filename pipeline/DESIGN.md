@@ -249,6 +249,7 @@ raw bytes
   - **digital**: 그 외
 - 디지털 PDF: reading-order blocks; 표는 HTML/markdown `table` block 통째
 - image/chart: full-page OCR이 아니라 crop → SGLang Vision caption → `image` block 순서 보존
+  - 구현: `parsers/image_caption.py` — digital PDF + `OCR_LLM_*` 설정 시 empty caption만 보강; 인접 text caption이 있으면 스킵
 - scan (저텍스트 + image-heavy): OCR 설정 시 full-page VL OCR → blocks, 아니면 `dead_letter`
 
 ### HWP
@@ -461,11 +462,13 @@ sglang Gemma 4 cookbook: 이미지 품질이 중요하면 서버 측 `--attentio
 |------|------|
 | `parsers/pdf_metrics.py` | `text_chars`/`image_ratio`/`page_count` + digital\|scan 분류 |
 | `parsers/parse.py` | `parse_pdf_to_blocks` (pymupdf4llm→adapter); non-PDF markitdown/HWP |
+| `parsers/image_caption.py` | picture bbox crop → Vision caption → `image.caption` |
 | `parsers/pdf_render.py` | PDF → `list[bytes]` PNG (`OCR_RENDER_DPI`, 기본 200) |
 | `parsers/vl_ocr.py` | 페이지 PNG → Markdown; httpx Vision client |
 | `parsers/ocr_prompt.py` | 기본·커스텀 프롬프트 상수 |
 | `tests/test_pdf_metrics.py` | digital/scan fixture + 임계값 |
 | `tests/test_pdf_native_ingest.py` | native PDF ingest·scan OCR/dead_letter |
+| `tests/test_image_caption.py` | crop PNG + caption enrich 순서 보존 |
 | `tests/test_vl_ocr.py` | mock HTTP; pdf_render·fallback·dead_letter |
 
 `ingest.py` / `ingest_helpers.py` 시그니처 변경 없음 — `parse_document` 내부만 확장.
