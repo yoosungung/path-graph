@@ -168,7 +168,7 @@
 | 3.3.2 | PDF/DOCX → **blocks JSON** (md 후처리) | [x] | **D3 개정으로 폐기 예정** — 당시 `md_heuristic`; 후속 3.3.5 |
 | 3.3.3 | ingest 검색 API / retrieval CLI | [x] | `retrieval_search` CLI · `api_search_project` · BFF `GET …/search` |
 | 3.3.4 | **스캔 PDF VL OCR fallback** (빈 parse → PNG→sglang→md) | [x] | ingest 동일 pass; native 전환 시 blocks 직행으로 재정렬 (3.3.5) |
-| 3.3.5 | **Native blocks parser** (markitdown/md_heuristic 폐기) | [ ] | parent #260; #274 문서 → #278 routing → #279 adapter/chunk → #280 VLM·검증 |
+| 3.3.5 | **Native blocks parser** (markitdown/md_heuristic 폐기) | [x] | parent #260 closeout; #274 문서, #278 routing, #293 adapter/chunk, #280 VLM·검증 완료. image `ghcr.io/yoosungung/path-graph/pipeline:c911fce66417ff27d967c2e255f1f8dc9fbc6d45` |
 
 ### 3.4 통합 Knowledge Search
 
@@ -186,7 +186,7 @@
 
 D1–D5 결정 완료. Phase 4 Console·GraphRAG downstream **MVP 완료** — 병목은 **수집 운영화(BFF)** · **검색 품질** · **runtime binding**.
 
-1. **검색·파싱 품질** — 3.3.1 RRF hybrid [x] · **3.3.5 native blocks** [ ] (#260)
+1. **검색·파싱 품질** — 3.3.1 RRF hybrid [x] · **3.3.5 native blocks** [x] (#260)
 2. **오케스트레이션 잔여** — 2.4.2 Argo wait→API NP · 2.4.3 tenant `max_parallel`·semaphore · 2.1.8 collect-only WF [x]
 3. **관리자 클러스터 검증 (일괄)** — 아래 §관리자 클러스터 검증 체크리스트 (SharePoint delta 등)
 
