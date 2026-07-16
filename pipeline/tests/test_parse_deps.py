@@ -32,3 +32,13 @@ def test_allowed_extensions_csv_sorted() -> None:
     assert allowed_extensions_csv() == (
         ".docx,.hwp,.hwpx,.md,.pdf,.pptx,.txt,.xls,.xlsx"
     )
+
+
+def test_pipeline_image_smoke_uses_native_deps_without_markitdown() -> None:
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "scripts" / "build-pipeline-image.sh").read_text(encoding="utf-8")
+    assert "markitdown" not in text.lower()
+    assert "pymupdf4llm" in text
+    assert "unstructured.partition.docx" in text
+    assert "unstructured.partition.pptx" in text
+    assert "unstructured.partition.xlsx" in text
