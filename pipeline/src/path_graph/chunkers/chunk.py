@@ -108,6 +108,18 @@ def chunk_from_markdown(
     return chunks
 
 
+def _block_chunk_text(block: dict[str, Any], btype: str) -> str:
+    """Pick chunk body by block type (DESIGN type-aware rules)."""
+    if btype == "table":
+        text = block.get("markdown") or block.get("text") or ""
+        if not text:
+            text = json.dumps(block.get("rows") or [], ensure_ascii=False)
+        return str(text).strip()
+    if btype == "image":
+        return str(block.get("caption") or block.get("text") or "").strip()
+    return str(block.get("text") or block.get("markdown") or "").strip()
+
+
 def chunk_from_blocks(
     doc: dict[str, Any],
     tenant: str,
@@ -116,19 +128,27 @@ def chunk_from_blocks(
     *,
     max_chars: int = 1000,
 ) -> list[ChunkRecord]:
+    """Chunk from ``content.json`` blocks only.
+
+    Type-aware rules (pipeline/DESIGN.md Blocks):
+    - ``heading``: not emitted as chunks (path only on later blocks)
+    - ``table``: prefer whole HTML/markdown as one chunk; hard-split only if oversized
+    - ``image``: caption text; reading order preserved by block order
+    - ``page``/``bbox`` stay on blocks — never copied onto ``ChunkRecord``
+    """
     doc_id = document_id(tenant, project_id, content_hash)
     blocks = doc.get("blocks") or []
     chunks: list[ChunkRecord] = []
     idx = 0
     for block in blocks:
         btype = block.get("type", "paragraph")
-        text = block.get("text") or block.get("markdown") or ""
-        if btype == "table" and not text:
-            text = json.dumps(block.get("rows") or [], ensure_ascii=False)
-        if not str(text).strip():
+        if btype == "heading":
+            continue
+        text = _block_chunk_text(block, btype)
+        if not text:
             continue
         heading_path = list(block.get("heading_path") or [])
-        for body in _split_oversized(str(text).strip(), max_chars):
+        for body in _split_oversized(text, max_chars):
             th = sha256_text(body)
             chunks.append(
                 ChunkRecord(
