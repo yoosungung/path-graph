@@ -18,6 +18,18 @@ def test_native_parse_deps_listed_without_markitdown() -> None:
     assert "unstructured[docx,pptx,xlsx]" in text
 
 
+def test_build_pipeline_image_smoke_uses_native_imports() -> None:
+    script = Path(__file__).resolve().parents[2] / "scripts" / "build-pipeline-image.sh"
+    text = script.read_text(encoding="utf-8")
+    assert "markitdown" not in text
+    assert "unstructured.partition.docx" in text
+    assert "unstructured.partition.pptx" in text
+    assert "unstructured.partition.xlsx" in text
+    assert "pymupdf4llm" in text
+    assert "openpyxl" in text and "xlrd" in text
+    assert "rhwp-batch" in text
+
+
 def test_legacy_doc_rejected_via_router() -> None:
     with pytest.raises(UnsupportedFormatError, match="not supported"):
         parse_document(b"data", "report.doc")
