@@ -78,6 +78,7 @@ def is_splittable_extraction_error(exc: BaseException) -> bool:
 
 
 def split_text_half(text: str) -> tuple[str, str]:
+    """Last-resort character split (used when chunk/line boundaries are unavailable)."""
     stripped = text.strip()
     if not stripped:
         return "", ""
@@ -90,6 +91,45 @@ def split_text_half(text: str) -> tuple[str, str]:
     left = stripped[:split_at].strip()
     right = stripped[split_at:].strip()
     return left, right
+
+
+def _split_joined_parts(parts: list[str], *, joiner: str, midpoint: int) -> tuple[str, str]:
+    if len(parts) < 2:
+        return "", ""
+    cumulative = 0
+    best_idx = 1
+    best_distance = float("inf")
+    for idx in range(1, len(parts)):
+        cumulative += len(parts[idx - 1]) + len(joiner)
+        distance = abs(cumulative - midpoint)
+        if distance < best_distance:
+            best_distance = distance
+            best_idx = idx
+    left = joiner.join(parts[:best_idx]).strip()
+    right = joiner.join(parts[best_idx:]).strip()
+    if left and right:
+        return left, right
+    return "", ""
+
+
+def split_batch_text(text: str) -> tuple[str, str]:
+    """Split LLM batch text without breaking joined chunk boundaries when possible."""
+    stripped = text.strip()
+    if not stripped:
+        return "", ""
+    midpoint = len(stripped) // 2
+
+    if "\n\n" in stripped:
+        left, right = _split_joined_parts(stripped.split("\n\n"), joiner="\n\n", midpoint=midpoint)
+        if left and right:
+            return left, right
+
+    if "\n" in stripped:
+        left, right = _split_joined_parts(stripped.split("\n"), joiner="\n", midpoint=midpoint)
+        if left and right:
+            return left, right
+
+    return split_text_half(stripped)
 
 
 def split_chunk_line_groups(
@@ -115,11 +155,13 @@ def split_chunk_line_groups(
 
 def split_chunk_batches(lines: list[dict], *, max_batch_chars: int) -> list[str]:
     """Group chunk texts into batches that fit the LLM context budget."""
+    from graph_extractor.text_sanitize import sanitize_chunk_text
+
     batches: list[str] = []
     parts: list[str] = []
     total = 0
     for line in lines:
-        text = (line.get("text") or "").strip()
+        text = sanitize_chunk_text(line.get("text") or "")
         if not text:
             continue
         if parts and total + len(text) > max_batch_chars:
@@ -134,21 +176,25 @@ def split_chunk_batches(lines: list[dict], *, max_batch_chars: int) -> list[str]
 
 
 def merge_graph_parts(parts: list[dict]) -> dict:
+    from graph_extractor.text_sanitize import sanitize_graph_v1
+
     entities: list[dict] = []
     edges: list[dict] = []
     seen_entity_ids: set[str] = set()
     seen_edge_keys: set[tuple] = set()
     for data in parts:
-        for entity in data.get("entities") or []:
+        cleaned = sanitize_graph_v1(data)
+        for entity in cleaned.get("entities") or []:
             eid = str(entity.get("id") or entity.get("name") or "")
             if not eid or eid in seen_entity_ids:
                 continue
             seen_entity_ids.add(eid)
             entities.append(entity)
-        for edge in data.get("edges") or []:
+        for edge in cleaned.get("edges") or []:
             key = (edge.get("type"), edge.get("source"), edge.get("target"))
             if key in seen_edge_keys:
                 continue
             seen_edge_keys.add(key)
             edges.append(edge)
-    return {"entities": entities, "edges": edges}
+    merged = {"entities": entities, "edges": edges}
+    return sanitize_graph_v1(merged)

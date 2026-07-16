@@ -18,9 +18,10 @@ from graph_extractor.batching import (
     resolve_graph_extractor_budgets,
     split_chunk_batches,
     split_chunk_line_groups,
-    split_text_half,
+    split_batch_text,
 )
 from graph_extractor.llm_json import invoke_json_llm
+from graph_extractor.text_sanitize import ensure_json_utf8_safe, sanitize_graph_v1
 from graph_extractor.output_schema import graph_v1_response_format
 from graph_extractor.paths import read_prompt
 
@@ -66,11 +67,13 @@ async def load_chunks(
         for group_lines in line_groups
     ]
     batches = [batch for group in chunk_groups for batch in group]
-    return {
+    payload = {
         "chunk_groups": chunk_groups,
         "chunk_batches": batches,
         "chunks_text": "\n\n".join(batches),
     }
+    ensure_json_utf8_safe(payload)
+    return payload
 
 
 async def _extract_chunks_text(
@@ -95,7 +98,7 @@ async def _extract_chunks_text(
             raise
         if len(chunks_text) <= min_split_chars:
             return {"entities": [], "edges": []}
-        left, right = split_text_half(chunks_text)
+        left, right = split_batch_text(chunks_text)
         if not left or not right:
             raise
         left_result, right_result = await asyncio.gather(
@@ -158,11 +161,13 @@ async def extract_graph(
             group_parts = await asyncio.gather(*tasks)
             parts.extend(group_parts)
 
-    merged = merge_graph_parts(parts)
-    return {
+    merged = sanitize_graph_v1(merge_graph_parts(parts))
+    payload = {
         "entities": list(merged.get("entities") or []),
         "edges": list(merged.get("edges") or []),
     }
+    ensure_json_utf8_safe(payload)
+    return payload
 
 
 def build_graph(cfg: dict, secrets: Any) -> Any:
