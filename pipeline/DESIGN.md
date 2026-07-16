@@ -244,6 +244,9 @@ raw bytes
 ### PDF
 
 - router·파싱·렌더: **PyMuPDF** (+ `pymupdf4llm`). 별도 pypdf/pdfminer **추가하지 않음**
+- **분류 지표** (`parsers/pdf_metrics.py`, #280): `text_chars`(전 페이지 strip 합), `avg_text_chars`, `image_ratio`(페이지면적 대비 image rect 합의 페이지 평균, cap 1.0), `page_count`
+  - **scan**: `avg_text_chars < OCR_MIN_TEXT_CHARS(기본 32)` **AND** `image_ratio >= 0.5`
+  - **digital**: 그 외
 - 디지털 PDF: reading-order blocks; 표는 HTML/markdown `table` block 통째
 - image/chart: full-page OCR이 아니라 crop → SGLang Vision caption → `image` block 순서 보존
 - scan (저텍스트 + image-heavy): OCR 설정 시 full-page VL OCR → blocks, 아니면 `dead_letter`
@@ -405,7 +408,7 @@ ingest_item
   → [rag] index_rag_for_document → indexed_rag
 ```
 
-`parse_backend` 메타: `pymupdf4llm` | `vl_ocr` | `pymupdf4llm+vl_ocr_fallback` (`OCR_FORCE` 시 VL만).
+`parse_backend` 메타: `pymupdf4llm` | `vl_ocr` | `pymupdf4llm+vl_ocr_fallback` (`OCR_FORCE` 시 VL만). scan + OCR unset → `dead_letter` `stage: parse_empty`.
 
 ### 산출물 (S3)
 
@@ -456,10 +459,13 @@ sglang Gemma 4 cookbook: 이미지 품질이 중요하면 서버 측 `--attentio
 
 | 모듈 | 역할 |
 |------|------|
+| `parsers/pdf_metrics.py` | `text_chars`/`image_ratio`/`page_count` + digital\|scan 분류 |
+| `parsers/parse.py` | `parse_pdf_to_blocks` (pymupdf4llm→adapter); non-PDF markitdown/HWP |
 | `parsers/pdf_render.py` | PDF → `list[bytes]` PNG (`OCR_RENDER_DPI`, 기본 200) |
 | `parsers/vl_ocr.py` | 페이지 PNG → Markdown; httpx Vision client |
 | `parsers/ocr_prompt.py` | 기본·커스텀 프롬프트 상수 |
-| `parsers/parse.py` | 포맷별 native parse (`vl_ocr`는 ingest에서 호출) |
+| `tests/test_pdf_metrics.py` | digital/scan fixture + 임계값 |
+| `tests/test_pdf_native_ingest.py` | native PDF ingest·scan OCR/dead_letter |
 | `tests/test_vl_ocr.py` | mock HTTP; pdf_render·fallback·dead_letter |
 
 `ingest.py` / `ingest_helpers.py` 시그니처 변경 없음 — `parse_document` 내부만 확장.
