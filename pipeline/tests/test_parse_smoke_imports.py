@@ -12,6 +12,6 @@ def test_native_parse_imports():
     from path_graph.parsers.parse import (  # noqa: F401
         parse_non_pdf_to_blocks,
         parse_office_to_blocks,
-        parse_pdf_to_blocks,
+        parse_pdf_to_json,
     )
     from path_graph.parsers.pdf_metrics import classify_pdf  # noqa: F401

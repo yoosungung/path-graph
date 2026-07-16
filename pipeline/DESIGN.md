@@ -204,23 +204,25 @@ raw bytes
        - PDF text/table: PyMuPDF4LLM/PyMuPDF reading-order JSON
        - PDF image/chart: crop → SGLang caption → image block
        - scan PDF: full-page VL OCR (enabled) or dead_letter
-  → content.json blocks[]  [canonical]
-  → chunk_from_blocks(type-aware)
+  → content.json  [canonical — PDF=pymupdf4llm JSON; Office/OCR=blocks[]]
+  → chunk_from_pymupdf_json | chunk_from_blocks
   → chunks.jsonl / PG chunks
 ```
 
 | 레이어 | 책임 | 구현 |
 |--------|------|------|
 | **router** | 확장자 → backend (+ PDF `text_chars`/`image_ratio`) | `parsers/route.py`; PDF 지표는 PyMuPDF |
-| **parse** | 바이너리 → `content.json` blocks | Unstructured / PyMuPDF4LLM / rhwp-batch / VL OCR / text |
-| **adapter** | typed elements / page_chunks → blocks | `parsers/adapters/` (`unstructured`, `pymupdf`) — #293 |
-| **chunk** | `blocks[]` → `chunks.jsonl` | `chunk_from_blocks` (type-aware; heading 제외, table whole, image caption) |
+| **parse** | 바이너리 → `content.json` | PDF=`to_json()`; Office/text/VL OCR=`blocks[]` |
+| **adapter** | Office typed elements → blocks | `parsers/adapters/unstructured` — #293 |
+| **chunk** | `content.json` → `chunks.jsonl` | PDF=`chunk_from_pymupdf_json`; 그 외=`chunk_from_blocks` |
 
-### Block 계약
+### Block 계약 (Office · text · VL OCR)
 
 공통 필드: `type` (`heading` \| `paragraph` \| `list_item` \| `table` \| `image` \| …), `heading_path: string[]`, 본문(`text` \| `markdown` \| `rows`).
 
-선택 metadata (`content.json`만, ChunkRecord 제외): `metadata.page`, `metadata.bbox`, extractor 고유 필드.
+### PDF content.json (pymupdf4llm native)
+
+`pymupdf4llm.to_json()` 출력을 **변환 없이** `content.json`에 저장한다. `pages[].boxes[]`의 `boxclass`, `textlines`, `table`, picture `caption`(VLM 보강 시 path-graph 확장 필드)을 그대로 유지한다.
 
 ### Office · 업로드 허용 · 라우팅 (#278)
 
@@ -247,9 +249,8 @@ raw bytes
 - **분류 지표** (`parsers/pdf_metrics.py`, #280): `text_chars`(전 페이지 strip 합), `avg_text_chars`, `image_ratio`(페이지면적 대비 image rect 합의 페이지 평균, cap 1.0), `page_count`
   - **scan**: `avg_text_chars < OCR_MIN_TEXT_CHARS(기본 32)` **AND** `image_ratio >= 0.5`
   - **digital**: 그 외
-- 디지털 PDF: reading-order blocks; 표는 HTML/markdown `table` block 통째
-- image/chart: full-page OCR이 아니라 crop → SGLang Vision caption → `image` block 순서 보존
-  - 구현: `parsers/image_caption.py` — digital PDF + `OCR_LLM_*` 설정 시 empty caption만 보강; 인접 text caption이 있으면 스킵
+- 디지털 PDF: `pymupdf4llm.to_json()` — `content.json`에 **native JSON 그대로** 저장 (`pages[]`/`boxes[]`). 청킹은 `chunk_from_pymupdf_json`이 boxclass·span을 직접 읽는다.
+- image/chart: crop → SGLang Vision caption → picture box에 `caption` 필드 추가 (path-graph 확장)
 - scan (저텍스트 + image-heavy): OCR 설정 시 full-page VL OCR → blocks, 아니면 `dead_letter`
 
 ### HWP
@@ -397,7 +398,7 @@ chunk 0이면 `ingest_item`이 성공(True)으로 끝나지 않는다 — fallba
 ```
 ingest_item
   → PDF router (PyMuPDF: text_chars / image_ratio / page_count)
-  → digital: pymupdf4llm → content.json blocks
+  → digital: pymupdf4llm.to_json() → content.json
   → scan/low-text AND OCR_LLM_BASE_URL configured:
        vl_ocr_pdf
          1. PDF → PNG (pymupdf, OCR_RENDER_DPI)
@@ -417,7 +418,7 @@ ingest_item
 |------|-----|------|
 | 페이지 PNG | `parsed/{tenant}/{doc_id}/pages/{page:04d}.png` | fallback 사용 시만 |
 | VL OCR 페이지 산출 | `parsed/{tenant}/{doc_id}/ocr/{page:04d}.md` | debug optional |
-| 정본 | `parsed/{tenant}/{doc_id}/content.json` | blocks — 청킹 입력 |
+| 정본 | `parsed/{tenant}/{doc_id}/content.json` | PDF=pymupdf4llm JSON; OCR/blocks 경로=`blocks[]` |
 | debug | `parsed/{tenant}/{doc_id}/content.md` | optional |
 | meta | `parsed/{tenant}/{doc_id}/meta.json` | `parse_backend`, `fallback_reason: low_text` |
 
@@ -461,7 +462,7 @@ sglang Gemma 4 cookbook: 이미지 품질이 중요하면 서버 측 `--attentio
 | 모듈 | 역할 |
 |------|------|
 | `parsers/pdf_metrics.py` | `text_chars`/`image_ratio`/`page_count` + digital\|scan 분류 |
-| `parsers/parse.py` | `parse_pdf_to_blocks` / `parse_office_to_blocks` / `parse_text_to_blocks`; HWP JSON |
+| `parsers/parse.py` | `parse_pdf_to_json` / `parse_office_to_blocks` / `parse_text_to_blocks`; HWP JSON |
 | `parsers/image_caption.py` | picture bbox crop → Vision caption → `image.caption` |
 | `parsers/pdf_render.py` | PDF → `list[bytes]` PNG (`OCR_RENDER_DPI`, 기본 200) |
 | `parsers/vl_ocr.py` | 페이지 PNG → Markdown; httpx Vision client |

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from path_graph.chunkers.chunk import chunk_from_blocks
-from path_graph.parsers.adapters.pymupdf import blocks_from_pymupdf_page_chunks
 from path_graph.parsers.adapters.unstructured import blocks_from_unstructured_elements
 from path_graph.parsers.blocks_contract import BLOCKS_SCHEMA_VERSION
 from constants import PROJECT_ID
@@ -62,43 +61,6 @@ def test_unstructured_typed_elements_to_blocks_with_page_bbox():
     assert image["heading_path"] == ["Doc Title"]
     assert image["metadata"]["page"] == 2
 
-
-def test_pymupdf_page_chunks_to_blocks_preserves_order_and_metadata():
-    pages = [
-        {
-            "metadata": {"page_number": 1, "page_count": 1},
-            "text": "## Section\n\nBody text.\n\n| h1 | h2 |\n| --- | --- |\n| a | b |\n\n![img](x.png)\n\nCaption under image.\n",
-            "tables": [{"bbox": [10, 40, 90, 70], "row_count": 2, "col_count": 2}],
-            "images": [{"bbox": [10, 80, 50, 120], "width": 40, "height": 40}],
-            "page_boxes": [
-                {"index": 0, "class": "text", "bbox": [10, 10, 90, 20], "pos": [0, 10]},
-                {"index": 1, "class": "text", "bbox": [10, 22, 90, 35], "pos": [12, 22]},
-                {"index": 2, "class": "table", "bbox": [10, 40, 90, 70], "pos": [24, 58]},
-                {"index": 3, "class": "picture", "bbox": [10, 80, 50, 120], "pos": [60, 74]},
-                {"index": 4, "class": "text", "bbox": [10, 125, 90, 140], "pos": [76, 96]},
-            ],
-        }
-    ]
-
-    doc = blocks_from_pymupdf_page_chunks(pages)
-    assert doc["extractor"] == "pymupdf4llm"
-    types = [b["type"] for b in doc["blocks"]]
-    assert "heading" in types or "paragraph" in types
-    assert "table" in types
-    assert "image" in types
-
-    table = next(b for b in doc["blocks"] if b["type"] == "table")
-    assert "| h1 | h2 |" in table["markdown"]
-    assert table["metadata"]["page"] == 1
-    assert table["metadata"]["bbox"] == [10.0, 40.0, 90.0, 70.0]
-
-    image = next(b for b in doc["blocks"] if b["type"] == "image")
-    assert image["caption"] == "Caption under image."
-    assert image["metadata"]["page"] == 1
-    assert image["metadata"]["bbox"] == [10.0, 80.0, 50.0, 120.0]
-
-    # reading order: table before image
-    assert types.index("table") < types.index("image")
 
 
 def test_chunk_type_aware_table_whole_image_caption_no_metadata_on_chunk():

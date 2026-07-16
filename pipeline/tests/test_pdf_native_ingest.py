@@ -7,7 +7,7 @@ import json
 import fitz
 import pytest
 
-from path_graph.parsers.parse import parse_pdf_to_blocks
+from path_graph.parsers.parse import parse_pdf_to_json
 from path_graph.steps.ingest import ParseError, ingest_raw_bytes
 from path_graph.storage.blob import LocalBlobStore
 
@@ -53,11 +53,11 @@ def _meta(doc_id: str, content_hash: str) -> dict:
     }
 
 
-def test_parse_pdf_to_blocks_digital():
-    doc = parse_pdf_to_blocks(_digital_pdf())
-    assert doc["extractor"] == "pymupdf4llm"
-    assert doc["blocks"]
-    assert any(b.get("text") or b.get("markdown") or b.get("caption") for b in doc["blocks"])
+def test_parse_pdf_to_json_digital():
+    doc = parse_pdf_to_json(_digital_pdf())
+    assert "pages" in doc
+    assert doc["page_count"] >= 1
+    assert "blocks" not in doc
 
 
 def test_ingest_digital_pdf_uses_pymupdf4llm_backend(local_store):
@@ -67,7 +67,8 @@ def test_ingest_digital_pdf_uses_pymupdf4llm_backend(local_store):
     assert result["parse_backend"] == "pymupdf4llm"
     store = LocalBlobStore(local_store)
     blocks = json.loads(store.get_bytes(f"parsed/dev/{meta['document_id']}/content.json"))
-    assert blocks["extractor"] == "pymupdf4llm"
+    assert "pages" in blocks
+    assert blocks["page_count"] >= 1
     saved = json.loads(store.get_bytes(f"parsed/dev/{meta['document_id']}/meta.json"))
     assert saved["pdf_kind"] == "digital"
     assert saved["parse_backend"] == "pymupdf4llm"
@@ -107,8 +108,8 @@ def test_ingest_digital_empty_triggers_pymupdf_ocr_fallback(local_store, monkeyp
     monkeypatch.setenv("OCR_LLM_BASE_URL", "http://ocr.test")
     monkeypatch.setenv("OCR_LLM_MODEL", "test-model")
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_pdf_to_blocks",
-        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
+        "path_graph.steps.ingest.parse_pdf_to_json",
+        lambda data: {"pages": [], "page_count": 0},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",

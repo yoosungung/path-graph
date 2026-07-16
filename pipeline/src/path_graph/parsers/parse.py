@@ -1,4 +1,4 @@
-"""Document parsers — native PDF/Office/text blocks; HWP JSON."""
+"""Document parsers — PDF pymupdf4llm JSON; Office/text blocks; HWP JSON."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from path_graph.parsers.adapters.pymupdf import blocks_from_pymupdf_page_chunks
 from path_graph.parsers.adapters.unstructured import blocks_from_unstructured_elements
 from path_graph.parsers.blocks_contract import normalize_blocks_document
 from path_graph.parsers.route import (
@@ -20,7 +19,7 @@ __all__ = [
     "UnsupportedFormatError",
     "parse_document",
     "parse_hwp_json",
-    "parse_pdf_to_blocks",
+    "parse_pdf_to_json",
     "parse_office_to_blocks",
     "parse_text_to_blocks",
     "parse_non_pdf_to_blocks",
@@ -44,24 +43,14 @@ def parse_hwp_json(data: bytes, rhwp_bin: str = "rhwp-batch") -> dict:
         tmp_out.unlink(missing_ok=True)
 
 
-def parse_pdf_to_blocks(data: bytes) -> dict:
-    """Digital PDF → pymupdf4llm page_chunks → content.json blocks."""
-    import fitz
+def parse_pdf_to_json(data: bytes) -> dict:
+    """Digital PDF → pymupdf4llm ``to_json()`` document (stored as-is in content.json)."""
     import pymupdf4llm
 
-    # pymupdf4llm + stream reopen can return empty text for subsequent docs;
-    # open via a temp file path for stable extraction.
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
         tmp.write(data)
         tmp.flush()
-        doc = fitz.open(tmp.name)
-        try:
-            pages = pymupdf4llm.to_markdown(doc, page_chunks=True)
-        finally:
-            doc.close()
-    if isinstance(pages, str):
-        pages = [{"text": pages, "metadata": {"page_number": 1}}]
-    return blocks_from_pymupdf_page_chunks(pages)
+        return json.loads(pymupdf4llm.to_json(tmp.name))
 
 
 def parse_text_to_blocks(data: bytes) -> dict:
@@ -123,7 +112,7 @@ def parse_non_pdf_to_blocks(
     """Route non-PDF bytes to native blocks (HWP / Office / text)."""
     backend = route_parse(filename)
     if backend is ParseBackend.PYMUPDF:
-        raise ValueError("PDF must use parse_pdf_to_blocks / ingest PDF path")
+        raise ValueError("PDF must use parse_pdf_to_json / ingest PDF path")
     if backend is ParseBackend.RHWP_BATCH:
         return normalize_blocks_document(
             parse_hwp_json(data, rhwp_bin=rhwp_bin),

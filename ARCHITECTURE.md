@@ -62,7 +62,9 @@ RAG ingest 이후 Graph(Nebula)·Wiki(PG VFS) 적재. Console MVP는 **`pipeline
 
 ### Parse · blocks
 
-- **청킹 정본**은 `parsed/{tenant}/{doc_id}/content.json`의 `blocks[]`만 본다. 포맷별 **native parser**가 blocks를 직접 생성한다.
+- **청킹 입력**은 `parsed/{tenant}/{doc_id}/content.json`이다. 포맷은 parse backend별 **native 출력 그대로** — 변환·정규화하지 않는다.
+- **디지털 PDF**: `pymupdf4llm.to_json()` 문서 (`pages[]`, `boxes[]`, `boxclass`, span metadata 등).
+- **Office / text / VL OCR fallback**: `blocks[]` 문서 (`schema_version`, `extractor`, `blocks`).
 - **`content.md`**는 optional debug artifact다. 청킹·재추출 필수가 아니다.
 - **출시 전 legacy 없음** — `markitdown → Markdown → md_heuristic` 경로 및 md fallback을 두지 않는다. 상세 형태: [`§2.1`](#21-s3-garage), [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
 
@@ -182,13 +184,12 @@ s3://{bucket}/
 
 Wiki 페이지 본문은 S3가 아닌 **`vfs_wiki_files`** (`public` schema, agents-runtime 마이그레이션)에 저장한다.
 
-**`content.json` (blocks, 청킹 정본)** — Office(Unstructured)·PDF(PyMuPDF/PyMuPDF4LLM)·스캔 PDF(VL OCR)·HWP(rhwp-batch)가 공통으로 기록:
+**`content.json` (parse 정본, backend별 native shape)**:
 
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| `schema_version` | ✓ | `"1"` |
-| `extractor` | ✓ | 구현 식별자 — 예: `unstructured`, `pymupdf4llm`, `vl_ocr`, `rhwp_batch` |
-| `blocks` | ✓ | 배열; block마다 `type`, `heading_path`, 본문(`text` \| `markdown` \| `rows`) |
+| backend | shape | 비고 |
+|---------|--------|------|
+| 디지털 PDF (`pymupdf4llm`) | `pymupdf4llm.to_json()` 문서 — `pages[]`, `boxes[]`, `boxclass`, span metadata | **blocks[]로 변환하지 않음** |
+| Office / text / VL OCR | `schema_version`, `extractor`, `blocks[]` | block마다 `type`, `heading_path`, 본문 |
 
 `page`/`bbox` 등 layout metadata는 **`content.json`에만** 두고, **`ChunkRecord`에는 넣지 않는다**. 상세: [`pipeline/DESIGN.md`](pipeline/DESIGN.md#blocks-구조화-d3).
 

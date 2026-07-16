@@ -73,6 +73,42 @@ def test_enrich_image_block_captions_fills_empty_via_vlm(monkeypatch):
     assert kwargs["prompt"] == DEFAULT_CAPTION_PROMPT
 
 
+def test_enrich_pymupdf_json_picture_captions():
+    data = _pdf_with_image_and_text()
+    parsed_doc = {
+        "page_count": 1,
+        "pages": [
+            {
+                "page_number": 1,
+                "boxes": [
+                    {
+                        "x0": 50.0,
+                        "y0": 50.0,
+                        "x1": 170.0,
+                        "y1": 130.0,
+                        "boxclass": "picture",
+                        "textlines": [],
+                    }
+                ],
+            }
+        ],
+    }
+    client = MagicMock()
+    client.ocr_page_png.return_value = "Blue rectangle chart showing values."
+    settings = Settings(
+        ocr_llm_base_url="http://ocr.test",
+        ocr_llm_model="test-model",
+    )
+    out = enrich_image_block_captions(
+        parsed_doc,
+        data,
+        settings=settings,
+        client=client,
+    )
+    assert out["pages"][0]["boxes"][0]["caption"] == "Blue rectangle chart showing values."
+    client.ocr_page_png.assert_called_once()
+
+
 def test_enrich_skips_when_caption_already_present():
     blocks_doc = {
         "blocks": [

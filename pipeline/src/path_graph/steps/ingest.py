@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from path_graph.chunkers.chunk import chunk_from_blocks, chunks_to_jsonl_lines
+from path_graph.chunkers.pymupdf_json import chunk_from_pymupdf_json
 from path_graph.config import Settings, get_settings
 from path_graph.contracts.s3_keys import (
     s3_key_chunks,
@@ -16,7 +17,8 @@ from path_graph.contracts.s3_keys import (
 )
 from path_graph.parsers.blocks_extractors import get_blocks_extractor
 from path_graph.parsers.image_caption import enrich_image_block_captions
-from path_graph.parsers.parse import parse_non_pdf_to_blocks, parse_pdf_to_blocks
+from path_graph.parsers.parse import parse_non_pdf_to_blocks, parse_pdf_to_json
+from path_graph.parsers.pymupdf_json import is_pymupdf_json_document
 from path_graph.parsers.pdf_metrics import PdfKind, classify_pdf
 from path_graph.parsers.route import route_parse
 from path_graph.parsers.vl_ocr import ParseBackend, vl_ocr_pdf_to_markdown
@@ -95,6 +97,31 @@ def _blocks_from_markdown(parsed_text: str, settings: Settings) -> dict[str, Any
     return get_blocks_extractor(settings.blocks_extractor).extract(parsed_text)
 
 
+def _chunk_parsed_doc(
+    parsed_doc: dict[str, Any],
+    tenant: str,
+    content_hash: str,
+    project_id: str,
+    *,
+    max_chars: int,
+) -> list:
+    if is_pymupdf_json_document(parsed_doc):
+        return chunk_from_pymupdf_json(
+            parsed_doc,
+            tenant,
+            content_hash,
+            project_id,
+            max_chars=max_chars,
+        )
+    return chunk_from_blocks(
+        parsed_doc,
+        tenant,
+        content_hash,
+        project_id,
+        max_chars=max_chars,
+    )
+
+
 def _chunk_from_blocks_doc(
     blocks_doc: dict[str, Any],
     tenant: str,
@@ -103,7 +130,7 @@ def _chunk_from_blocks_doc(
     *,
     max_chars: int,
 ) -> list:
-    return chunk_from_blocks(
+    return _chunk_parsed_doc(
         blocks_doc,
         tenant,
         content_hash,
@@ -160,7 +187,7 @@ def _ingest_pdf(
     parsed_text = ""
     ocr_attempted = False
     parse_backend = ParseBackend.PYMUPDF4LLM
-    blocks_doc: dict[str, Any] | None = None
+    parsed_doc: dict[str, Any] | None = None
 
     if settings.ocr_force:
         if not ocr_available:
@@ -186,7 +213,7 @@ def _ingest_pdf(
             )
             parse_backend = ParseBackend.VL_OCR
             ocr_attempted = True
-            blocks_doc = _blocks_from_markdown(parsed_text, settings)
+            parsed_doc = _blocks_from_markdown(parsed_text, settings)
         except Exception as ocr_exc:
             _record_dead_letter(
                 store,
@@ -225,7 +252,7 @@ def _ingest_pdf(
             parse_backend = ParseBackend.VL_OCR
             ocr_attempted = True
             fallback_reason = "scan"
-            blocks_doc = _blocks_from_markdown(parsed_text, settings)
+            parsed_doc = _blocks_from_markdown(parsed_text, settings)
         except Exception as ocr_exc:
             _record_dead_letter(
                 store,
@@ -241,15 +268,15 @@ def _ingest_pdf(
             raise ParseError(str(ocr_exc)) from ocr_exc
     else:
         try:
-            blocks_doc = parse_pdf_to_blocks(data)
+            parsed_doc = parse_pdf_to_json(data)
             parse_backend = ParseBackend.PYMUPDF4LLM
             if ocr_available:
-                blocks_doc = enrich_image_block_captions(
-                    blocks_doc, data, settings=settings
+                parsed_doc = enrich_image_block_captions(
+                    parsed_doc, data, settings=settings
                 )
         except Exception as exc:
             parse_error = str(exc)
-            blocks_doc = {"blocks": [], "extractor": "pymupdf4llm"}
+            parsed_doc = {"pages": [], "page_count": 0}
             if not ocr_available:
                 _record_dead_letter(
                     store,
@@ -259,8 +286,8 @@ def _ingest_pdf(
                 )
                 raise ParseError(parse_error) from exc
 
-        chunks = _chunk_from_blocks_doc(
-            blocks_doc,
+        chunks = _chunk_parsed_doc(
+            parsed_doc,
             tenant,
             content_hash,
             meta["project_id"],
@@ -284,7 +311,7 @@ def _ingest_pdf(
                 )
                 parse_backend = backend
                 ocr_attempted = True
-                blocks_doc = _blocks_from_markdown(parsed_text, settings)
+                parsed_doc = _blocks_from_markdown(parsed_text, settings)
             except Exception as ocr_exc:
                 err = {
                     "stage": "ocr_empty",
@@ -296,9 +323,9 @@ def _ingest_pdf(
                 _record_dead_letter(store, tenant, content_hash, err)
                 raise ParseError(str(ocr_exc)) from ocr_exc
 
-    assert blocks_doc is not None
-    chunks = _chunk_from_blocks_doc(
-        blocks_doc,
+    assert parsed_doc is not None
+    chunks = _chunk_parsed_doc(
+        parsed_doc,
         tenant,
         content_hash,
         meta["project_id"],
@@ -320,7 +347,7 @@ def _ingest_pdf(
         store,
         tenant,
         doc_id,
-        blocks_doc,
+        parsed_doc,
         markdown=parsed_text or None,
     )
     meta_payload: dict[str, Any] = {
@@ -328,9 +355,12 @@ def _ingest_pdf(
         "parsed_key": parsed_key,
         "chunk_count": len(chunks),
         "parse_backend": parse_backend.value,
-        "blocks_extractor": blocks_doc.get("extractor"),
         "pdf_kind": pdf_kind.value,
     }
+    if is_pymupdf_json_document(parsed_doc):
+        meta_payload["content_format"] = "pymupdf4llm_json"
+    else:
+        meta_payload["blocks_extractor"] = parsed_doc.get("extractor")
     if fallback_reason:
         meta_payload["fallback_reason"] = fallback_reason
 

@@ -140,8 +140,8 @@ def test_ingest_empty_digital_triggers_ocr_fallback(local_store, monkeypatch):
     monkeypatch.setenv("OCR_LLM_MODEL", "test-model")
 
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_pdf_to_blocks",
-        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
+        "path_graph.steps.ingest.parse_pdf_to_json",
+        lambda data: {"pages": [], "page_count": 0},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",
@@ -172,8 +172,8 @@ def test_ingest_ocr_fallback_still_empty_records_dead_letter(local_store, monkey
     monkeypatch.setenv("OCR_LLM_MODEL", "test-model")
 
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_pdf_to_blocks",
-        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
+        "path_graph.steps.ingest.parse_pdf_to_json",
+        lambda data: {"pages": [], "page_count": 0},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",
@@ -208,8 +208,8 @@ def test_ingest_item_returns_false_when_chunks_empty_after_fallback(local_store,
     store.put_bytes(raw_key, _minimal_pdf_bytes())
 
     monkeypatch.setattr(
-        "path_graph.steps.ingest.parse_pdf_to_blocks",
-        lambda data: {"blocks": [], "extractor": "pymupdf4llm"},
+        "path_graph.steps.ingest.parse_pdf_to_json",
+        lambda data: {"pages": [], "page_count": 0},
     )
     monkeypatch.setattr(
         "path_graph.steps.ingest.vl_ocr_pdf_to_markdown",
