@@ -141,3 +141,76 @@ def test_agent_bundle_imports_and_reads_prompt(
     paths_key = next(k for k in sys.modules if k.endswith(f".{package_name}.paths"))
     read_prompt = getattr(sys.modules[paths_key], "read_prompt")
     assert needle in read_prompt(prompt_file).lower()
+
+
+@pytest.mark.parametrize("agent_name,package_name,entrypoint,prompt_file,needle", AGENT_CASES)
+def test_agent_package_has_no_runtime_absolute_self_imports(
+    agent_name: str,
+    package_name: str,
+    entrypoint: str,
+    prompt_file: str,
+    needle: str,
+) -> None:
+    """BundleLoader only rewrites absolute imports during module exec.
+
+    Function-body ``from <package>.X import ...`` fails at invoke time with
+    ``No module named '<package>'`` because the checksum namespace is not on
+    ``sys.path``. Keep self-imports at module top level (or relative).
+    """
+    pkg_root = _agent_src(agent_name) / package_name
+    for path in sorted(pkg_root.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for child in ast.walk(node):
+                if isinstance(child, ast.ImportFrom) and child.module:
+                    if child.module == package_name or child.module.startswith(
+                        f"{package_name}."
+                    ):
+                        pytest.fail(
+                            f"{path.relative_to(REPO_ROOT)}:{child.lineno} "
+                            f"runtime absolute import {child.module!r} "
+                            f"inside {node.name}()"
+                        )
+                if isinstance(child, ast.Import):
+                    for alias in child.names:
+                        if alias.name == package_name or alias.name.startswith(
+                            f"{package_name}."
+                        ):
+                            pytest.fail(
+                                f"{path.relative_to(REPO_ROOT)}:{child.lineno} "
+                                f"runtime absolute import {alias.name!r} "
+                                f"inside {node.name}()"
+                            )
+
+
+def test_graph_extractor_batching_works_under_bundle_loader(bundle_loader, tmp_path) -> None:
+    """Regression: lazy imports in batching.py broke agent:compiled_graph invoke."""
+    BundleLoader, SourceMeta = bundle_loader
+    agent_name = "graph-extractor"
+    package_name = "graph_extractor"
+    bundle_bytes = _zip_src_dir(_agent_src(agent_name))
+    zip_path = tmp_path / "bundle.zip"
+    zip_path.write_bytes(bundle_bytes)
+    checksum = "sha256:" + hashlib.sha256(bundle_bytes).hexdigest()
+    meta = SourceMeta(
+        kind="agent",
+        name=agent_name,
+        version="test",
+        runtime_pool="agent:compiled_graph",
+        entrypoint="graph_extractor.agent:factory",
+        bundle_uri=f"file://{zip_path}",
+        checksum=checksum,
+    )
+    loader = BundleLoader(cache_dir=str(tmp_path / "cache"), max_entries=4)
+    assert callable(loader.load(meta))
+
+    batching_key = next(k for k in sys.modules if k.endswith(f".{package_name}.batching"))
+    batching = sys.modules[batching_key]
+    batches = batching.split_chunk_batches([{"text": "alpha"}, {"text": "beta"}], max_batch_chars=100)
+    assert batches == ["alpha\n\nbeta"]
+    merged = batching.merge_graph_parts(
+        [{"entities": [{"id": "e1", "name": "E1"}], "edges": []}]
+    )
+    assert merged["entities"][0]["id"] == "e1"

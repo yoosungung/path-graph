@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 
+from graph_extractor.text_sanitize import sanitize_chunk_text, sanitize_graph_v1
+
 DEFAULT_MAX_BATCH_CHARS = 4_000
 DEFAULT_MAX_COMPLETION_TOKENS = 4_096
 DEFAULT_MIN_SPLIT_CHARS = 400
@@ -155,8 +157,6 @@ def split_chunk_line_groups(
 
 def split_chunk_batches(lines: list[dict], *, max_batch_chars: int) -> list[str]:
     """Group chunk texts into batches that fit the LLM context budget."""
-    from graph_extractor.text_sanitize import sanitize_chunk_text
-
     batches: list[str] = []
     parts: list[str] = []
     total = 0
@@ -176,8 +176,6 @@ def split_chunk_batches(lines: list[dict], *, max_batch_chars: int) -> list[str]
 
 
 def merge_graph_parts(parts: list[dict]) -> dict:
-    from graph_extractor.text_sanitize import sanitize_graph_v1
-
     entities: list[dict] = []
     edges: list[dict] = []
     seen_entity_ids: set[str] = set()
