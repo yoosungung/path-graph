@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib
 import io
 import sys
 import zipfile
@@ -65,6 +66,32 @@ def _zip_src_dir(src_dir: Path) -> bytes:
                 continue
             zf.write(path, str(path.relative_to(src_dir)))
     return buf.getvalue()
+
+
+@pytest.mark.parametrize("agent_name,package_name,entrypoint,prompt_file,needle", AGENT_CASES)
+def test_agent_bundle_zip_is_directly_importable(
+    tmp_path,
+    agent_name: str,
+    package_name: str,
+    entrypoint: str,
+    prompt_file: str,
+    needle: str,
+) -> None:
+    zip_path = tmp_path / f"{agent_name}.zip"
+    zip_path.write_bytes(_zip_src_dir(_agent_src(agent_name)))
+    for mod in list(sys.modules):
+        if mod == package_name or mod.startswith(f"{package_name}."):
+            sys.modules.pop(mod)
+    sys.path.insert(0, str(zip_path))
+    try:
+        module_name, attr_name = entrypoint.split(":", 1)
+        module = importlib.import_module(module_name)
+        assert callable(getattr(module, attr_name))
+    finally:
+        sys.path.remove(str(zip_path))
+        for mod in list(sys.modules):
+            if mod == package_name or mod.startswith(f"{package_name}."):
+                sys.modules.pop(mod)
 
 
 @pytest.fixture
